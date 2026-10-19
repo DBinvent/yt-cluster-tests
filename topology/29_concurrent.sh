@@ -294,7 +294,7 @@ hot_case() {
 hot_case C11 cw 1
 settle "C11"
 # C14: the same, committed the way an ordinary client commits - a plain COMMIT,
-# which yaxaha.auto_complete (default on) turns into the cluster commit: the
+# which yt_cluster.auto_complete (default on) turns into the cluster commit: the
 # party PREPAREs at the commit's start, the origin commits, the party COMMITs
 # PREPARED after it.
 hot_case C14 cwc 11

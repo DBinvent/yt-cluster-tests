@@ -1,6 +1,6 @@
 # Single-node pgbench — TPS per CPU TFLOPS
 
-One plain PostgreSQL per host, no cluster, no `yaxaha` extension. The question:
+One plain PostgreSQL per host, no cluster, no `yt-cluster` extension. The question:
 **how much throughput does each machine's CPU capacity buy, and how much of
 that is the per-commit fsync?** The table reports pgbench TPS twice per node —
 `synchronous_commit=on` (the default) and `=off` (bench session only) — beside

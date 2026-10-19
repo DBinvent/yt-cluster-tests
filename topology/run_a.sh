@@ -6,7 +6,7 @@
 #
 # Failure policy is PLAN.md §4a: **record and carry on**. A red script does not
 # stop the run, because one complete coverage picture is worth more than an
-# early exit, and nothing here changes ytserv or yxctl mid-run.
+# early exit, and nothing here changes ytserv or ytctl mid-run.
 cd "$(dirname "$0")"
 LOG="${YX_LOG:-/tmp/yxtopo-run-a.log}"
 

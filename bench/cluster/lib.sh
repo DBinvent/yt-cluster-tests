@@ -12,7 +12,7 @@ BENCH_ROLE_CMD=${BENCH_ROLE_CMD:-"sudo -n -u postgres"}
 BENCH_PGPORT=${BENCH_PGPORT:-5432}
 # How a nodes1 transaction gets completed into the cluster:
 #   BENCH_VIA_PGBOUNCER=0 (default) — connect direct; the extension's
-#       `yaxaha.auto_complete` GUC (default on) fires yt_complete at
+#       `yt_cluster.auto_complete` GUC (default on) fires yt_complete at
 #       PRE_COMMIT, so a plain COMMIT is a cluster commit. No PgBouncer.
 #   BENCH_VIA_PGBOUNCER=1 — legacy path: drive the load through a patched
 #       PgBouncer so a bare COMMIT is turned into `yt_complete(true); COMMIT`
@@ -20,7 +20,7 @@ BENCH_PGPORT=${BENCH_PGPORT:-5432}
 BENCH_VIA_PGBOUNCER=${BENCH_VIA_PGBOUNCER:-0}
 BENCH_PGB_HOST=${BENCH_PGB_HOST:-127.0.0.1}
 BENCH_PGB_PORT=${BENCH_PGB_PORT:-6432}
-BENCH_REMOTE_DIR=${BENCH_REMOTE_DIR:-/tmp/yaxaha_bench}
+BENCH_REMOTE_DIR=${BENCH_REMOTE_DIR:-/tmp/yt_cluster_bench}
 BENCH_ERR=${BENCH_ERR:-"$HERE/results/error.msg"}
 BENCH_SCHEMA=${BENCH_SCHEMA:-public}
 BENCH_YTSERVER_RESTART=${BENCH_YTSERVER_RESTART:-"sudo -n systemctl restart ytserver"}

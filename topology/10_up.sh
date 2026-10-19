@@ -59,7 +59,7 @@ for n in "${NODES[@]}"; do
 	sql+="insert into $YX_CFG (name,module,value) values ('serve_etcd','C','true');"
 	# [peering] ONE cluster uuid, shared by every node.
 	#
-	# Left unset - which is what `yxctl --batch` produces and what this fixture
+	# Left unset - which is what `ytctl --batch` produces and what this fixture
 	# did - each node calls `Uuid::new_v4()` for its own cluster id, peering
 	# compares those and refuses every peer, and the embedded etcd is a kv of
 	# one per node. Nothing said so; the only trace was a `wrong cluster` line
@@ -101,7 +101,7 @@ for n in "${NODES[@]}"; do rh "docker restart $n >/dev/null"; done
 sleep 25
 
 # [cfgsync] The config table's OWN trigger, installed only once ytserv answers -
-# the same post-start step `yxctl --batch` now performs (actions/config_trigger.rs).
+# the same post-start step `ytctl --batch` now performs (actions/config_trigger.rs).
 # Without it a config change reaches one node and only at its next restart.
 #
 # This is the ONE registration that cannot use yt_setup, and it is the origin of

@@ -54,8 +54,8 @@ YX_IMAGE="${YX_HIER_IMAGE:-yxhier-node}"
 # [skv] node <n>'s app key: its own (skv-secrets.md H7). A hierarchy runs on the
 # secret store (H2), and the store needs every node's app key: the fixture always
 # has them - YX_HIER_SECRET picks the prefix. ../topology/skv_lib.sh asks it for
-# every yxctl call it makes on a node.
-YX_HIER_SECRET="${YX_HIER_SECRET:-yaxaha-hier-fixture}"
+# every ytctl call it makes on a node.
+YX_HIER_SECRET="${YX_HIER_SECRET:-yt-cluster-hier-fixture}"
 secret_of() { printf '%s' "${YX_HIER_SECRET:+$YX_HIER_SECRET-$1}"; }
 # [skv] and from 15_store.sh on every cluster stays on the store and TLS: a restart
 # (restart_all) wipes the cluster WAL but keeps each node's key - wiped, the node

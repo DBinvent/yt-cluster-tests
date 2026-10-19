@@ -73,7 +73,7 @@ for n in "${NODES[@]}"; do
 	        values (\$fn\$$FN\$fn\$, 'na', 'public.skv_t', '', true, true, 'fn_secret');" >/dev/null
 	cfg_write "$n" serve_rppd C true
 done
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'on_commit_python' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'on_commit_python' | tail -1)"
 [ -n "$CFG" ] || { bad "--encode-table-cfg 'on_commit_python' produced nothing"; summary; }
 register_table public.skv_t "$CFG"
 # ytserv reads the A row and rppd_function at startup

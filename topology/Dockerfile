@@ -1,4 +1,4 @@
-# [topology] One cluster node: PostgreSQL 18 + the yaxaha extension + ytserv.
+# [topology] One cluster node: PostgreSQL 18 + the yt_cluster extension + ytserv.
 #
 # Docker rather than LXC, measured on the docker host: ~60 MB/node here against ~70 MB for
 # an LXC container running only systemd, before PostgreSQL. A system container
@@ -49,14 +49,14 @@ https://apt.postgresql.org/pub/repos/apt noble-pgdg main" > /etc/apt/sources.lis
 RUN pip3 install --quiet --no-cache-dir --break-system-packages clickhouse_connect ballista \
     && python3 -c 'import psycopg2, etcd3, clickhouse_connect, ballista'
 
-# The deb is built on the dev host and carries yxctl, ytserv, the PG18 .so and
+# The deb is built on the dev host and carries ytctl, ytserv, the PG18 .so and
 # the vendored libpython. Nothing is compiled in here - same rule as a real node.
 #
 # `apt-get install ./file.deb`, not `dpkg -i`: the deb's Depends name libcurl4
 # and libpq-dev, and dpkg cannot pull them - it unpacks, fails, and the follow-up
 # `apt -f install` REMOVES the package again, leaving an image that builds
 # cleanly and contains nothing.
-COPY yaxaha.deb /tmp/yaxaha.deb
+COPY yt-cluster.deb /tmp/yt-cluster.deb
 # libexpat1 is NOT in the deb's Depends but the vendored libpython3.12 links it,
 # so ytserv exits 127 at startup on a minimal image. A real node happens to have
 # it pulled in by something else; a container has only what is asked for.
@@ -66,31 +66,31 @@ COPY yaxaha.deb /tmp/yaxaha.deb
 # Found`, on an image that had built fine for weeks. The layer that installs must
 # refresh the index it installs against, or the build has a silent expiry date.
 RUN apt-get update -q \
-    && apt-get install -qy /tmp/yaxaha.deb libexpat1 \
-    && rm -f /tmp/yaxaha.deb && rm -rf /var/lib/apt/lists/*
+    && apt-get install -qy /tmp/yt-cluster.deb libexpat1 \
+    && rm -f /tmp/yt-cluster.deb && rm -rf /var/lib/apt/lists/*
 # The python stdlib the deb now REQUIRES has to actually be there, or server
 # functions fail at the first dispatch with `init_fs_encoding` - which is the
 # whole reason for the dependency. Fail the build instead.
 RUN test -f /usr/lib/python3.12/encodings/__init__.py
 # Fail the BUILD, not the first test run, if anything is still unresolved.
 RUN ldconfig \
-    && test -f /usr/local/bin/yaxaha/ytserv \
-    && ! ldd /usr/local/bin/yaxaha/ytserv | grep -q "not found"
+    && test -f /usr/local/bin/yt-cluster/ytserv \
+    && ! ldd /usr/local/bin/yt-cluster/ytserv | grep -q "not found"
 
 # The extension has to sit in PostgreSQL's own directories; on a real node
-# `yxctl --batch` does this copy. Here it is baked into the image so N
+# `ytctl --batch` does this copy. Here it is baked into the image so N
 # containers share the layer.
-RUN cp /usr/local/include/yaxaha/yaxaha0_5-pg18-glibc2_39.so \
-       "$(pg_config --pkglibdir)/yaxaha.so" \
-    && cp /usr/local/include/yaxaha/yaxaha.control \
-          /usr/local/include/yaxaha/yaxaha--0.5.sql \
+RUN cp /usr/local/include/yt-cluster/yt_cluster0_5-pg18-glibc2_39.so \
+       "$(pg_config --pkglibdir)/yt_cluster.so" \
+    && cp /usr/local/include/yt-cluster/yt_cluster.control \
+          /usr/local/include/yt-cluster/yt_cluster--0.5.sql \
        "$(pg_config --sharedir)/extension/"
 
 # The cluster WAL directory. pg_basebackup does not copy it and neither does
-# any package - on a real node `yxctl --batch` creates it, so a container has to
+# any package - on a real node `ytctl --batch` creates it, so a container has to
 # do the same or ytserv exits 16 on first write.
-RUN mkdir -p /var/yaxaha /var/log/yaxaha \
-    && chown postgres:postgres /var/yaxaha /var/log/yaxaha
+RUN mkdir -p /var/yt-cluster /var/log/yt-cluster \
+    && chown postgres:postgres /var/yt-cluster /var/log/yt-cluster
 
 COPY node-entrypoint.sh /usr/local/bin/node-entrypoint.sh
 COPY pg_setup.sql /opt/pg_setup.sql

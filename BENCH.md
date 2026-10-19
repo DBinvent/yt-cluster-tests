@@ -1,4 +1,4 @@
-# pgbench plan — single Postgres vs. a YaXAHA cluster
+# pgbench plan — single Postgres vs. a YT Cluster
 
 A ToDo, not a result. **None of §1's matrix has been run.** The only
 measurements on disk are the three calibration anchors in
@@ -25,7 +25,7 @@ Reporting one without the other is what makes a benchmark an advertisement.
 
 **Up to 10 hardware nodes.** That changes what this benchmark can answer.
 On one 4-core box a three-node run is nine processes fighting for four cores
-and a flat scale curve says nothing about YaXAHA; on ten machines the curve
+and a flat scale curve says nothing about YT Cluster; on ten machines the curve
 is real, and the interesting part — *where it bends, and why* — becomes
 measurable rather than arguable.
 
@@ -40,7 +40,7 @@ before measuring the database.
       not less — the roster has to be generated per host anyway.
 - [ ] **Record the rig, once, in the results header.** Per node: CPU model
       and core count, RAM, disk (model, and whether it has a write cache),
-      PostgreSQL version, `yaxaha` version, kernel.
+      PostgreSQL version, `yt-cluster` version, kernel.
 - [ ] **Say whether Alloy was scraping.** Since 2026-08-27 this host ships
       its own metrics to Grafana Cloud: one `alloy.service`, 15 targets,
       30s interval, ~80MB RSS (see `../raw/grafana.md`). Small, but it is on
@@ -128,7 +128,7 @@ reason without:
 
 | id | what | why it exists |
 |---|---|---|
-| `S1` | plain Postgres, no `yaxaha` extension | the baseline everyone compares to |
+| `S1` | plain Postgres, no `yt-cluster` extension | the baseline everyone compares to |
 | `S1x` | plain Postgres, extension installed, **no peers** | separates the *trigger and WAL* overhead from the *replication* cost. Without it, every millisecond gets blamed on the network |
 | `C1` | one-node cluster, `ytserv` running | the synchronisation tax with nothing to synchronise *to* — the floor of the protocol's own cost |
 | `CN` | N-node cluster, **N ∈ {2, 3, 5, 7, 10}**, load split per node | the scale factor, and where it stops |
@@ -211,7 +211,7 @@ END;
       synchronisation rather than the disk. Record both settings.
 - [ ] Identical `postgresql.conf` across configurations —
       `shared_buffers`, `max_connections`, `wal_level`, `synchronous_commit`,
-      `fsync`. If `yaxaha` requires a different value for any of them, that
+      `fsync`. If `yt-cluster` requires a different value for any of them, that
       difference *is* part of the tax and belongs in the writeup, not
       silently in the config.
 - [ ] `-T 300 -P 5`, not `-t`: a fixed transaction count finishes at
@@ -244,7 +244,7 @@ END;
 | host | per-container CPU and IO (`docker stats` sampled, or `pidstat 1`) |
 
 The CPU column is not decoration: on 4 cores it is what tells you whether a
-flat scale curve is YaXAHA's ceiling or the host's.
+flat scale curve is YT Cluster's ceiling or the host's.
 
 ## 5. The final check — do the nodes agree?
 
@@ -375,7 +375,7 @@ CREATE TABLE bench.run (
   net_tx_bytes  bigint,               -- /proc/net/dev delta
   net_rx_bytes  bigint,
   cpu_pct       numeric,
-  host          jsonb                 -- cpu, ram, disk, pg version, yaxaha version
+  host          jsonb                 -- cpu, ram, disk, pg version, yt-cluster version
 );
 
 -- One row per `-P 5` progress line: the shape of a run, not just its number.

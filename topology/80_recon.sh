@@ -18,7 +18,7 @@ done
 
 # rows=1 so a single write makes the table due on the next poll; repair mode so
 # a losing node rewrites itself rather than only reporting
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
 echo "  recon config: $CFG"
 # register_table, not yt_setup: yt_setup creates the trigger and writes the
 # module-A row in ONE transaction, and on a node whose config table is synced

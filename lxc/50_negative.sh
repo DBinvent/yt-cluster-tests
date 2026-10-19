@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Negative and repeat-install paths of `yxctl --batch` / `--purge`. Runs after
+# Negative and repeat-install paths of `ytctl --batch` / `--purge`. Runs after
 # 30_purge.sh (any configured or purged state will do) and before 90_destroy.sh.
 #
 #   L5  --batch with a database that does not exist, and with PostgreSQL stopped:
@@ -16,7 +16,7 @@
 #       extension, its tables in its own config table, and participates;
 #       --purge --drop-extension drops the extension in every database.
 #
-# Every yxctl run is wrapped in `timeout`, so a hang is a FAIL (exit 124/137),
+# Every ytctl run is wrapped in `timeout`, so a hang is a FAIL (exit 124/137),
 # not a stuck nightly. Every check prints OK:/FAIL: and the script carries on; it
 # exits 1 when any failed. A precondition that does not hold is a FAIL, never a
 # skip.
@@ -31,19 +31,19 @@ bad() { echo "  FAIL: $1" >&2; failed=$((failed + 1)); }
 check() { local d="$1"; shift; if "$@"; then ok "$d"; else bad "$d"; fi; }
 
 UNIT=/lib/systemd/system/ytserver.service
-YT_LOGS="/var/log/yaxaha/ytserver.log /var/log/yaxaha/ytserver_error.log"
+YT_LOGS="/var/log/yt-cluster/ytserver.log /var/log/yt-cluster/ytserver_error.log"
 OUT="$(mktemp)"
 trap 'rm -f "$OUT"' EXIT
 
 db_url() { echo "postgresql://postgres@localhost/$1?host=/var/run/postgresql"; }
 
-# yx <secs> <yxctl args...>: yxctl in the container under `timeout`; its output is
+# yx <secs> <ytctl args...>: ytctl in the container under `timeout`; its output is
 # shown (indented, so it cannot be read as an OK:/FAIL: line) and kept in $OUT.
-# Returns yxctl's exit status: 124, or 137 after the kill, means it hung.
+# Returns ytctl's exit status: 124, or 137 after the kill, means it hung.
 yx() {
 	local secs="$1" rc; shift
-	echo "  \$ yxctl $*"
-	xc timeout -k 10 "$secs" yxctl "$@" >"$OUT" 2>&1
+	echo "  \$ ytctl $*"
+	xc timeout -k 10 "$secs" ytctl "$@" >"$OUT" 2>&1
 	rc=$?
 	sed 's/^/    | /' "$OUT"
 	return $rc
@@ -75,7 +75,7 @@ fresh_db() {
 purge() {
 	local rc
 	yx 120 --purge default; rc=$?
-	check "$1: yxctl --purge default exits 0 (exit $rc)" [ "$rc" -eq 0 ]
+	check "$1: ytctl --purge default exits 0 (exit $rc)" [ "$rc" -eq 0 ]
 	check "$1: no ytserver unit after the purge" unit_absent
 }
 
@@ -98,7 +98,7 @@ log_since() {
 
 # write_row <db> <id> <value>: an INSERT into public.yx_l2_t, a table with the
 # extension's zytsync_ trigger - so it goes through yt_synchronize and commits as
-# a cluster commit (yaxaha.auto_complete). Retried over ytserv's start-up window;
+# a cluster commit (yt_cluster.auto_complete). Retried over ytserv's start-up window;
 # every error is kept in $WERR, the last one in $WOUT.
 WERR=""; WOUT=""
 write_row() {
@@ -146,13 +146,13 @@ check "L5: PostgreSQL is back after the restart" wait_pg
 # Its own database and a fixed node uuid (-i), the same for both installs: a
 # re-install keeps the node's identity (as a host-derived --peers uuid does), and
 # the database a purge leaves alone is then consistent with it - the one stale
-# thing is the cluster WAL. /var/yaxaha is cleared HERE, before the first install,
+# thing is the cluster WAL. /var/yt-cluster is cleared HERE, before the first install,
 # only so that this half starts clean; the purge in part 2 is what is under test.
 echo "-- L2: install, take a write, purge, install again on the same container"
 L2_DB=yx_l2
 L2_NODE="$(xc cat /proc/sys/kernel/random/uuid)"
 check "L2: fresh database $L2_DB" fresh_db "$L2_DB"
-xc rm -rf /var/yaxaha
+xc rm -rf /var/yt-cluster
 yx 600 -v --batch -t "$YX_TARGET" -i "$L2_NODE" --db "$(db_url "$L2_DB")"; rc=$?
 check "L2: first install exits 0 (exit $rc)" [ "$rc" -eq 0 ]
 check "L2: ytserver active after the first install" wait_active
@@ -204,7 +204,7 @@ else
 fi
 check "L2: ...and the row reads back" \
 	test "$(pgq "$L2_DB" "select v from public.yx_l2_t where id = 2")" = "after-purge"
-# The stale-WAL symptom: it shows when the purge left /var/yaxaha behind
+# The stale-WAL symptom: it shows when the purge left /var/yt-cluster behind
 # (30_purge.sh checks that it does not).
 newlog="$(log_since "$offs")"
 check "L2: the ytserv log has lines since the re-install (what the next check reads)" test -n "$newlog"
@@ -215,18 +215,18 @@ check "L2: no 'Sub-term ... already exists' in the ytserv log or the writes sinc
 # ── L3: --peers, --cluster and a bare --bind address ────────────────────────
 #
 # A bare `--bind <ip>` gets the default port, like a --peers line
-# (yxctl/src/actions/config.rs bind_with_port): the node's own N-row is ip:7421.
+# (ytctl/src/actions/config.rs bind_with_port): the node's own N-row is ip:7421.
 echo "-- L3: --batch --peers <two names> --cluster <uuid> --bind <bare ip>"
 purge "L3"
 L3_DB=yx_l3
 check "L3: fresh database $L3_DB" fresh_db "$L3_DB"
-xc rm -rf /var/yaxaha
+xc rm -rf /var/yt-cluster
 IP="$(xc hostname -I | tr ' ' '\n' | grep -E '^[0-9]+(\.[0-9]+){3}$' | head -1)"
 check "L3: the container has an IPv4 address to bind" test -n "$IP"
 L3_CLUSTER="$(xc cat /proc/sys/kernel/random/uuid)"
 xc bash -c 'printf "%s\n" yx-peer-a.invalid yx-peer-b.invalid > /tmp/yx-peers'
-# the node's own uuid as yxctl derives it with --peers and no -i: uuid v5 of the
-# bind host in YAXAHA_NS (yxctl/src/consts.rs node_uuid)
+# the node's own uuid as ytctl derives it with --peers and no -i: uuid v5 of the
+# bind host in YT_CLUSTER_NS (ytctl/src/consts.rs node_uuid)
 SELF="$(python3 -c "import uuid,sys; print(uuid.uuid5(uuid.UUID('6a9f5c2e-1b3d-5e47-9a08-0bf99b3e0275'), sys.argv[1]))" "$IP" 2>/dev/null)"
 check "L3: the node's derived uuid computed (python3 on the test host)" test -n "$SELF"
 yx 600 -v --batch -t "$YX_TARGET" --db "$(db_url "$L3_DB")" \
@@ -245,7 +245,7 @@ check "L3: ytserver active after the install (a bind address without a port woul
 
 # ── L6: --users-db ──────────────────────────────────────────────────────────
 #
-# [dbreg] A users database beside the catalog (yt-pgxt combined-config.md, yxctl
+# [dbreg] A users database beside the catalog (yt-pgxt combined-config.md, ytctl
 # README "Users databases"). A missing one exits 33 without hanging - never
 # created here; an existing one gets the extension, its tables registered in its
 # OWN config table (none of the extension's), and ytserv replicates it
@@ -258,7 +258,7 @@ L6_APP=yx_l6_app
 L6_MISSING=yx_l6_missing
 check "L6: fresh database $L6_DB" fresh_db "$L6_DB"
 pgq postgres "drop database if exists $L6_MISSING with (force)" >/dev/null
-xc rm -rf /var/yaxaha
+xc rm -rf /var/yt-cluster
 yx 600 -v --batch -t "$YX_TARGET" --db "$(db_url "$L6_DB")" --users-db "$L6_MISSING"; rc=$?
 check "L6: --users-db naming a missing database exits 33 without hanging (exit $rc)" [ "$rc" -eq 33 ]
 check "L6: ...and its message names it" grep -q "$L6_MISSING" "$OUT"
@@ -267,11 +267,11 @@ purge "L6b"
 check "L6: fresh database $L6_DB" fresh_db "$L6_DB"
 check "L6: fresh users database $L6_APP" fresh_db "$L6_APP"
 pgq "$L6_APP" "create table public.yx_l6_t (id int primary key, v text)" >/dev/null
-xc rm -rf /var/yaxaha
+xc rm -rf /var/yt-cluster
 yx 600 -v --batch -t "$YX_TARGET" --db "$(db_url "$L6_DB")" --users-db "$L6_APP" --tables 'public.%'; rc=$?
 check "L6: install with --users-db $L6_APP exits 0 (exit $rc)" [ "$rc" -eq 0 ]
 check "L6: the extension in $L6_APP" \
-	test "$(pgq "$L6_APP" "select count(*) from pg_extension where extname = 'yaxaha'")" = "1"
+	test "$(pgq "$L6_APP" "select count(*) from pg_extension where extname = 'yt_cluster'")" = "1"
 check "L6: yx_l6_t registered in $L6_APP's own config table" \
 	test "$(pgq "$L6_APP" "select count(*) from public.yt_config where module = 'A' and name = 'public.yx_l6_t'")" = "1"
 check "L6: ...with its sync trigger" \
@@ -281,8 +281,8 @@ check "L6: none of the extension's own tables registered there" \
 check "L6: its config table keyed by (module, name)" \
 	test "$(pgq "$L6_APP" "select count(*) from pg_index i join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any(i.indkey) where i.indrelid = 'public.yt_config'::regclass and i.indisprimary and a.attname in ('module', 'name')")" = "2"
 # ytserv takes the database in by itself, not at once: the announce (yt_info('U+'),
-# made by the extension's script and by yxctl) has a pass probe it every second for
-# 30 s - yxctl says "does not replicate ... yet" when it is not in by its end
+# made by the extension's script and by ytctl) has a pass probe it every second for
+# 30 s - ytctl says "does not replicate ... yet" when it is not in by its end
 for _ in $(seq 1 20); do
 	u="$(pgq "$L6_DB" "select x.value from json_to_recordset(yt_info('U')) as x(name text, value text) where x.name = '$L6_APP'")"
 	[ "${u%% *}" = "participant" ] && break
@@ -292,9 +292,9 @@ check "L6: ytserv replicates $L6_APP within the announce's 30 s (yt_info('U'): $
 yx 120 --purge default --drop-extension -d "$L6_DB"; rc=$?
 check "L6: --purge default --drop-extension exits 0 (exit $rc)" [ "$rc" -eq 0 ]
 check "L6: ...the extension is gone from $L6_APP" \
-	test "$(pgq "$L6_APP" "select count(*) from pg_extension where extname = 'yaxaha'")" = "0"
+	test "$(pgq "$L6_APP" "select count(*) from pg_extension where extname = 'yt_cluster'")" = "0"
 check "L6: ...and from $L6_DB" \
-	test "$(pgq "$L6_DB" "select count(*) from pg_extension where extname = 'yaxaha'")" = "0"
+	test "$(pgq "$L6_DB" "select count(*) from pg_extension where extname = 'yt_cluster'")" = "0"
 check "L6: ...and the purge stopped ytserver" svc_inactive
 
 if [ "$failed" -gt 0 ]; then

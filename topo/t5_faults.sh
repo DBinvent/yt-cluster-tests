@@ -18,7 +18,7 @@ C=west
 . "$(dirname "$0")/lib.sh"
 topo_log t5
 for c in "${CLUSTERS[@]}"; do [ -s "$RUN/members.$c" ] || die "no $RUN/members.$c - run ../rmc/up.sh first"; done
-say "== topo T5 $(now) UTC, yaxaha $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yaxaha 2>/dev/null), cluster $C: $(members $C)"
+say "== topo T5 $(now) UTC, yt-cluster $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yt-cluster 2>/dev/null), cluster $C: $(members $C)"
 RMC_WAIT=${RMC_WAIT:-120}
 
 cfgval() { QT=20 q "$1" -c "select value from $CFG where module = '$2' and name = '$3'" 2>/dev/null; }
@@ -163,6 +163,13 @@ docker restart -t 5 "$(cname "$X2")" >/dev/null
 job_wait 300 "$f" "$s" done "J5 the split that lost a node of its zone during the cut done"
 XU=$(job_get "$f" "$s" reason | sed -n 's/.*is cluster \([0-9a-f-]*\) now.*/\1/p')
 for n in $X1 $X2; do check "J5 $n names westx's cluster" "$XU" "$(cfgval "$n" C cluster)"; done
+# the config a switch installed is the new cluster's alone: what west still sent
+# before the restart - its link rows, deleting the leaving nodes' N rows - landed
+# in it, and westx came up with no roster (the nightly of 2026-10-18)
+for n in $X1 $X2; do
+    check "J5 $n holds its own N row in westx" 1 "$(QT=20 q "$n" -c "select count(*) from $CFG where module = 'N' and name = '$(node_uuid "$n")'")"
+    check "J5 $n's catalogue does not name westx itself" "" "$(cfgval "$n" Z westx.level)"
+done
 wait_for 120 leader_among "$X1" "$X2" && XL=$(leader_among "$X1" "$X2") || XL=""
 [ -n "$XL" ] && ok "J5 westx elects $XL" || bad "J5 westx elects a leader"
 cwrite "$L" "insert into topo_s2 values (21, 'down')" >/dev/null || bad "write topo_s2 in west"
@@ -179,6 +186,11 @@ wait_for 300 named "$X1" "$WUUID" && wait_for 60 named "$X2" "$WUUID" \
     && ok "J5 the combine that lost its leader moved both nodes to west" || bad "J5 both name west: $X1=$(cfgval "$X1" C cluster) $X2=$(cfgval "$X2" C cluster)"
 wait_for 180 good "$X1" && wait_for 60 good "$X2" && ok "J5 both are members of west again" \
     || bad "J5 both members of west: $X1=$(node_state "$X1") $X2=$(node_state "$X2")"
+# ...in west's own view, not only their own: Good or Leader above is either cluster's
+# (the nightly of 2026-10-18 read it OK while $X2 still led westx)
+counted() { case "$(info "$L" E "$(node_uuid "$1")")" in *Good*) return 0;; esac; return 1; }
+wait_for 60 counted "$X1" && wait_for 30 counted "$X2" && ok "J5 $L (west) counts both Good" \
+    || bad "J5 $L (west) counts both Good: $X1=[$(info "$L" E "$(node_uuid "$X1")")] $X2=[$(info "$L" E "$(node_uuid "$X2")")]"
 S2=$(sum "$L" topo_s2)
 for n in $X1 $X2; do check "J5 topo_s2 the same on $n" "$S2" "$(sum "$n" topo_s2)"; done
 

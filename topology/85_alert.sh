@@ -14,7 +14,7 @@ for n in "${NODES[@]}"; do
 	q "$n" "delete from public.yt_alert" >/dev/null
 done
 
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'recon=repair; recon_rows=1; recon_max_attempts=1' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'recon=repair; recon_rows=1; recon_max_attempts=1' | tail -1)"
 # register_table, not yt_setup: yt_setup creates the trigger and writes the
 # module-A row in ONE transaction, and on a node whose config table is synced
 # that write is refused unless the node is the leader - rolling the CREATE
@@ -142,11 +142,11 @@ print(1 if any(r['name'].startswith('alert.') for r in rows) else 0)" 2>/dev/nul
 	# reporting "recon never blocked the row" instead of testing the thing.
 	#
 	# Until this landed every ytserv refusal reached the client as
-	# `08006 connection_failure`, the one code `yaxaha.c` hard-coded, so "this
+	# `08006 connection_failure`, the one code `yt_cluster.c` hard-coded, so "this
 	# row needs an audit", "the cluster is short of nodes" and "the socket
 	# dropped" were indistinguishable and no driver could decide whether to
 	# retry. ytserv now prefixes `<sqlstate>: ` and the extension PARSES it
-	# (`yaxaha_error_sqlstate`), so one .so serves every future code.
+	# (`yt_cluster_error_sqlstate`), so one .so serves every future code.
 	#
 	# 55000 is object_not_in_prerequisite_state and is PERMANENT - the refusal
 	# is `is_permanent()` already and retrying cannot help, so a class-40 code

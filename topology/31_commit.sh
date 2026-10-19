@@ -4,7 +4,7 @@
 #
 #   C2   explicit yt_complete(true), then COMMIT: on every node, and the client
 #        was told "committed" exactly when the row exists
-#   C7   the auto_complete path (GUC yaxaha.auto_complete, ytpgc yaxaha.c):
+#   C7   the auto_complete path (GUC yt_cluster.auto_complete, ytpgc yt_cluster.c):
 #        a bare COMMIT and an autocommit INSERT replicate, a ROLLBACK leaves nothing
 #   C8   yt_complete(false), then ROLLBACK: nothing anywhere
 #   C13  an UPDATE of the primary key and a DELETE land the same on every node;
@@ -183,8 +183,8 @@ cleanup() {
 # ── setup ────────────────────────────────────────────────────────────────────
 
 [ "${#VOTERS[@]}" -ge 2 ] || { bad "needs two non-spare nodes, has ${#VOTERS[@]}"; summary; }
-ALL_CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'cluster_commit=all' | tail -1 || true)"
-[ -n "$ALL_CFG" ] || { bad "yxctl --encode-table-cfg produced nothing (is $REPO_ROOT built?)"; summary; }
+ALL_CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'cluster_commit=all' | tail -1 || true)"
+[ -n "$ALL_CFG" ] || { bad "ytctl --encode-table-cfg produced nothing (is $REPO_ROOT built?)"; summary; }
 
 for n in "${NODES[@]}"; do
 	q "$n" "drop table if exists cm_t; create table cm_t (id bigint primary key, v text);
@@ -240,8 +240,8 @@ done
 echo "  -- C7: auto_complete (bare COMMIT, autocommit INSERT, ROLLBACK)"
 # yt_info('T') first: it loads the extension without a server call, and the GUC
 # exists only once the library is loaded in this session.
-ac="$(qt "$O" "select yt_info('T') is not null; select current_setting('yaxaha.auto_complete', true);" | tail -1)"
-check "C7 precondition: yaxaha.auto_complete is on" "on" "$ac"
+ac="$(qt "$O" "select yt_info('T') is not null; select current_setting('yt_cluster.auto_complete', true);" | tail -1)"
+check "C7 precondition: yt_cluster.auto_complete is on" "on" "$ac"
 
 e="$(err_of "$(qx "$O" "begin; insert into cm_t values (701,'c7-bare-commit'); commit;")")"
 check "C7 a bare COMMIT with no yt_complete() is accepted" "" "$e"
@@ -400,23 +400,25 @@ wait_writable "$O" "$W" cm_t -9000 || true
 xa_cleanup() { q "$O" "rollback prepared 'yt_test_xa1'; " >/dev/null 2>&1; q "$O" "rollback prepared 'yt_test_xa2';" >/dev/null 2>&1;
 	q "$O" "rollback prepared 'yt_test_xa3';" >/dev/null 2>&1; true; }
 xa_cleanup
-out="$(q "$O" "begin; insert into cm_t values (91001, 'xa'); prepare transaction 'yt_test_xa1';" 2>&1)"
+# qe, not q: q drops psql's errors, and these checks look for one (an ERROR branch
+# that could never fire made an OK out of any refusal)
+out="$(qe "$O" "begin; insert into cm_t values (91001, 'xa'); prepare transaction 'yt_test_xa1';")"
 case "$out" in *ERROR*) bad "X1 PREPARE TRANSACTION of a cluster-synced insert refused: $out" ;;
 	*) ok "X1 PREPARE TRANSACTION of a cluster-synced insert: the cluster side prepared with it" ;; esac
-out="$(q "$O" "commit prepared 'yt_test_xa1';" 2>&1)"
+out="$(qe "$O" "commit prepared 'yt_test_xa1';")"
 case "$out" in *ERROR*) bad "X1 COMMIT PREPARED (another session) refused: $out" ;;
 	*) ok "X1 COMMIT PREPARED from another session" ;; esac
 wait_all 30 cm_t "id = 91001" 1 && ok "X1 the prepared insert is on every node" \
 	|| bad "X1 the prepared insert is missing: $(lacking cm_t "id = 91001" 1)"
 q "$O" "begin; insert into cm_t values (91002, 'xa'); prepare transaction 'yt_test_xa2';" >/dev/null 2>&1
-out="$(q "$O" "rollback prepared 'yt_test_xa2';" 2>&1)"
+out="$(qe "$O" "rollback prepared 'yt_test_xa2';")"
 case "$out" in *ERROR*) bad "X2 ROLLBACK PREPARED refused: $out" ;; *) ok "X2 ROLLBACK PREPARED" ;; esac
 sleep 5
 check "X2 the rolled-back insert is on no node" "" "$(lacking cm_t "id = 91002" 0)"
 # a transaction that synced nothing: no cluster side, its gid unknown to ytserv
 q "$O" "drop table if exists cm_local; create table cm_local (id int primary key);" >/dev/null 2>&1
 q "$O" "begin; insert into cm_local values (1); prepare transaction 'yt_test_xa3';" >/dev/null 2>&1
-out="$(q "$O" "commit prepared 'yt_test_xa3';" 2>&1)"
+out="$(qe "$O" "commit prepared 'yt_test_xa3';")"
 case "$out" in *ERROR*) bad "X3 a prepared transaction with no cluster side did not commit: $out" ;;
 	*) check "X3 a prepared transaction with no cluster side commits as before" "1" "$(q "$O" "select count(*) from cm_local")" ;; esac
 check "X1-X3 nothing is left prepared under a test gid" "0" \

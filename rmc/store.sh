@@ -4,19 +4,19 @@
 # clusters elect and before the writers start, and by steps.sh for a node added
 # at runtime - with the store on, a runtime join waits for the operator's approval.
 # Set up as an operator does it (H6): the store and genesis in each cluster, every
-# node approved, TLS on, the links declared with yxctl from both ends and each lower
-# CA approved on the upper leader with the line yxctl printed; the cluster's CA
+# node approved, TLS on, the links declared with ytctl from both ends and each lower
+# CA approved on the upper leader with the line ytctl printed; the cluster's CA
 # pinned (C skv_ca_root) for every node that joins later (H12).
 #
 # Source after lib.sh, not executed.
 
-# yxctl inside a node, as postgres, with its own app key: output and errors. The
-# database by name, `-d`: yxctl's `--db` is a connection URL, and a bare name there
+# ytctl inside a node, as postgres, with its own app key: output and errors. The
+# database by name, `-d`: ytctl's `--db` is a connection URL, and a bare name there
 # ran its own SQL (the --link-* checks) in `postgres` (hier 15_store, 2026-10-17)
 yxn() { # yxn <node> <args...>
     local n="$1"; shift
     docker exec -i -u postgres -e SECRET="$(secret_of "$n")" "$(cname "$n")" \
-        yxctl -d "$DB" --target "$CFG" "$@" 2>&1 || true
+        ytctl -d "$DB" --target "$CFG" "$@" 2>&1 || true
 }
 # a C row through the cluster, on its leader
 cfg_c() { # cfg_c <cluster> <name> <value>
@@ -138,15 +138,19 @@ required_tls() { case "$(info "$(leader_of "$1")" X peer_tls)" in "TLS between m
 # cluster's current master key and its certificate
 store_join() { # store_join <cluster> <node>
     local c="$1" n="$2" v i
-    v=$(info "$(leader_of "$c")" J mk | sed -n 's/^v\([0-9]*\) held.*/\1/p')
-    v=${v:-1}
+    for _ in $(seq 1 10); do
+        v=$(info "$(leader_of "$c")" J mk | sed -n 's/^v\([0-9]*\) held.*/\1/p')
+        [ -n "$v" ] && break; sleep 2
+    done
+    # no master key on the leader: the store never came up (up.sh 5b) - nothing to wait for
+    [ -n "$v" ] || { bad "$n: its join cannot be approved - $c's leader holds no master key: $(info "$(leader_of "$c")" J mk)"; return 1; }
     for ((i = 0; i < ${RMC_WAIT:-180}; i += 4)); do
         case "$(mk_line "$n")" in "v$v held"*) break ;; esac
         approve_pending "$c"
         sleep 4
     done
     case "$(mk_line "$n")" in "v$v held"*) ok "$n: its join approved, it holds master key v$v" ;;
-        *) bad "$n: no master key v$v after its join: $(mk_line "$n")"; return 1 ;; esac
+        *) bad "$n: no master key v$v after its join: $(mk_line "$n"); peer_tls: $(tls_line "$n")"; return 1 ;; esac
     wait_for 120 node_tls "$n" && ok "$n: holds its certificate" || bad "$n: no certificate: $(tls_line "$n")"
 }
 node_tls() { case "$(tls_line "$1")" in *"certificates v"*) return 0;; esac; return 1; }

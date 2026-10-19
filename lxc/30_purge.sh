@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Purge + clean re-install cycle: sudo yxctl --purge default must leave the host
+# Purge + clean re-install cycle: sudo ytctl --purge default must leave the host
 # clean enough for a fresh --batch install to succeed (mode 1 + purge docs).
 #
-# What purge promises, and so what is asserted (yxctl README "Purge", en.yml
-# arg-purge, yxctl/src/main.rs uninstall()):
+# What purge promises, and so what is asserted (ytctl README "Purge", en.yml
+# arg-purge, ytctl/src/main.rs uninstall()):
 #   - stop and disable ytserver, delete its unit                       (coded)
-#   - delete yaxaha.so from `pg_config --pkglibdir`, yaxaha.control and
-#     yaxaha--0.5.sql from `pg_config --sharedir`/extension              (coded)
-#   - delete the working directory with the cluster WAL (/var/yaxaha)  (coded)
+#   - delete yt_cluster.so from `pg_config --pkglibdir`, yt_cluster.control and
+#     yt_cluster--0.5.sql from `pg_config --sharedir`/extension              (coded)
+#   - delete the working directory with the cluster WAL (/var/yt-cluster)  (coded)
 #   - exit 0 (it is the package pre-uninstall script)
 # Purge does not touch the database. The cleanup it prints for that (`psql
 # command> "..."`) is run as printed, after the purge - the library and the
@@ -34,37 +34,37 @@ check() {
 pgval() { xc sudo -u postgres psql -X -tAq -v ON_ERROR_STOP=1 -c "$1"; }
 absent() { ! xc test -e "$1"; }
 present() { xc test -e "$1"; }
-no_extension() { local v; v="$(pgval "select 1 from pg_extension where extname = 'yaxaha'")" || return 1; [ -z "$v" ]; }
+no_extension() { local v; v="$(pgval "select 1 from pg_extension where extname = 'yt_cluster'")" || return 1; [ -z "$v" ]; }
 no_config_table() { local v; v="$(pgval "select to_regclass('$YX_TARGET') is null")" || return 1; [ "$v" = "t" ]; }
 no_sync_trigger() { local v; v="$(pgval "select count(*) from pg_trigger where tgname like 'zytsync\_%'")" || return 1; [ "$v" = "0" ]; }
 
-# where `--purge default` resolves the extension files: pg_config, as yxctl does
+# where `--purge default` resolves the extension files: pg_config, as ytctl does
 # (cli.rs, pe_def). Read before the purge, and the files must be there to begin
 # with - "deleted" is vacuous for a file that never existed.
 pkglib="$(xc pg_config --pkglibdir 2>/dev/null || true)"
 share="$(xc pg_config --sharedir 2>/dev/null || true)/extension"
 check "pg_config answers in the container (pkglibdir=[$pkglib])" test -n "$pkglib"
-check "before the purge: yaxaha.so installed in $pkglib" present "$pkglib/yaxaha.so"
-check "before the purge: yaxaha.control installed in $share" present "$share/yaxaha.control"
-check "before the purge: the working directory /var/yaxaha exists" present /var/yaxaha
+check "before the purge: yt_cluster.so installed in $pkglib" present "$pkglib/yt_cluster.so"
+check "before the purge: yt_cluster.control installed in $share" present "$share/yt_cluster.control"
+check "before the purge: the working directory /var/yt-cluster exists" present /var/yt-cluster
 
 echo "Purging..."
 rc=0
-purge_out="$(xc timeout -k 10 120 yxctl --purge default 2>&1)" || rc=$?
+purge_out="$(xc timeout -k 10 120 ytctl --purge default 2>&1)" || rc=$?
 echo "$purge_out"
-check "yxctl --purge default exits 0 (exit $rc; 124/137 = it hung)" test "$rc" -eq 0
+check "ytctl --purge default exits 0 (exit $rc; 124/137 = it hung)" test "$rc" -eq 0
 
 check "ytserver stopped" \
 	bash -c "! lxc exec $YX_CONTAINER -- systemctl is-active ytserver >/dev/null 2>&1"
 # --purge must stop AND remove the service control: unit file gone, systemd reloaded
 check "ytserver unit file deleted" \
 	bash -c "! lxc exec $YX_CONTAINER -- test -f /lib/systemd/system/ytserver.service"
-check "extension library deleted: $pkglib/yaxaha.so" absent "$pkglib/yaxaha.so"
-check "extension control file deleted: $share/yaxaha.control" absent "$share/yaxaha.control"
-check "extension script deleted: $share/yaxaha--0.5.sql" absent "$share/yaxaha--0.5.sql"
+check "extension library deleted: $pkglib/yt_cluster.so" absent "$pkglib/yt_cluster.so"
+check "extension control file deleted: $share/yt_cluster.control" absent "$share/yt_cluster.control"
+check "extension script deleted: $share/yt_cluster--0.5.sql" absent "$share/yt_cluster--0.5.sql"
 # a stale WAL is what a re-install on the same box would trip over ("Sub-term
 # ... already exists"; 50_negative.sh L2 checks that end to end)
-check "working directory /var/yaxaha (cluster WAL) deleted" absent /var/yaxaha
+check "working directory /var/yt-cluster (cluster WAL) deleted" absent /var/yt-cluster
 
 # purge does not touch the DB: clean it with the command the purge printed, in
 # the install database (20_batch.sh's --db)
@@ -75,15 +75,15 @@ rc=0
 xc sudo -u postgres psql -X -v ON_ERROR_STOP=1 -c "$cleanup" || rc=$?
 check "the documented DB cleanup succeeds after the purge (psql exit $rc)" test "$rc" -eq 0
 check "after the DB cleanup: no zytsync_ trigger left" no_sync_trigger
-check "after the DB cleanup: extension yaxaha dropped" no_extension
+check "after the DB cleanup: extension yt_cluster dropped" no_extension
 check "after the DB cleanup: config table $YX_TARGET dropped" no_config_table
 
 echo "Re-installing after purge with -U ytsvc (service role auto-creation)..."
-# the -U scenario: OS user exists, DB role does not — yxctl must create the role
+# the -U scenario: OS user exists, DB role does not — ytctl must create the role
 # (as postgres, no password), run the service as ytsvc, and connect via peer auth
 xc bash -c "id -u ytsvc >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin ytsvc"
 assert "re-install --batch -U ytsvc exits 0" \
-	xc yxctl -v --batch -t "$YX_TARGET" -U ytsvc \
+	xc ytctl -v --batch -t "$YX_TARGET" -U ytsvc \
 		--db "postgresql://postgres@localhost/postgres?host=/var/run/postgresql"
 
 assert "role ytsvc created" \

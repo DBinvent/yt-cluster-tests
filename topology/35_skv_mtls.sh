@@ -5,7 +5,7 @@
 #
 # The prerequisites come first, as the owner set them (2026-10-12): the app key on
 # every node (10_up.sh), the cluster master key (genesis), every node approved for
-# it (enroll + yxctl --skv-approve). Then peer_tls on: the leader makes the CA of
+# it (enroll + ytctl --skv-approve). Then peer_tls on: the leader makes the CA of
 # the current version and a certificate per approved node; members speak TLS to
 # each other as soon as each has one (the peer port takes both until then); once
 # every member reported a certificate the leader writes @tls and plaintext peer
@@ -30,7 +30,7 @@
 # M8 rotation under load: v2 published, certificates of both versions while it
 #    runs, writes and reads never fail, v1 retired - every node on v2 alone
 # M10 [H12] a member that lost its node key comes back while TLS is required: with
-#    the cluster CA pinned (C skv_ca_root, as yxctl --batch --ca-root writes it) it
+#    the cluster CA pinned (C skv_ca_root, as ytctl --batch --ca-root writes it) it
 #    enrolls, is approved, takes the leader's certificate bundle through the pin,
 #    speaks TLS and holds the current master key again (written 2026-10-16, not
 #    run yet: no full test runs in a dev session)
@@ -69,12 +69,12 @@ EOF
 # what its own key opens, and speaks TLS from its first packet.
 cold_start() {
 	local n
-	for n in "${NODES[@]}"; do rh "docker exec $n pkill -f yaxaha/ytserv >/dev/null 2>&1; true"; done
+	for n in "${NODES[@]}"; do rh "docker exec $n pkill -f yt-cluster/ytserv >/dev/null 2>&1; true"; done
 	sleep 2
 	for n in "${NODES[@]}"; do
-		rh "docker exec $n sh -c 'k=\$(find /var/yaxaha -name node.key | head -1); if [ -n \"\$k\" ]; then d=\$(dirname \"\$k\");
-			find /var/yaxaha -mindepth 1 -maxdepth 1 ! -path \"\$d\" -exec rm -rf {} +;
-			find \"\$d\" -mindepth 1 ! -name node.key ! -name node.pub -exec rm -rf {} +; else rm -rf /var/yaxaha/*; fi'" \
+		rh "docker exec $n sh -c 'k=\$(find /var/yt-cluster -name node.key | head -1); if [ -n \"\$k\" ]; then d=\$(dirname \"\$k\");
+			find /var/yt-cluster -mindepth 1 -maxdepth 1 ! -path \"\$d\" -exec rm -rf {} +;
+			find \"\$d\" -mindepth 1 ! -name node.key ! -name node.pub -exec rm -rf {} +; else rm -rf /var/yt-cluster/*; fi'" \
 			>/dev/null 2>&1 || true
 		cfg_delete "$n" least C
 	done
@@ -122,7 +122,7 @@ skv_wait 60 "every node requires TLS" all_tls "TLS required between members" \
 
 # ── M4 on the wire ───────────────────────────────────────────────────────────
 PU="$(node_uuid "$P")"
-o="$(rh "docker exec $F sh -c 'openssl s_client -connect $P:$YX_PORT -servername v1.$PU.yaxaha -showcerts </dev/null 2>&1'" 2>&1 || true)"
+o="$(rh "docker exec $F sh -c 'openssl s_client -connect $P:$YX_PORT -servername v1.$PU.yt-cluster -showcerts </dev/null 2>&1'" 2>&1 || true)"
 case "$o" in *"CN = $PU"*|*"CN=$PU"*) ok "M4 $P answers a TLS hello with its own certificate (CN = its uuid)" ;;
 	*) bad "M4 no certificate of $P in the TLS answer: $(echo "$o" | grep -m3 -i 'subject\|error\|CONNECTED')" ;; esac
 case "$o" in *"CA v1"*) ok "M4 ...issued by the cluster CA of v1" ;; *) bad "M4 the issuer is not the CA of v1" ;; esac
@@ -212,8 +212,8 @@ cfg_push skv_ca_root C "$ROOT"
 J=""; for n in "${NODES[@]}"; do is_spare_node "$n" && continue; [ "$n" = "$L" ] && continue; J="$n"; done
 JU="$(node_uuid "$J")"
 SINCE10="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-rh "docker exec $J pkill -f yaxaha/ytserv >/dev/null 2>&1; true"
-rh "docker exec $J sh -c 'find /var/yaxaha \( -name node.key -o -name node.pub -o -name skv.approved \) -exec rm -f {} +'" \
+rh "docker exec $J pkill -f yt-cluster/ytserv >/dev/null 2>&1; true"
+rh "docker exec $J sh -c 'find /var/yt-cluster \( -name node.key -o -name node.pub -o -name skv.approved \) -exec rm -f {} +'" \
 	>/dev/null 2>&1 || true
 rh "docker restart $J >/dev/null"
 # it asks with a new key: approved once its pending row is there

@@ -13,7 +13,7 @@ for n in "${NODES[@]}"; do
 done
 sleep 2
 
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'az=top,east; write=top' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'az=top,east; write=top' | tail -1)"
 echo "  writable_az value: $CFG"
 # register_table, not yt_setup: yt_setup creates the trigger and writes the
 # module-A row in ONE transaction, and on a node whose config table is synced

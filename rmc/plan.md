@@ -1,6 +1,6 @@
 # rmc test plan: resilience and membership under change
 
-This test checks that a hierarchy of yaxaha clusters keeps every acknowledged
+This test checks that a hierarchy of yt-cluster clusters keeps every acknowledged
 transaction, and keeps its boundaries, while its membership changes underneath a
 running write load: nodes are added at runtime on every level, leadership is
 moved, nodes are restarted, and old nodes are replaced one by one by new ones.
@@ -42,7 +42,7 @@ Nodes added during the run: `u4 u5` (upper), `a5 a6 a7 a8` (east), `b5 b6`
 
 ## The data
 
-| table | routing (`yxctl --encode-table-cfg`) | written by | what it shows |
+| table | routing (`ytctl --encode-table-cfg`) | written by | what it shows |
 |---|---|---|---|
 | `rmc_ledger` | `no_up; no_down` | the load, in every cluster, each in its own id range | durability and convergence inside a cluster; that no row crosses a boundary up, down or sideways |
 | `rmc_down` | `az=top,eastc,westc; write=top` | probes on the upper leader | the **down** gate: a top write reaches both lower clusters by the relay, and a lower write is refused |

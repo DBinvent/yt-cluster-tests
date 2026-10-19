@@ -114,7 +114,7 @@ def badge(run: dict) -> dict:
 def render(b: dict) -> bytes:
     """The badge as an SVG, drawn by shields.io - a few tries before giving up."""
     url = f"{SHIELDS}?{urllib.parse.urlencode(b)}"
-    req = urllib.request.Request(url, headers={"User-Agent": "yaxaha-nightly-badge"})
+    req = urllib.request.Request(url, headers={"User-Agent": "yt-cluster-nightly-badge"})
     for attempt in range(1, TRIES + 1):
         try:
             with urllib.request.urlopen(req, timeout=30) as r:

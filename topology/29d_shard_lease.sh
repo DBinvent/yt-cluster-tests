@@ -20,6 +20,8 @@
 #   L5  W takes the lease again and drops off the network with it: O's writes of
 #       the shard fail while they are sent to W, and commit again once the lease
 #       lapsed - nothing waits for W for good (added 2026-10-16, unrun)
+#       ...and meanwhile a write of another synced table commits at once: the
+#       lease's gap holds only its own rows (lease-end, 2026-10-17)
 #   L6  W back on the network holds what O holds
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== shard lease: a shard's subterms issued by the node that writes it =="
@@ -65,22 +67,26 @@ cleanup() {
 	# L5 takes the holder off the network: never leave it so
 	[ -n "${W:-}" ] && node_up "$W" >/dev/null 2>&1
 	for n in "${NODES[@]}"; do
-		q "$n" "drop table if exists sl_t;" >/dev/null 2>&1
+		q "$n" "drop table if exists sl_t; drop table if exists sl_o;" >/dev/null 2>&1
 		cfg_delete "$n" public.sl_t A >/dev/null 2>&1 || true
+		cfg_delete "$n" public.sl_o A >/dev/null 2>&1 || true
 	done
 }
 
 # ── setup ────────────────────────────────────────────────────────────────────
 TOPS=(); for n in "${NODES[@]}"; do [ "${NODE_AZ[$n]:-}" = top ] && TOPS+=("$n"); done
 [ "${#TOPS[@]}" -ge 2 ] || { bad "needs two nodes in az top, has ${#TOPS[@]}"; summary; }
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'shard=store; outer=pin; hpc' | tail -1 || true)"
-[ -n "$CFG" ] || { bad "yxctl --encode-table-cfg does not know 'hpc' (is $REPO_ROOT built?)"; summary; }
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'shard=store; outer=pin; hpc' | tail -1 || true)"
+[ -n "$CFG" ] || { bad "ytctl --encode-table-cfg does not know 'hpc' (is $REPO_ROOT built?)"; summary; }
 trap cleanup EXIT
 cleanup
 for n in "${NODES[@]}"; do
 	q "$n" "create table sl_t (store text not null, id bigint not null, v bigint, primary key (store, id));" >/dev/null
+	# [lease-end] a table no lease covers, written while the holder is away (L5)
+	q "$n" "create table sl_o (id bigint primary key, v bigint);" >/dev/null
 done
 register_table public.sl_t "$CFG"
+register_table public.sl_o ""
 restart_all
 await_cluster
 L="$(leader_now)"
@@ -153,19 +159,37 @@ check "L4 $O's write after the lapse committed" "" "$(cwc "$O" "insert into sl_t
 
 # ── L5: the holder goes away under its lease ────────────────────────────────
 batch "$W" 3001 40
+check "L5 $W's 40 writes of shard top committed" "40" "${BATCH_N:-0}${BATCH_ERR:+ - $BATCH_ERR}"
+# a live lease, not the lapsed one of L4 - that one still names the shard
 case "$(yinfo "$W" E hpc_lease)" in
+	*"spent or past its time"*) bad "L5 $W did not take the lease again - it shows the lapsed one: [$(yinfo "$W" E hpc_lease)]" ;;
 	*"holds shard top of public.sl_t"*) ok "L5 $W holds the lease of shard top again" ;;
 	*) bad "L5 $W did not take the lease again: [$(yinfo "$W" E hpc_lease)]" ;;
 esac
 node_down "$W"
-t0=$(date +%s); back=""; e=""
+# Writes only once O has NOTICED the holder gone (as 23_split's E2): a write racing
+# the detection takes the holder into its 2PC party and fails on its PREPARE
+# ("Fail to modify peer ... of party: Timeout expired", the nightly of 2026-10-18) -
+# a different question from whether it waits on the lease's gap
+seen=""
+for i in $(seq 1 20); do
+	case "$(info "$O" E "$(node_uuid "$W")")" in ""|*Good*|*Leader*) sleep 1 ;; *) seen=$i; break ;; esac
+done
+echo "  $O sees $W off${seen:+ after ${seen}s}${seen:- - not within 20s}"
+# [lease-end] another table's write does not wait on the lease's gap: it commits
+# well inside the statement timeout (before, every synced table waited on it)
+t1=$(date +%s)
+e1="$(cwc "$O" "insert into sl_o values (1, 1)" 20s)"
+check "L5 with the holder gone, $O's write of another table committed at once" "" \
+	"${e1}$( [ -z "$e1" ] && [ $(( $(date +%s) - t1 )) -gt 10 ] && echo "after $(( $(date +%s) - t1 ))s" )"
+t0=$(date +%s); back=""; e=""; wrote=""
 for i in $(seq 1 24); do
 	e="$(cwc "$O" "insert into sl_t values ('top', $((4000 + i)), $i)" 30s)"
-	[ -z "$e" ] && { back=$(( $(date +%s) - t0 )); break; }
+	[ -z "$e" ] && { back=$(( $(date +%s) - t0 )); wrote=$((4000 + i)); break; }
 	sleep 5
 done
 [ -n "$back" ] && ok "L5 with the holder gone, $O's write of shard top committed again after ${back}s" \
-	|| bad "L5 $O's writes of shard top never committed in 2 min with the holder $W off the network: [$e]"
+	|| bad "L5 $O's writes of shard top never committed in $(( ($(date +%s) - t0) / 60 )) min with the holder $W off the network: [$e]"
 node_up "$W"
 
 # ── L6: the holder back holds what the others hold ──────────────────────────
@@ -177,4 +201,7 @@ for _ in $(seq 1 30); do
 	sleep 5
 done
 check "L6 $W back on the network holds what $O holds" "$a" "$b"
+# and the write it missed: L6 is otherwise met by two copies that never changed
+[ -z "$wrote" ] || check "L6 $W holds $O's write of id $wrote, made while it was away" "1" \
+	"$(qt "$W" "select count(*) from sl_t where id = $wrote")"
 summary

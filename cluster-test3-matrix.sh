@@ -39,7 +39,7 @@ resync() {
 prepare() { # $1 = A-row base64
   for h in $ALL; do psql_on "$h" -qc "\"update public.yt_config set value='$1' where module='A' and name in ('public.pgbench_branches','public.pgbench_tellers')\""; done
   for h in $ALL; do $K "$h" 'sudo systemctl stop ytserver' & done; wait
-  for h in $ALL; do $K "$h" 'sudo rm -rf /var/yaxaha/*' & done; wait      # equal WAL start
+  for h in $ALL; do $K "$h" 'sudo rm -rf /var/yt-cluster/*' & done; wait      # equal WAL start
   for h in $ALL; do $K "$h" 'sudo systemctl start ytserver' & done; wait
   for i in $(seq 20); do sleep 5; [ -n "$(leader)" ] && break; done
   resync
@@ -47,7 +47,7 @@ prepare() { # $1 = A-row base64
   [ "$a" = "$b" ] && [ "$b" = "$c" ] && echo "converged" || echo "NOT-CONVERGED"
 }
 
-marks() { for h in $ALL; do $K "$h" 'sudo cat /var/log/yaxaha/ytserver.log | wc -l'; done; }
+marks() { for h in $ALL; do $K "$h" 'sudo cat /var/log/yt-cluster/ytserver.log | wc -l'; done; }
 
 run_case() { # $1 label  $2 base64  $3 txcount
   echo "############ $1"
@@ -57,9 +57,9 @@ run_case() { # $1 label  $2 base64  $3 txcount
   printf "  RESULT: "
   $K $N1 "sudo -u postgres pgbench -p 5434 -h /var/run/postgresql -c 1 -j 1 -n -f /tmp/s2.sql -t $3 pgbench 2>&1 | grep -oE 'latency average = [0-9.]+ ms|tps = [0-9.]+|failed transactions: [0-9]+ ' | tr '\n' ' '"; echo
   sleep 5
-  $K $N1 "sudo tail -n +$((M1+1)) /var/log/yaxaha/ytserver.log" > "$SP/c_$1_n1.log"
-  $K $N2 "sudo tail -n +$((M2+1)) /var/log/yaxaha/ytserver.log" > "$SP/c_$1_n2.log"
-  $K $N3 "sudo tail -n +$((M3+1)) /var/log/yaxaha/ytserver.log" > "$SP/c_$1_n3.log"
+  $K $N1 "sudo tail -n +$((M1+1)) /var/log/yt-cluster/ytserver.log" > "$SP/c_$1_n1.log"
+  $K $N2 "sudo tail -n +$((M2+1)) /var/log/yt-cluster/ytserver.log" > "$SP/c_$1_n2.log"
+  $K $N3 "sudo tail -n +$((M3+1)) /var/log/yt-cluster/ytserver.log" > "$SP/c_$1_n3.log"
   echo "$L" > "$SP/c_$1_leader"
   local a b c; a=$(digest $N1); b=$(digest $N2); c=$(digest $N3)
   [ "$a" = "$b" ] && [ "$b" = "$c" ] && echo "  post: CONVERGED" || echo "  post: DIVERGED n1=${a:0:8} n2=${b:0:8} n3=${c:0:8}"
@@ -87,9 +87,9 @@ run_case3() { # label base64 tx
   printf "  RESULT: "
   $K $N1 "sudo -u postgres pgbench -p 5434 -h /var/run/postgresql -c 1 -j 1 -n -f /tmp/s2.sql -t $3 pgbench 2>&1 | grep -oE 'latency average = [0-9.]+ ms|tps = [0-9.]+|failed transactions: [0-9]+ ' | tr '\n' ' '"; echo
   sleep 6
-  $K $N1 "sudo tail -n +$((M1+1)) /var/log/yaxaha/ytserver.log" > "$SP/t3_$1_n1.log"
-  $K $N2 "sudo tail -n +$((M2+1)) /var/log/yaxaha/ytserver.log" > "$SP/t3_$1_n2.log"
-  $K $N3 "sudo tail -n +$((M3+1)) /var/log/yaxaha/ytserver.log" > "$SP/t3_$1_n3.log"
+  $K $N1 "sudo tail -n +$((M1+1)) /var/log/yt-cluster/ytserver.log" > "$SP/t3_$1_n1.log"
+  $K $N2 "sudo tail -n +$((M2+1)) /var/log/yt-cluster/ytserver.log" > "$SP/t3_$1_n2.log"
+  $K $N3 "sudo tail -n +$((M3+1)) /var/log/yt-cluster/ytserver.log" > "$SP/t3_$1_n3.log"
   local a b c; a=$(digest $N1); b=$(digest $N2); c=$(digest $N3)
   [ "$a" = "$b" ] && [ "$b" = "$c" ] && echo "  post: CONVERGED" || echo "  post: DIVERGED ${a:0:8}/${b:0:8}/${c:0:8}"
 }

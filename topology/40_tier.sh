@@ -13,7 +13,7 @@ done
 sleep 2
 
 # holds in east AND west (both tier 1), but never climbs to tier 0
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'az=east,west; no_up' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'az=east,west; no_up' | tail -1)"
 echo "  no_up value: $CFG"
 # register_table, not yt_setup: yt_setup creates the trigger and writes the
 # module-A row in ONE transaction, and on a node whose config table is synced

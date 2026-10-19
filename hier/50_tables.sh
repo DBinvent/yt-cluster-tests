@@ -18,7 +18,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== tables: write-by-top-only, and not-propagated-at-all =="
 
-enc() { "$REPO_ROOT"/target/release/yxctl --encode-table-cfg "$1" 2>/dev/null | tail -1; }
+enc() { "$REPO_ROOT"/target/release/ytctl --encode-table-cfg "$1" 2>/dev/null | tail -1; }
 
 CFG_TOP="$(enc 'az=top,eastc,westc; write=top')"
 CFG_PINNED="$(enc 'az=eastc; no_up; no_down')"

@@ -31,7 +31,7 @@ Two numbers, from one rig:
 `stream.sql` gives every node a disjoint `bid` range, so the tables never
 collide *by workload* and the only cross-node work is whatever the sync mode
 asks for. What changes between runs is **how the `pgbench_*` tables are
-registered with YaXaHa** — i.e. the per-table `cluster_commit`:
+registered with YT Cluster** — i.e. the per-table `cluster_commit`:
 
 | cond | `cluster_commit` | client's COMMIT returns after… | write-time consistency guard | measures |
 |---|---|---|---|---|
@@ -64,8 +64,8 @@ both now handled:
    `BENCH_NODES1_B64=CgIiAA==` (then `{at_least:1}` means origin + 1
    *synchronous* peer instead). `cluster_commit.b64` has the full table.
 
-2. **Transaction completion — no PgBouncer needed.** `ytpgc/src/yaxaha.c`
-   does `RegisterXactCallback` in `_PG_init` behind a `yaxaha.auto_complete`
+2. **Transaction completion — no PgBouncer needed.** `ytpgc/src/yt_cluster.c`
+   does `RegisterXactCallback` in `_PG_init` behind a `yt_cluster.auto_complete`
    GUC (default on): a transaction that fired `yt_synchronize()` is completed
    into the cluster at `XACT_EVENT_PRE_COMMIT` (rollback at
    `XACT_EVENT_ABORT`), so a plain `COMMIT` is a cluster commit with **no
@@ -78,7 +78,7 @@ both now handled:
    `yt_complete`) for a build with `auto_complete` disabled.
 
 The `.so` with `auto_complete` is built by `ytpgc/build-all-ytpgc.sh 18` and
-shipped in the `yxctl` deb — a cluster node never compiles it.
+shipped in the `ytctl` deb — a cluster node never compiles it.
 
 ## Run
 
@@ -111,13 +111,13 @@ from a cluster that lost writes is not a result (BENCH.md §5).
 | `BENCH_CONVERGE_TIMEOUT_S` | `120` | bound on the convergence poll; hitting it fails the run |
 | `BENCH_SYNC_TABLES` | `pgbench_branches pgbench_tellers pgbench_accounts` | which tables `nodes1` registers (`pgbench_history` has no PK — opt in with `BENCH_SYNC_HISTORY=1`) |
 | `BENCH_YTSERVER_RESTART` | `sudo -n systemctl restart ytserver` | run on every node, together, after a sync condition is applied |
-| `BENCH_VIA_PGBOUNCER` | `0` | `0` = direct connect, rely on `yaxaha.auto_complete`; `1` = legacy route through a patched PgBouncer on `:6432` |
+| `BENCH_VIA_PGBOUNCER` | `0` | `0` = direct connect, rely on `yt_cluster.auto_complete`; `1` = legacy route through a patched PgBouncer on `:6432` |
 | `BENCH_SKIP_INIT` | unset | reuse the existing `pgbench -i` data and registration |
 
 ## Status (2026-09-09)
 
 Both conditions are runnable. `nosync` is a plain pgbench target. `nodes1`
-replicates on the node2/node3 cluster via `yaxaha.auto_complete` (direct
+replicates on the node2/node3 cluster via `yt_cluster.auto_complete` (direct
 connect, no PgBouncer) — `case1`/`case2` confirm a single write crosses in
 both `cluster_commit` modes. Sustained concurrent same-table load can still
 diverge (serialized `process_call` consumer); the convergence gate catches

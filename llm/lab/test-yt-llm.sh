@@ -2,14 +2,14 @@
 # yt_llm() on the lab cluster: plain-language questions answered by the
 # database itself, through the text-to-SQL service of this folder (agent.md).
 #
-#   ./test-yt-llm.sh [--deploy <yaxaha.so | dist dir>] [--no-llm] [node ...]
+#   ./test-yt-llm.sh [--deploy <yt_cluster.so | dist dir>] [--no-llm] [node ...]
 #
 #   node      <ssh target>[/<pg port>[/<database>]] of a cluster node. Default:
 #             YT_LLM_NODES from ../../.env (space separated), e.g.
 #             "user@node1 user@node2 user@node3/5434".
 #   --deploy  first put this build of the extension library on every node; from
 #             a directory (ytpgc/dist) the one for the node's PostgreSQL major
-#             and glibc. The one it replaces is kept as yaxaha.so.bak-<time>.
+#             and glibc. The one it replaces is kept as yt_cluster.so.bak-<time>.
 #   --no-llm  skip the questions to the model (step 5)
 #
 # yt_llm_query(nl, page, size) calls the node's ytserv, which does all of the
@@ -18,7 +18,7 @@
 # the caller. yt_llm(nl) returns the rows: SELECT * FROM yt_llm(..) AS t(..).
 # On every node, in $YT_DB:
 #   1. install: yt_config.value becomes text (a PEM is ~600 bytes, it was
-#      varchar(250)), then the [llm] block of ytpgc/yaxaha--0.5.sql, which
+#      varchar(250)), then the [llm] block of ytpgc/yt_cluster--0.5.sql, which
 #      re-runs cleanly
 #   2. configure ytserv in yt_config: module 'C' serve_llm, llm_host and the
 #      NAMES of three module 'K' rows - the CA, the client certificate and its
@@ -58,7 +58,7 @@
 # Env: YT_DB (pgbench); YT_SSH (ssh -o BatchMode=yes ..., with the lab key when
 # this machine has it); YT_PSQL (sudo -n -u postgres psql); YT_LOG, run on the
 # node to print ytserv's [llm] log lines (grep -a '\[llm\]' on the ytserver
-# unit's StandardOutput file, /var/log/yaxaha/ytserver.log).
+# unit's StandardOutput file, /var/log/yt-cluster/ytserver.log).
 # Step 7 env: YT_CH_URL (ClickHouse HTTP as the node reaches it), YT_CH_USER
 # (llm_ro) and YT_CH_PASSWORD, YT_CH_DB (where unqualified names are looked up),
 # YT_CH_DATABASES (comma-separated; none = every non-system one) - together module
@@ -76,7 +76,7 @@
 set -uo pipefail
 
 TESTS_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-# Settings: yaxaha-tests/.env (not committed, see env.example); the environment wins.
+# Settings: yt-cluster-tests/.env (not committed, see env.example); the environment wins.
 if [ -f "$TESTS_ROOT/.env" ]; then
     _yx_keep="$(export -p)"; set -a; . "$TESTS_ROOT/.env"; set +a; eval "$_yx_keep"; unset _yx_keep
 fi
@@ -84,7 +84,7 @@ fi
 # the client settings, the question file and the sample data this test reads.
 ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-pgxt}"
 HERE="${LLM_DIR:-$ROOT/llm}"
-EXT_SQL="$ROOT/ytpgc/yaxaha--0.5.sql"
+EXT_SQL="$ROOT/ytpgc/yt_cluster--0.5.sql"
 ENV_FILE="${LLM_CLIENT_ENV:-$HERE/llm-client.env}"
 
 YT_DB=${YT_DB:-pgbench}
@@ -95,7 +95,7 @@ if [ -z "${YT_SSH:-}" ]; then
         YT_SSH="$YT_SSH -o IdentitiesOnly=yes -i $YT_SSH_KEY"
 fi
 YT_PSQL=${YT_PSQL:-"sudo -n -u postgres psql"}
-YT_LOG=${YT_LOG:-"grep -a '\\[llm\\]' /var/log/yaxaha/ytserver.log"}
+YT_LOG=${YT_LOG:-"grep -a '\\[llm\\]' /var/log/yt-cluster/ytserver.log"}
 
 # names of the module 'K' rows; module 'C' llm_ca/llm_cert/llm_key point at them
 K_CA=llm.ca
@@ -369,7 +369,7 @@ BEGIN
     LOOP
         IF EXISTS (SELECT 1 FROM pg_depend d
                     WHERE d.classid = 'pg_proc'::regclass AND d.objid = f AND d.deptype = 'e') THEN
-            EXECUTE format('ALTER EXTENSION yaxaha DROP FUNCTION %s', f);
+            EXECUTE format('ALTER EXTENSION yt_cluster DROP FUNCTION %s', f);
         END IF;
         name := f::text;  -- once it is gone, regprocedure prints only the oid
         EXECUTE format('DROP FUNCTION %s', f);
@@ -379,7 +379,7 @@ END
 \$\$;
 SQL
     sed -n '/^-- \[llm\] begin/,/^-- \[llm\] end/p' "$EXT_SQL" |
-        sed "s/@extschema@/$1/g; s|'MODULE_PATHNAME'|'\$libdir/yaxaha'|g"
+        sed "s/@extschema@/$1/g; s|'MODULE_PATHNAME'|'\$libdir/yt_cluster'|g"
     cat <<SQL
 DO \$\$
 DECLARE f regprocedure;
@@ -390,7 +390,7 @@ BEGIN
                                  WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid
                                    AND d.deptype = 'e')
     LOOP
-        EXECUTE format('ALTER EXTENSION yaxaha ADD FUNCTION %s', f);
+        EXECUTE format('ALTER EXTENSION yt_cluster ADD FUNCTION %s', f);
     END LOOP;
 END
 \$\$;
@@ -481,7 +481,7 @@ DECLARE
     want text[];
     secs numeric;
     tag  text := CASE WHEN graded THEN 'FAIL' ELSE 'INFO' END;
-    ext  text := (SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname = 'yaxaha');
+    ext  text := (SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname = 'yt_cluster');
 BEGIN
     EXECUTE format('SELECT array_agg(s ORDER BY s) FROM (SELECT (SELECT string_agg(v, ''|'' ORDER BY v)
                       FROM json_each_text(row_to_json(t)) x(k, v)) AS s FROM (%s) t) a', ref)
@@ -746,7 +746,7 @@ SQL
 # the dist file for a node: its PostgreSQL major, the newest glibc not above its own
 pick_so() {
     local dir=$1 major=$2 glibc=$3 f t best="" bt=0
-    for f in "$dir"/yaxaha*-pg"$major"-glibc*.so; do
+    for f in "$dir"/yt_cluster*-pg"$major"-glibc*.so; do
         [ -f "$f" ] || continue
         t=${f##*-glibc}; t=${t%.so}; t=${t/_/.}
         [ "$(printf '%s\n%s\n' "$t" "$glibc" | sort -V | tail -1)" = "$glibc" ] || continue
@@ -764,17 +764,17 @@ deploy() {
         major=$(node_sql "$n" <<< "SELECT current_setting('server_version_num')::int / 10000")
         glibc=$($YT_SSH "$ssh" "ldd --version | head -1" | awk '{print $NF}')
         so=$(pick_so "$DEPLOY" "$major" "$glibc")
-        [ -n "$so" ] || { check "$n" deploy 0 "no yaxaha*-pg$major-glibc*.so for glibc $glibc in $DEPLOY"; return; }
+        [ -n "$so" ] || { check "$n" deploy 0 "no yt_cluster*-pg$major-glibc*.so for glibc $glibc in $DEPLOY"; return; }
     fi
-    tmp=/tmp/yaxaha.so.$$
+    tmp=/tmp/yt_cluster.so.$$
     out=$($YT_SSH "$ssh" "cat > $tmp" < "$so" && $YT_SSH "$ssh" "set -e
-        sudo -n install -m 0755 $tmp $lib/yaxaha.so.new
-        sudo -n cp -p $lib/yaxaha.so $lib/yaxaha.so.bak-\$(date +%Y%m%d%H%M%S)
-        sudo -n mv -f $lib/yaxaha.so.new $lib/yaxaha.so
+        sudo -n install -m 0755 $tmp $lib/yt_cluster.so.new
+        sudo -n cp -p $lib/yt_cluster.so $lib/yt_cluster.so.bak-\$(date +%Y%m%d%H%M%S)
+        sudo -n mv -f $lib/yt_cluster.so.new $lib/yt_cluster.so
         rm -f $tmp
-        md5sum $lib/yaxaha.so" 2>&1)
+        md5sum $lib/yt_cluster.so" 2>&1)
     check "$n" deploy "$([ "${out%% *}" = "$(md5sum < "$so" | cut -d' ' -f1)" ] && echo 1 || echo 0)" \
-        "$(basename "$so") -> $lib/yaxaha.so"
+        "$(basename "$so") -> $lib/yt_cluster.so"
 }
 
 # ── [llm2] step 7 ─────────────────────────────────────────────────────────────
@@ -840,7 +840,7 @@ DECLARE
     got  text[];
     defs text;
     secs numeric;
-    ext  text := (SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname = 'yaxaha');
+    ext  text := (SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname = 'yt_cluster');
 BEGIN
     BEGIN
         EXECUTE format('SELECT %s.yt_llm_query($1)', ext) INTO s USING nl;
@@ -1041,13 +1041,13 @@ for n in "${NODES[@]}"; do
     say "== $n"
     [ -n "$DEPLOY" ] && deploy "$n"
 
-    x=$(node_sql "$n" <<< "SELECT extnamespace::regnamespace FROM pg_extension WHERE extname = 'yaxaha'")
+    x=$(node_sql "$n" <<< "SELECT extnamespace::regnamespace FROM pg_extension WHERE extname = 'yt_cluster'")
     if ! [[ "$x" =~ ^[a-z_][a-z0-9_]*$ ]]; then
-        check "$n" extension 0 "no yaxaha extension in $(node_db "$n"): $x"
+        check "$n" extension 0 "no yt_cluster extension in $(node_db "$n"): $x"
         continue
     fi
     tally "$n" <<< "$(node_sql "$n" <<< "SELECT 'INFO node: PostgreSQL ' || current_setting('server_version')
-        || ', yaxaha ' || extversion || ' in schema $x of ' || current_database() FROM pg_extension WHERE extname = 'yaxaha'")"
+        || ', yt-cluster ' || extversion || ' in schema $x of ' || current_database() FROM pg_extension WHERE extname = 'yt_cluster'")"
 
     # 1
     tally "$n" <<< "$(install_sql "$x" | node_sql "$n")"

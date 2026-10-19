@@ -16,7 +16,7 @@
 # ytserv reads module-'A' rows from EVERY database's config table at startup
 # and keys them `A.<db>.<schema>.<table>` (ytserv/src/yt_config.rs, "[C4] Table
 # config is PER DATABASE"), and the trigger sends its database with every row
-# (ytpgc/src/yaxaha.c, get_database_name). So the table half of this layout is
+# (ytpgc/src/yt_cluster.c, get_database_name). So the table half of this layout is
 # meant to work, and so is the rppd half since ytserv 0.20.57 - see below.
 #
 # ## Its own fixture
@@ -70,7 +70,7 @@
 #   9  [D4] appdb's own def_sql_timeout_sec is its tables' fallback and theirs only
 #      (yt_info('c:..@appdb'), a: source.timeout_sec); a catalog setting written in
 #      appdb is ignored (yt_info('U') ignored=1) and changes nothing.
-#  10  [D12] the yt_config_effective view in appdb; yxctl --config-lint finds the
+#  10  [D12] the yt_config_effective view in appdb; ytctl --config-lint finds the
 #      misplaced row (exit 34) and no longer once it is gone.
 #  11  [D5] C recon_batch_max@<uuid> written on the leader applies on that node
 #      alone; deleted, the node takes the plain value again.
@@ -81,7 +81,7 @@
 #      once, recorded in app4's rppd_function_log - and appdb's instance does not
 #  12  a users database (app3) with a synced config table: a catalog setting
 #      written there is refused and stored nowhere, a database setting applies
-#      live everywhere; yxctl --db-remove on the leader detaches it on every
+#      live everywhere; ytctl --db-remove on the leader detaches it on every
 #      node, which then lets it be dropped.
 #
 # ## Gaps this found, fixed in ytserv 0.20.57
@@ -104,7 +104,7 @@
 # itself synced here. (complete_cfg_update used to look an UPDATE's name/module up
 # by id in the startup database - another row - and reads its own now, 0.20.57.)
 #
-# Standalone: needs the node image (00_build.sh) and REPO_ROOT's release yxctl
+# Standalone: needs the node image (00_build.sh) and REPO_ROOT's release ytctl
 # for --encode-table-cfg, not a running fixture A.
 
 # ── this fixture's settings, BEFORE env.sh ──────────────────────────────────
@@ -146,6 +146,11 @@ cleanup() {
 		return 0
 	fi
 	local n
+	# a failed run keeps its nodes' logs (YX_FAIL_LOGS, as run_a.sh does for the
+	# shared cluster - which is not where this script runs, so that copy is of no use)
+	if [ "${fail:-0}" -gt 0 ] && [ -n "${YX_FAIL_LOGS:-}" ]; then
+		save_node_logs 0 25_cross_db.sh && echo "  logs of ${NODES[*]} kept in $YX_FAIL_LOGS" || true
+	fi
 	for n in "${NODES[@]}"; do rh "docker rm -f $n >/dev/null 2>&1; true" || true; done
 	echo "  removed ${NODES[*]}"
 }
@@ -480,10 +485,10 @@ was needed or written there" "0" \
 }
 
 # ── table configs ───────────────────────────────────────────────────────────
-AZCFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'az=east' 2>/dev/null | tail -1 || true)"
-PYCFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'on_commit_python' 2>/dev/null | tail -1 || true)"
+AZCFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'az=east' 2>/dev/null | tail -1 || true)"
+PYCFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'on_commit_python' 2>/dev/null | tail -1 || true)"
 [ -n "$AZCFG" ] && ok "az=east encodes to a table config" \
-	|| bad "--encode-table-cfg 'az=east' produced nothing (is REPO_ROOT's release yxctl built?)"
+	|| bad "--encode-table-cfg 'az=east' produced nothing (is REPO_ROOT's release ytctl built?)"
 [ -n "$PYCFG" ] && ok "on_commit_python encodes to a table config" \
 	|| bad "--encode-table-cfg 'on_commit_python' produced nothing"
 
@@ -548,7 +553,7 @@ for n in "${NODES[@]}"; do
 	         create table if not exists cx_sink (id serial primary key, data text);" >/dev/null
 done
 
-# rppd schema: yxctl/src/actions/rppd_schema.rs, the four tables `yxctl --batch`
+# rppd schema: ytctl/src/actions/rppd_schema.rs, the four tables `ytctl --batch`
 # creates - here in the USERS database, which is the point of this test.
 RPPD_DDL="
 create table if not exists rppd_config (
@@ -607,7 +612,7 @@ for n in "${NODES[@]}"; do
 		pq "$n" "create database $APPDB" >/dev/null
 		sleep 1
 	done
-	aq "$n" "create extension if not exists yaxaha" >/dev/null
+	aq "$n" "create extension if not exists yt_cluster" >/dev/null
 	aq "$n" "$RPPD_DDL
 	         create table if not exists cx_t (id bigint primary key, v text);
 	         create table if not exists cx_r (id bigint primary key, v text);
@@ -739,7 +744,7 @@ for n in "${NODES[@]}"; do
 	[ "$(pq "$n" "select count(*) from pg_database where datname='$APP2'")" = "1" ] \
 		|| pq "$n" "create database $APP2" >/dev/null
 	q "$n" "begin;
-	        create extension if not exists yaxaha;
+	        create extension if not exists yt_cluster;
 	        create table if not exists cx2_t (id bigint primary key, v text);
 	        create trigger zytsync_public_cx2_t_trigger after insert or update or delete on cx2_t
 	          for each row execute procedure yt_synchronize();
@@ -844,11 +849,11 @@ done
 
 # ── 10 ──────────────────────────────────────────────────────────────────────
 # [D12] the combined config as appdb sees it (the yt_config_effective view), and
-# yxctl --config-lint on the misplaced row (exit 34), clean once it is gone
+# ytctl --config-lint on the misplaced row (exit 34), clean once it is gone
 echo "-- 10: the combined view; --config-lint"
 check "10: $TOP: yt_config_effective in $APPDB" "7|$APPDB|Database" \
 	"$(aq "$TOP" "select value || '|' || source || '|' || scope from yt_config_effective where name = 'def_sql_timeout_sec'")"
-out="$(rh "docker exec -u postgres $TOP yxctl --config-lint -d postgres 2>&1; echo rc=\$?" || true)"
+out="$(rh "docker exec -u postgres $TOP ytctl --config-lint -d postgres 2>&1; echo rc=\$?" || true)"
 [[ "$out" == *"rc=34"* && "$out" == *"min_cluster_size"* ]] && ok "10: --config-lint on $TOP finds $APPDB's min_cluster_size (exit 34)" \
 	|| bad "10: --config-lint on $TOP: $(printf '%s' "$out" | tail -4 | tr '\n' ' ')"
 for n in "${NODES[@]}"; do
@@ -859,7 +864,7 @@ done
 for n in "${NODES[@]}"; do c_wait "10" "$n" "c:def_sql_timeout_sec@$APPDB" source default 60; done
 # the fixture's own catalog rows (cfg_ready, the entrypoint's marker) name no
 # setting and stay reported: what must be gone is appdb's
-out="$(rh "docker exec -u postgres $TOP yxctl --config-lint -d postgres 2>&1; echo rc=\$?" || true)"
+out="$(rh "docker exec -u postgres $TOP ytctl --config-lint -d postgres 2>&1; echo rc=\$?" || true)"
 [[ "$out" == *"rc="* && "$out" != *"$APPDB.public.yt_config: C min_cluster_size"* ]] \
 	&& ok "10: --config-lint on $TOP no longer reports $APPDB's row once it is gone" \
 	|| bad "10: --config-lint on $TOP after the delete: $(printf '%s' "$out" | tail -4 | tr '\n' ' ')"
@@ -891,15 +896,15 @@ fi
 # ── 12 ──────────────────────────────────────────────────────────────────────
 # [phase 4/5] A users database whose config table is synced: a catalog setting
 # written there is refused on the origin and stored nowhere; a database setting
-# applies live on every node; then `yxctl --db-remove` on the leader detaches it
+# applies live on every node; then `ytctl --db-remove` on the leader detaches it
 # cluster-wide (`!app3` in the synced catalog's C databases), and every node lets
 # go of it, so it can be dropped.
-echo "-- 12: a users database with a synced config table; yxctl --db-remove"
+echo "-- 12: a users database with a synced config table; ytctl --db-remove"
 APP3="${XDB_APP3:-app3}"
 for n in "${NODES[@]}"; do
 	[ "$(pq "$n" "select count(*) from pg_database where datname='$APP3'")" = "1" ] \
 		|| pq "$n" "create database $APP3" >/dev/null
-	q "$n" "create extension if not exists yaxaha" "$APP3" >/dev/null
+	q "$n" "create extension if not exists yt_cluster" "$APP3" >/dev/null
 done
 for n in "${NODES[@]}"; do u_wait "12" "$n" "$APP3" "participant *" 45; done
 for n in "${NODES[@]}"; do
@@ -919,9 +924,9 @@ else
 	e="$(qe "$L" "insert into public.yt_config (name, module, value) values ('def_cluster_commit', 'C', 'all')" "$APP3")"
 	[[ "$e" == *ERROR* ]] && bad "12b: the database setting on $L: $e"
 	for n in "${NODES[@]}"; do c_wait "12b" "$n" "c:def_cluster_commit@$APP3" source "$APP3" 30; done
-	out="$(rh "docker exec -u postgres $L yxctl --db-remove $APP3 --drop-extension -d postgres 2>&1; echo rc=\$?" || true)"
-	[[ "$out" == *"rc=0"* ]] && ok "12c: yxctl --db-remove $APP3 on $L" \
-		|| bad "12c: yxctl --db-remove $APP3 on $L: $(printf '%s' "$out" | tail -4 | tr '\n' ' ')"
+	out="$(rh "docker exec -u postgres $L ytctl --db-remove $APP3 --drop-extension -d postgres 2>&1; echo rc=\$?" || true)"
+	[[ "$out" == *"rc=0"* ]] && ok "12c: ytctl --db-remove $APP3 on $L" \
+		|| bad "12c: ytctl --db-remove $APP3 on $L: $(printf '%s' "$out" | tail -4 | tr '\n' ' ')"
 	for n in "${NODES[@]}"; do u_wait "12c" "$n" "$APP3" "detached" 90; done
 	for n in "${NODES[@]}"; do
 		pq "$n" "drop database $APP3" >/dev/null 2>&1
@@ -937,7 +942,7 @@ APP4="${XDB_APP4:-app4}"
 for n in "${NODES[@]}"; do
 	[ "$(pq "$n" "select count(*) from pg_database where datname='$APP4'")" = "1" ] \
 		|| pq "$n" "create database $APP4" >/dev/null
-	q "$n" "create extension if not exists yaxaha" "$APP4" >/dev/null
+	q "$n" "create extension if not exists yt_cluster" "$APP4" >/dev/null
 done
 for n in "${NODES[@]}"; do u_wait "13" "$n" "$APP4" "participant *" 45; done
 for n in "${NODES[@]}"; do
@@ -998,7 +1003,7 @@ else
 	check "13c: $APPDB's instance ran nothing for it" "$app_b" "$(sum_app "select count(*) from cx_sink")"
 	# done: app4 goes as app3 did
 	qe "$L" "delete from $YX_CFG where module = 'C' and name = 'rppd_dbs'" postgres >/dev/null
-	rh "docker exec -u postgres $L yxctl --db-remove $APP4 --drop-extension -d postgres >/dev/null 2>&1" || true
+	rh "docker exec -u postgres $L ytctl --db-remove $APP4 --drop-extension -d postgres >/dev/null 2>&1" || true
 	for n in "${NODES[@]}"; do u_wait "13" "$n" "$APP4" "detached" 90; done
 	for n in "${NODES[@]}"; do pq "$n" "drop database $APP4" >/dev/null 2>&1; done
 	qe "$(x_leader)" "delete from $YX_CFG where module = 'C' and name = 'databases'" postgres >/dev/null

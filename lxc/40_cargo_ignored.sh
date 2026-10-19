@@ -14,5 +14,5 @@ lxc file push /tmp/yx-src.tgz "$YX_CONTAINER/tmp/yx-src.tgz"
 xc bash -c 'rm -rf /root/yx-src && mkdir -p /root/yx-src && tar -C /root/yx-src -xzf /tmp/yx-src.tgz'
 
 echo "Running ignored (root+postgres) tests..."
-xc bash -c 'source $HOME/.cargo/env && cd /root/yx-src && cargo test -p yxctl --bins -- --ignored'
+xc bash -c 'source $HOME/.cargo/env && cd /root/yx-src && cargo test -p ytctl --bins -- --ignored'
 echo "Ignored cargo tests: PASS"

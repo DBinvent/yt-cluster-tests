@@ -1,4 +1,4 @@
-name: Build YaXaHa
+name: Build YT Cluster
 
 on:
   push:

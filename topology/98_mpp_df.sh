@@ -152,9 +152,9 @@ create table if not exists rppd_function_log (
 # mp_t is the subject table, sharded exactly as in 97_mpp.sh so the layout this
 # reads is the one that was proven to tile. df_t is only a trigger to dispatch
 # the function; df_sink is where the function reports.
-SHARD="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg \
+SHARD="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg \
 	'shard=owner; outer=pin; recon=report' | tail -1)"
-PYCFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'on_commit_python' | tail -1)"
+PYCFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'on_commit_python' | tail -1)"
 [ -n "$SHARD" ] && [ -n "$PYCFG" ] \
 	&& ok "the shard and on_commit_python configs encode" \
 	|| { bad "--encode-table-cfg produced nothing"; summary; }

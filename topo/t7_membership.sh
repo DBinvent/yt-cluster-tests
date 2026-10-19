@@ -34,7 +34,7 @@ C=east
 topo_log t7
 for c in "${CLUSTERS[@]}"; do [ -s "$RUN/members.$c" ] || die "no $RUN/members.$c - run ../rmc/up.sh first"; done
 [ "$(members $C)" = "${START[$C]}" ] || die "$C is not as ../rmc/up.sh made it ($(members $C)) - run ../rmc/up.sh first"
-say "== topo T7 $(now) UTC, yaxaha $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yaxaha 2>/dev/null), cluster $C: $(members $C)"
+say "== topo T7 $(now) UTC, yt-cluster $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yt-cluster 2>/dev/null), cluster $C: $(members $C)"
 
 good()    { local s; s=$(node_state "$1"); [ "$s" = Good ] || [ "$s" = Leader ]; }
 paused()  { [ "$(node_state "$1")" = Paused ]; }
@@ -44,7 +44,7 @@ logs()    { docker logs --since "$1" "$(cname "$2")" 2>&1; }   # logs <since> <n
 # node_run, as a cluster write on the leader: '<uuid8>:<command>' reaches every
 # member, and only the node it names acts on it
 node_cmd() { cfg_tx $C "update $CFG set value = '$1' where module = 'C' and name = 'node_run'"; }
-ext_ready() { [ "$(q "$1" <<< "select count(*) from pg_extension where extname = 'yaxaha'" 2>/dev/null)" = 1 ]; }
+ext_ready() { [ "$(q "$1" <<< "select count(*) from pg_extension where extname = 'yt_cluster'" 2>/dev/null)" = 1 ]; }
 ids()     { QT=60 q "$1" -c "select id from rmc_ledger" 2>/dev/null | LC_ALL=C sort; }
 # lacks <node> <ref>: how many ledger rows <ref> holds that <node> does not
 lacks()   { LC_ALL=C comm -23 <(ids "$2") <(ids "$1") | grep -c .; }
@@ -174,10 +174,28 @@ t0=$(date +%s)
 # [H2] the clusters run on the secret store: a join waits for the operator's
 # approval - given on the leader while the join is waited for (../rmc/store.sh)
 follows_approved() { approve_pending $C >/dev/null 2>&1; follows "$@"; }
+# What a joiner's own word cannot show: the leader counts it a member, and it holds
+# the cluster's master key and its certificate. A copy cut off by TLS called itself
+# a Follower while the leader never reached it, and east lost its quorum to two such
+# members (the nightly of 2026-10-18, M7)
+seen_good() { case "$(info "$(leader_of $C)" E "$(node_uuid "$1")")" in *Good*) return 0;; esac; return 1; }
+holds_mk() {
+    local v; v=$(info "$(leader_of $C)" J mk | sed -n 's/^v\([0-9]*\) held.*/\1/p')
+    [ -n "$v" ] && case "$(mk_line "$1")" in "v$v held"*) return 0;; esac; return 1
+}
+joiner_store_check() { # joiner_store_check <label> <node>
+    local l; l=$(leader_of $C)
+    wait_for 60 seen_good "$2" && ok "$1 the leader $l counts $2 Good" \
+        || bad "$1 the leader $l counts $2 a member: it reads [$(info "$l" E "$(node_uuid "$2")")]"
+    wait_for 120 holds_mk "$2" && ok "$1 $2 holds the master key: $(mk_line "$2")" \
+        || bad "$1 $2 holds the cluster's master key: $(mk_line "$2")"
+    wait_for 120 node_tls "$2" && ok "$1 $2 holds its certificate" || bad "$1 $2 holds its certificate: $(tls_line "$2")"
+}
 for n in $N1 $N2; do
     wait_for "$RMC_WAIT" follows_approved "$n" "$(leader_of $C)" && ok "M7 $n follows $(leader_of $C) after $(( $(date +%s) - t0 ))s" \
         || bad "M7 $n follows within ${RMC_WAIT}s: [$(node_status "$n" | cut -d'|' -f1,4)]"
 done
+for n in $N1 $N2; do joiner_store_check M7 "$n"; done
 load_pause $C
 for n in $N1 $N2; do
     wait_for "$RMC_WAIT" holds_all "$n" "$(leader_of $C)" && ok "M7 $n holds every ledger row" \
@@ -218,6 +236,7 @@ SQL
     s0=$(since)
     if wait_for "$RMC_WAIT" follows_approved "$NE" "$(leader_of $C)"; then
         ok "M2 $NE, empty, admitted: it follows $(leader_of $C)"
+        joiner_store_check M2 "$NE"
         load_pause $C
         miss() { LC_ALL=C comm -23 "$RUN/t7.before" <(ids "$NE") | grep -c .; }
         none_missing() { [ "$(miss)" = 0 ]; }

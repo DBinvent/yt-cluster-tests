@@ -1,7 +1,7 @@
 <!-- The ClickHouse Keeper ensemble of the llm test: one member on each ClickHouse
      node, which also makes the ON CLUSTER DDL of data/ch.sql work. KEEPER_ID is
      set per node by compose.yml. The cluster itself (remote_servers) is not here:
-     it is the yt_config row C clickhouse_cluster, rendered by each yaxaha node. -->
+     it is the yt_config row C clickhouse_cluster, rendered by each yt-cluster node. -->
 <clickhouse>
     <keeper_server>
         <tcp_port>9181</tcp_port>

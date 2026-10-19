@@ -26,7 +26,7 @@
 #   7. writing `ok` by hand admits nothing -- the arming is the decision
 #   8. the pending row is swept past skv_approve_ttl_sec
 #   8b. the approved key is recorded as a module-K row, leader-only (CFGLC)
-#   9. the approval as SQL (ytserv skv.md "Approval"): on a follower `yxctl
+#   9. the approval as SQL (ytserv skv.md "Approval"): on a follower `ytctl
 #      --skv-approve` is refused, a value someone typed is refused by the trigger,
 #      and `select yt_approve('<uuid>')` on the leader admits the subject - the J
 #      row goes, `K <uuid>` carries the fingerprint the row showed, a follower
@@ -331,14 +331,14 @@ esac
 # (`yt_info('J!:<uuid>')`, `ok:<kid>:<challenge>:<expires>:<mac>:<fingerprint>` -
 # nothing secret, the key stays in ytserv's memory) and writes it into the J row;
 # the yt_join_gate trigger hands it to the leader (`yt_info('J=:..')`), which
-# arms the entry, and the subject's next ask is admitted. `yxctl --skv-approve`
+# arms the entry, and the subject's next ask is admitted. `ytctl --skv-approve`
 # runs the same SQL. No SECRET: the app key is a node's own.
 #
-# The negatives first, while the entry is still pending: yxctl on a follower,
+# The negatives first, while the entry is still pending: ytctl on a follower,
 # and a value someone typed, arm nothing.
-approve() { # approve <node> -> yxctl's output; its exit status
+approve() { # approve <node> -> ytctl's output; its exit status
 	local node="$1"
-	local cmd="yxctl --skv-approve $SUBJECT_UUID --yes -U postgres -d $YX_DB -t $YX_CFG"
+	local cmd="ytctl --skv-approve $SUBJECT_UUID --yes -U postgres -d $YX_DB -t $YX_CFG"
 	if [ "$YX_HOST" = "local" ]; then
 		docker exec -u postgres "$node" $cmd 2>&1
 	else
@@ -379,8 +379,8 @@ esac
 out="$(approve "$F")" && rc=0 || rc=$?
 case "$rc:$out" in
 	0:*) bad "an approval on a follower was ACCEPTED - [$out]" ;;
-	*"not the leader"*) ok "yxctl --skv-approve on a follower is refused: not the leader" ;;
-	*) bad "yxctl --skv-approve on a follower failed, but not as 'not the leader' (rc $rc) - [$out]" ;;
+	*"not the leader"*) ok "ytctl --skv-approve on a follower is refused: not the leader" ;;
+	*) bad "ytctl --skv-approve on a follower failed, but not as 'not the leader' (rc $rc) - [$out]" ;;
 esac
 # a value someone typed: the leader's own signature with one bit of it changed
 signed="$(info "$L" "J!:$SUBJECT_UUID" "$SUBJECT_UUID")"

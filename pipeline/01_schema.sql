@@ -1,6 +1,6 @@
 -- RPPD tables, minus the rppd_event() cache-invalidation triggers: this
 -- pipeline never uses a PostgreSQL trigger, so the rppd C extension is not
--- needed. Step 1 is driven by yaxaha's on_commit_python (ytserv calls rppd
+-- needed. Step 1 is driven by yt-cluster's on_commit_python (ytserv calls rppd
 -- directly) and step 2 by an etcd queue watcher. Restart ytserver to pick up
 -- rppd_function changes instead of relying on the triggers.
 

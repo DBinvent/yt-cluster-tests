@@ -15,6 +15,8 @@ CFG_TABLE=public.yt_config
 # fresh: a restarted container re-runs this against the same filesystem.
 cat > /etc/postgresql/18/main/conf.d/yt.conf <<EOF
 max_prepared_transactions = 100
+# [xa] as ytctl writes it: the extension's COMMIT PREPARED hook in every backend
+shared_preload_libraries = 'yt_cluster'
 yt.node = '${NODE_UUID}'
 EOF
 chown -R postgres:postgres /etc/postgresql/18/main/conf.d
@@ -24,8 +26,8 @@ rm -f /var/run/postgresql/.s.YT.*.pid
 # The ClickHouse cluster file ytserv renders from C clickhouse_cluster: this
 # directory is a volume its ClickHouse node reads too. Group 101 is ClickHouse's
 # in the official image; setgid, so the 0640 file ytserv writes stays readable.
-chown postgres:101 /etc/yaxaha/clickhouse
-chmod 2750 /etc/yaxaha/clickhouse
+chown postgres:101 /etc/yt-cluster/clickhouse
+chmod 2750 /etc/yt-cluster/clickhouse
 
 # ytserv's app key (marg SECRET): it decrypts the module K rows. Handed over in a
 # file rather than on a command line.
@@ -40,8 +42,8 @@ for _ in $(seq 1 30); do
 done
 su postgres -c "psql -tAc \"select 1 from pg_database where datname='${DB}'\"" | grep -q 1 \
     || su postgres -c "createdb ${DB}"
-su postgres -c "psql -v ON_ERROR_STOP=1 -q -d ${DB} -c 'create extension if not exists yaxaha'" \
-    || { echo "[node] FATAL: create extension yaxaha failed"; sleep infinity; }
+su postgres -c "psql -v ON_ERROR_STOP=1 -q -d ${DB} -c 'create extension if not exists yt_cluster'" \
+    || { echo "[node] FATAL: create extension yt_cluster failed"; sleep infinity; }
 echo "[node] ${NODE_UUID} postgres up, waiting for C cfg_ready..."
 
 # Waits for the sentinel up.sh writes LAST: a node that started on a half-written
@@ -53,7 +55,7 @@ while :; do
 done
 
 echo "[node] starting ytserv"
-su postgres -s /bin/bash -c "set -a; . /run/yt/ytserv.env; set +a; exec /usr/local/bin/yaxaha/ytserv \
+su postgres -s /bin/bash -c "set -a; . /run/yt/ytserv.env; set +a; exec /usr/local/bin/yt-cluster/ytserv \
     'postgresql://postgres@localhost/${DB}?host=/var/run/postgresql' ${CFG_TABLE}" \
     || echo "[node] ytserv exited $? - container held open for inspection"
 sleep infinity

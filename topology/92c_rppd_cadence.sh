@@ -53,7 +53,7 @@
 # `rppd_cron` every tick - so the row has to replicate for the master to see it,
 # and for a new master to continue a watch the old one started (C6). The test
 # therefore puts `rppd_cron` under cluster sync (register_table); rppd's own
-# bare COMMITs then become cluster commits through `yaxaha.auto_complete`.
+# bare COMMITs then become cluster commits through `yt_cluster.auto_complete`.
 # `CAD_SYNC=0` leaves it node-local: C1-C5 still mean something when every
 # message happens to land on the master, C6's "state persisted" cannot pass.
 #

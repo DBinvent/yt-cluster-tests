@@ -1,6 +1,6 @@
 # Cluster test 1 — replication cost profile, 2026-09-13
 
-Where the time goes in a 3-node yaxaha cluster, measured against PostgreSQL's
+Where the time goes in a 3-node yt-cluster cluster, measured against PostgreSQL's
 own synchronous replication on the same hardware and network. Includes four
 fixes made during the run and the evidence for each.
 
@@ -299,7 +299,7 @@ NODE1=<address> NODE2=<address> NODE3=<address> \
 
 Per-stage numbers come from `[YT_CHAIN]` lines in `ytserver.log` on all three
 nodes, correlated with `[YT_CALL]` start/end markers the C extension writes to
-the PostgreSQL log when `YAXAHA_PROF` is set in the postmaster environment
+the PostgreSQL log when `YT_CLUSTER_PROF` is set in the postmaster environment
 (Debian/Ubuntu: `/etc/postgresql/<ver>/<cluster>/environment`).
 
 ## Appendix — hot-path async/lock cleanup (same session)

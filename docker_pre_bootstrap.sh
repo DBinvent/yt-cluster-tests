@@ -1,12 +1,12 @@
 #!/bin/bash
 set -Eeu
 
-sudo mkdir -p /var/log/yaxaha/
-sudo chmod a+rw /var/log/yaxaha
+sudo mkdir -p /var/log/yt-cluster/
+sudo chmod a+rw /var/log/yt-cluster
 
 sudo apt-get update
-echo "refresh yaxaha..."
-sudo apt-get install --only-upgrade yaxaha
+echo "refresh yt-cluster..."
+sudo apt-get install --only-upgrade yt-cluster
 sudo localedef -i en_US -f UTF-8 en_US.UTF-8
 
 sudo service postgresql start # required for ytsetup
@@ -16,7 +16,7 @@ echo "Please ignore errors as of systemctl is not working on Docker, and the fin
 echo "self-test failing since YtServ isn't actually running until docker_bootstrap.sh does"
 echo
 
-sudo /usr/local/bin/yxctl-glibc2_35 --batch -v -s -g $(pwd)/pgbouncer.ini --docker_bootstrap ./docker_bootstrap.sh || true
+sudo /usr/local/bin/ytctl-glibc2_35 --batch -v -s -g $(pwd)/pgbouncer.ini --docker_bootstrap ./docker_bootstrap.sh || true
 
 echo "\$@" | sudo tee -a ./docker_bootstrap.sh > /dev/null
 echo

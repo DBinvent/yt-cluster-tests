@@ -1,6 +1,6 @@
 # [P5] A git server over ssh, on the cluster's own network.
 #
-# ssh only, by decision: it is how the real yaxaha and rdbm deployments
+# ssh only, by decision: it is how the real yt-cluster and rdbm deployments
 # authenticate to git, and it is the path `rppd_git::ssh_command` /
 # `rdbm::dbm_git::ssh_command` take. The consequence is recorded in PLAN.md §2 —
 # `secret::git_credential_line` returns None for an ssh remote by design, so

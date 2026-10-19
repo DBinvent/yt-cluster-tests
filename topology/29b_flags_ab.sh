@@ -195,8 +195,8 @@ hot_ab() {
 # ── setup ────────────────────────────────────────────────────────────────────
 
 [ "$NV" -ge 3 ] || { bad "needs three non-spare nodes, has $NV"; summary; }
-ONE_CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'cluster_commit=nodes>=2' | tail -1 || true)"
-[ -n "$ONE_CFG" ] || { bad "yxctl --encode-table-cfg produced nothing (is $REPO_ROOT built?)"; summary; }
+ONE_CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'cluster_commit=nodes>=2' | tail -1 || true)"
+[ -n "$ONE_CFG" ] || { bad "ytctl --encode-table-cfg produced nothing (is $REPO_ROOT built?)"; summary; }
 for n in "${NODES[@]}"; do
 	q "$n" "drop table if exists ab_t;  create table ab_t  (id bigint primary key, v bigint not null default 0);
 	        drop table if exists ab1_t; create table ab1_t (id bigint primary key, v bigint not null default 0);" >/dev/null

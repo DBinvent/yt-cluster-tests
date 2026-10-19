@@ -41,7 +41,7 @@ done
 # ENOUGH - admission at half the budget, demotion past the whole - so rejoining
 # a little behind is by design, and recon is what closes the remainder. Without
 # a recon config nothing ever does, and the row is simply gone on that node.
-NB_CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
+NB_CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
 register_table public.nb_t "$NB_CFG"
 restart_all
 await_cluster

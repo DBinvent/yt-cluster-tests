@@ -9,8 +9,8 @@ done
 sleep 2
 
 # az_routing lives in CfgTabl field 20; the row value is base64 protobuf, so it
-# is written with the same encoder yxctl's TUI uses rather than hand-packed here.
-AZCFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'az=east' | tail -1)"
+# is written with the same encoder ytctl's TUI uses rather than hand-packed here.
+AZCFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'az=east' | tail -1)"
 [ -n "$AZCFG" ] || { echo "  encoder produced nothing" >&2; exit 1; }
 echo "  az_routing value: $AZCFG"
 # register_table, not yt_setup: yt_setup creates the trigger and writes the

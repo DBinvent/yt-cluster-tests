@@ -3,15 +3,15 @@
 # the unit tests and the end-to-end suites ran. nightly/nightly.sh measures it in a
 # run that finds nightly/coverage.yaml missing (or with --coverage), through these:
 #
-#   nightly/coverage.sh build <deb> <out.deb>   # instrumented ytserv + yxctl, and <deb> carrying them
+#   nightly/coverage.sh build <deb> <out.deb>   # instrumented ytserv + ytctl, and <deb> carrying them
 #   nightly/coverage.sh unit                    # the workspace's cargo tests, instrumented
 #   nightly/coverage.sh report <dir> <yaml>     # <dir>/e2e/<suite>/*.profraw + the unit profiles
 #
-# build: ytserv and yxctl, release profile, yt-pgxt's own crates compiled with
+# build: ytserv and ytctl, release profile, yt-pgxt's own crates compiled with
 #   `-C instrument-coverage --cfg yt_coverage` (coverage-rustc.sh; the registry
 #   crates plain), in yt-pgxt/target/coverage - never target/release, which the
 #   release build reads. The package is <deb> with those two binaries swapped in and
-#   /var/lib/yaxaha-cov (mode 1777) added: every suite installs it in place of
+#   /var/lib/yt-cluster-cov (mode 1777) added: every suite installs it in place of
 #   <deb>, and an instrumented process writes its counts there itself
 #   (ytcluster-common/src/coverage.rs) - rewritten every 5 s, so a node killed by
 #   its test keeps all but its last seconds. A suite mounts a docker volume of its
@@ -50,13 +50,13 @@ build() {
 	command -v cargo-llvm-cov >/dev/null && [ -x "$LLVM_BIN/llvm-profdata" ] \
 		|| die "needs cargo-llvm-cov and the llvm-tools component (rustup component add llvm-tools-preview)"
 	(cd "$YT_PGXT" && YT_COV_ROOT="$(realpath "$YT_PGXT")" RUSTC_WRAPPER="$HERE/coverage-rustc.sh" \
-		CARGO_TARGET_DIR="$COV_TARGET" cargo build --release -p ytserv -p yxctl) \
+		CARGO_TARGET_DIR="$COV_TARGET" cargo build --release -p ytserv -p ytctl) \
 		|| die "the instrumented build failed"
 	stage="$(mktemp -d)"
 	dpkg-deb -R "$deb" "$stage" || die "cannot unpack $deb"
-	install -m 755 "$COV_TARGET/release/ytserv" "$stage/usr/local/bin/yaxaha/ytserv"
-	install -m 755 "$COV_TARGET/release/yxctl" "$stage/usr/local/bin/yxctl"
-	install -d -m 1777 "$stage/var/lib/yaxaha-cov"
+	install -m 755 "$COV_TARGET/release/ytserv" "$stage/usr/local/bin/yt-cluster/ytserv"
+	install -m 755 "$COV_TARGET/release/ytctl" "$stage/usr/local/bin/ytctl"
+	install -d -m 1777 "$stage/var/lib/yt-cluster-cov"
 	(cd "$stage" && find . -path ./DEBIAN -prune -o -type f -printf '%P\0' | sort -z | xargs -0 md5sum > DEBIAN/md5sums)
 	sed -i "s/^Installed-Size: .*/Installed-Size: $(du -sk --exclude=DEBIAN "$stage" | cut -f1)/" "$stage/DEBIAN/control"
 	dpkg-deb --root-owner-group -Zgzip -b "$stage" "$out" >/dev/null || die "cannot pack $out"
@@ -74,7 +74,7 @@ e2e_lcov() {
 	"$LLVM_BIN/llvm-profdata" merge -sparse --failure-mode=all "$@" -o "${out%.lcov}.profdata" 2>"${out%.lcov}.merge.log" \
 		|| { echo "  WARN  no usable profile for $(basename "$out")"; return 1; }
 	"$LLVM_BIN/llvm-cov" export -format=lcov -instr-profile "${out%.lcov}.profdata" \
-		-ignore-filename-regex="$IGNORE" "$COV_TARGET/release/ytserv" -object "$COV_TARGET/release/yxctl" > "$out"
+		-ignore-filename-regex="$IGNORE" "$COV_TARGET/release/ytserv" -object "$COV_TARGET/release/ytctl" > "$out"
 }
 
 report() {
@@ -94,7 +94,7 @@ report() {
 	mapfile -t files < <(find "$dir/e2e" -name '*.profraw' -size +0 2>/dev/null)
 	if [ "${#files[@]}" -gt 0 ] && e2e_lcov "$dir/e2e.lcov" "${files[@]}"; then
 		"$LLVM_BIN/llvm-cov" show -format=html -output-dir "$dir/e2e-html" -instr-profile "$dir/e2e.profdata" \
-			-ignore-filename-regex="$IGNORE" "$COV_TARGET/release/ytserv" -object "$COV_TARGET/release/yxctl" >/dev/null 2>&1
+			-ignore-filename-regex="$IGNORE" "$COV_TARGET/release/ytserv" -object "$COV_TARGET/release/ytctl" >/dev/null 2>&1
 	fi
 	ROOT="$YT_PGXT" DIR="$dir" YAML="$yaml" python3 - <<'EOF'
 import glob, json, os, sys
@@ -153,8 +153,8 @@ with open(f"{d}/combined.lcov", "w") as fh:
             fh.write(f"DA:{ln},{1 if ln in total[f] else 0}\n")
         fh.write(f"LF:{len(lines[f])}\nLH:{len(total[f])}\nend_of_record\n")
 
-out = ["# yaxaha code coverage: the lines of yt-pgxt's Rust workspace the nightly's tests ran -",
-       "# the unit tests and every end-to-end suite, against an instrumented ytserv and yxctl",
+out = ["# YT Cluster code coverage: the lines of yt-pgxt's Rust workspace the nightly's tests ran -",
+       "# the unit tests and every end-to-end suite, against an instrumented ytserv and ytctl",
        "# (nightly/coverage.sh says what counts). Written by a nightly run that measured it,",
        "# and a run measures it when this file is MISSING, or lists fewer suites than a whole",
        "# run: rename or delete it and the next nightly measures again, even with no code",

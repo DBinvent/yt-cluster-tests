@@ -68,7 +68,7 @@ only be rediscovered after an election, which is what item 4 exists to avoid"
 # ── 3. a cross-boundary write works BEFORE the failover ────────────────────
 #
 # The baseline. Without it, "it still works afterwards" could mean it never worked.
-enc() { "$REPO_ROOT"/target/release/yxctl --encode-table-cfg "$1" 2>/dev/null | tail -1; }
+enc() { "$REPO_ROOT"/target/release/ytctl --encode-table-cfg "$1" 2>/dev/null | tail -1; }
 CFG="$(enc 'az=top,eastc; write=top')"
 for n in ${CLUSTER_NODES[upper]} ${CLUSTER_NODES[east]}; do
 	q "$n" "drop table if exists f_t; create table f_t (id bigint primary key, v text);" >/dev/null

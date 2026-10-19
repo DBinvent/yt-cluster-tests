@@ -6,7 +6,7 @@
 #
 # The hierarchy runs on the store and TLS from the start (H2): 15_store.sh set it up
 # - the store, genesis and approvals in each cluster, TLS required, the links
-# declared with yxctl and each lower CA approved on the upper leader. This script
+# declared with ytctl and each lower CA approved on the upper leader. This script
 # checks what holds across the links, then rotates a lower and the upper. The store
 # and TLS stay on afterwards: a hierarchy cannot run without them.
 #

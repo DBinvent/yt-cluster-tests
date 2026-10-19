@@ -6,7 +6,7 @@ output is in `results/`.
 
 ## In short
 
-- **The last run passes everything, with the relay**: run 35, yaxaha 0.17.31
+- **The last run passes everything, with the relay**: run 35, yt-cluster 0.17.31
   (ytserv 0.20.31), all seven phases, 883 checks passed, none failed, no `GAP`.
   Three linked clusters grew at runtime on every level by physical copy, each
   copy following in 3 to 4 s and caught up within a second; leadership moved to
@@ -24,7 +24,7 @@ output is in `results/`.
   held. The writers made about 14,300 writes; 91 (0.6%) were refused while a
   leader changed, and none of them was ever acknowledged.
 - **Thirty-five runs found 43 faults and a few smaller ones, and 31 ytserv
-  releases fixed them** (0.20.1 to 0.20.31, yaxaha 0.17.1 to 0.17.31). Runs 1 to
+  releases fixed them** (0.20.1 to 0.20.31, yt-cluster 0.17.1 to 0.17.31). Runs 1 to
   24 brought the clusters to a clean run with the relay still missing; 0.20.22
   built the relay, and runs 25 to 35 found what carrying data across a boundary,
   and the fixes on the way, uncovered (findings 32 to 43). Most faults predate
@@ -52,7 +52,7 @@ output is in `results/`.
 
 ## The runs
 
-| run | yaxaha (ytserv) | new nodes | outcome | log |
+| run | yt-cluster (ytserv) | new nodes | outcome | log |
 |---|---|---|---|---|
 | 1 | 0.17.0 (0.20.0) | empty | follower writes break replication; via the leader only: P1 holds, P2 fails (runtime config writes refused, lower leaders stop answering) | [run-20261004-171919](results/run-20261004-171919.log) |
 | 3 | 0.17.1 (0.20.1) | empty | P1 holds, but half the follower writes time out; P2: lower clusters lose their leaders, upper rows on the west leader | [run-20261004-175208](results/run-20261004-175208.log) |
@@ -693,7 +693,7 @@ drives its relay, changed four times (a1, a5, a4, a5, a8).
 
 ## Run 35 by phase
 
-Physical-copy joins, round-robin load on every member, yaxaha 0.17.31.
+Physical-copy joins, round-robin load on every member, yt-cluster 0.17.31.
 
 | phase | ok / failed / gap | what happened |
 |---|---|---|

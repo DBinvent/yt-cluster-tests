@@ -2,10 +2,10 @@
 #
 # The counterpart to cluster.tape: that one shows the suite running, this one
 # shows what the suite is running *against*, which is the part someone
-# evaluating YaXAHA actually wants to poke at.
+# evaluating YT Cluster actually wants to poke at.
 #
 #   ../record.sh          builds the image, boots a container, records this
-#   vhs tapes/single-node.tape   if `yaxaha-demo` is already bootstrapped
+#   vhs tapes/single-node.tape   if `yt-cluster-demo` is already bootstrapped
 
 Output single-node.gif
 Output single-node.mp4
@@ -22,7 +22,7 @@ Type "# One node of the cluster, with a psql prompt attached."
 Enter
 Sleep 2s
 
-Type "docker exec -it yaxaha-demo bash -lc 'cd /home/rust && cargo make --makefile node.toml --env NID=1 --env psql=1 --env CNT=1 --env INIT=it_init_single.sql'"
+Type "docker exec -it yt-cluster-demo bash -lc 'cd /home/rust && cargo make --makefile node.toml --env NID=1 --env psql=1 --env CNT=1 --env INIT=it_init_single.sql'"
 Enter
 # initdb, Postgres start, extension create, ytserv start, then the prompt.
 # Guessed — measure it on the first recording and trim.

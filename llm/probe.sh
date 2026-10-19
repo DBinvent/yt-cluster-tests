@@ -8,7 +8,7 @@
 #
 # A model that is loading (503) or down (502, 000 = no connection) is asked
 # again every 10 s for up to PROBE_WAIT seconds (default 300) in all. When one
-# never answers, the yt_llm test says nothing about yaxaha - it is skipped, not
+# never answers, the yt_llm test says nothing about yt-cluster - it is skipped, not
 # failed.
 . "$(dirname "$0")/lib.sh"
 

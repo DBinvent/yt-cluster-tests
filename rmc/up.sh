@@ -25,9 +25,9 @@ say "== 1. nodes: $ALL"
 net_up
 for n in $ALL; do node_run "$n" || die "docker run $n"; done
 load_run || die "docker run the load client"
-ext_ready() { [ "$(q "$1" <<< "select count(*) from pg_extension where extname = 'yaxaha'" 2>/dev/null)" = 1 ]; }
+ext_ready() { [ "$(q "$1" <<< "select count(*) from pg_extension where extname = 'yt_cluster'" 2>/dev/null)" = 1 ]; }
 for n in $ALL; do wait_for 180 ext_ready "$n" || die "$n: PostgreSQL with the extension"; done
-say "  every node: PostgreSQL 18, extension yaxaha ($(docker exec "$(cname u1)" dpkg-query -W -f='${Version}' yaxaha))"
+say "  every node: PostgreSQL 18, extension yt_cluster ($(docker exec "$(cname u1)" dpkg-query -W -f='${Version}' yt-cluster))"
 
 say "== 2. tables"
 {
@@ -37,7 +37,7 @@ say "== 2. tables"
     echo "CFG_UP='$(enc 'az=top,eastc; write=eastc; no_down')'"
 } > "$RUN/tables.env"
 table_cfg
-[ -n "$CFG_LOCAL" ] && [ -n "$CFG_DOWN" ] && [ -n "$CFG_SIDE" ] && [ -n "$CFG_UP" ] || die "yxctl --encode-table-cfg gave nothing"
+[ -n "$CFG_LOCAL" ] && [ -n "$CFG_DOWN" ] && [ -n "$CFG_SIDE" ] && [ -n "$CFG_UP" ] || die "ytctl --encode-table-cfg gave nothing"
 for n in $ALL; do schema_sql | q "$n" >/dev/null || die "$n: schema"; done
 say "  rmc_ledger, rmc_probe: no_up; no_down   rmc_down: az=top,eastc,westc; write=top   rmc_up: az=top,eastc; write=eastc; no_down   rmc_side: az=eastc,westc"
 
@@ -70,7 +70,10 @@ for c in "${CLUSTERS[@]}"; do
 done
 
 say "== 5b. the store and TLS, the links (H2)"
-store_up || die "the clusters are not on the secret store and TLS"
+# Its FAILs are counted, and the layout comes up all the same: a test may only be
+# added, never cut - a failed new step must not keep every later check from running
+# (the nightly of 2026-10-17 ran 80 of rmc/topo's 1,471 checks when this stopped)
+store_up || say "  ....  the store and TLS are not up everywhere (FAILs above): the steps below run without them"
 
 say "== 6. writers"
 for c in "${CLUSTERS[@]}"; do

@@ -138,7 +138,7 @@ psql -p $port -h $wd -c "create database $USER owner $USER;" postgres || echo "D
 # Fatal, and said out loud. Without this the failure is discarded — there is
 # no `set -e` here — and the run continues to wait for an extension that was
 # never created, forever. That is how `CREATE EXTENSION ytpgxt` survived the
-# rename to `yaxaha`: the suite never reported it, it just stopped.
+# rename to `yt-cluster`: the suite never reported it, it just stopped.
 # error.msg is the channel close_wait.sh reads to decide the exit code.
 if ! psql -p $port -h $wd -f ${INIT} -v ON_ERROR_STOP=on
 then
@@ -158,7 +158,7 @@ fi
 # The config table is the second argument and is NOT optional. Given only a
 # connection string, ytserv 0.12 derives the table from its own argv[0] and
 # queries `public.ytserv-glibc2_35`, which is a syntax error it retries
-# forever. `yxctl` passes `public.yt_config` in the packaged bootstrap; so
+# forever. `ytctl` passes `public.yt_config` in the packaged bootstrap; so
 # does this now.
 if [[ -f node.env ]]
 then

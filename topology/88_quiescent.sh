@@ -16,7 +16,7 @@ for n in "${NODES[@]}"; do
 done
 # a short age trigger so the test does not take ten minutes; rows trigger set
 # high so ONLY the age path can fire
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'recon=repair; recon_rows=100000; recon_timeout_sec=20' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'recon=repair; recon_rows=100000; recon_timeout_sec=20' | tail -1)"
 echo "  config (age-only): $CFG"
 # register_table, not yt_setup: yt_setup creates the trigger and writes the
 # module-A row in ONE transaction, and on a node whose config table is synced

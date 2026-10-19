@@ -18,7 +18,7 @@ wait_for_container
 
 echo "Installing PostgreSQL..."
 xc apt-get update -q
-# libprotobuf-c1: runtime dep of the yaxaha extension .so (matches deb Depends)
+# libprotobuf-c1: runtime dep of the yt_cluster extension .so (matches deb Depends)
 xc env DEBIAN_FRONTEND=noninteractive apt-get install -qy postgresql postgresql-client libpq-dev binutils libprotobuf-c1
 xc systemctl enable --now postgresql
 

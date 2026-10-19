@@ -19,6 +19,8 @@ PGDATA=/var/lib/postgresql/18/main
 # the SAME filesystem, and appending grew a new pair of settings on every cycle.
 cat > /etc/postgresql/18/main/conf.d/yt.conf <<EOF
 max_prepared_transactions = 100
+# [xa] as ytctl writes it: the extension's COMMIT PREPARED hook in every backend
+shared_preload_libraries = 'yt_cluster'
 yt.node = '${NODE_UUID}'
 EOF
 
@@ -42,8 +44,8 @@ YT_PID=""
 stop_node() {
     echo "[node] stopping: ytserv, then PostgreSQL (fast)"
     [ -n "$YT_PID" ] && kill -TERM "$YT_PID" 2>/dev/null || true
-    pkill -TERM -f yaxaha/ytserv 2>/dev/null || true
-    for _ in 1 2 3 4 5; do pgrep -f yaxaha/ytserv >/dev/null || break; sleep 0.2; done
+    pkill -TERM -f yt-cluster/ytserv 2>/dev/null || true
+    for _ in 1 2 3 4 5; do pgrep -f yt-cluster/ytserv >/dev/null || break; sleep 0.2; done
     pg_ctlcluster 18 main stop -m fast 2>/dev/null || true
     exit 0
 }
@@ -93,8 +95,8 @@ su postgres -c "psql -tAc \"select 1 from pg_database where datname='${DB}'\"" |
 # Errors here are REPORTED, not swallowed. A silent `|| true` on the extension
 # step produced a node whose only symptom was ytserv saying yt_config did not
 # exist, several layers away from the statement that actually failed.
-su postgres -c "psql -v ON_ERROR_STOP=1 -q -d ${DB} -c 'create extension if not exists yaxaha'" \
-    || { echo "[node] FATAL: create extension yaxaha failed"; sleep infinity & wait $!; }
+su postgres -c "psql -v ON_ERROR_STOP=1 -q -d ${DB} -c 'create extension if not exists yt_cluster'" \
+    || { echo "[node] FATAL: create extension yt_cluster failed"; sleep infinity & wait $!; }
 
 # What the fixture adds on top of the extension (yt_setup() itself comes with
 # the extension): the join gate. Advisory, but its errors still print.
@@ -167,7 +169,7 @@ fi
 #
 # In the background with `wait`: a trap runs only between foreground commands,
 # so a ytserv (or `sleep`) in the foreground kept SIGTERM from stop_node.
-su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yaxaha/ytserv '${DB_URL}' ${CFG_TABLE}" &
+su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yt-cluster/ytserv '${DB_URL}' ${CFG_TABLE}" &
 YT_PID=$!
 wait "$YT_PID" || echo "[node] ytserv exited $? - container held open for inspection"
 YT_PID=""

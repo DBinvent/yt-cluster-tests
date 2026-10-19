@@ -75,7 +75,7 @@ for n in "${NODES[@]}"; do
 	cfg_write "$n" clickhouse_db C "$YX_DB"
 done
 
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'on_commit_clickhouse' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'on_commit_clickhouse' | tail -1)"
 [ -n "$CFG" ] && ok "on_commit_clickhouse encodes to a config ($CFG)" \
 	|| bad "--encode-table-cfg 'on_commit_clickhouse' produced nothing"
 
@@ -182,7 +182,7 @@ done
 chq "DROP TABLE IF EXISTS $YX_DB.chp_sink" >/dev/null
 chq "CREATE TABLE $YX_DB.chp_sink (id Int64, note String) ENGINE = MergeTree ORDER BY id" >/dev/null
 
-PYCFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'on_commit_python' | tail -1)"
+PYCFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'on_commit_python' | tail -1)"
 register_table public.chp_t "$PYCFG"
 
 q "$L" "insert into rppd_config (host, host_name, master) values ('$L:7421','$L',true)

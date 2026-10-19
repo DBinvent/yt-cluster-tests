@@ -26,7 +26,7 @@
 #
 # `serve_rppd` is off by default, on purpose: "a cluster that silently starts
 # executing rows a tool wrote into a table is the worst possible default"
-# (`rmc.rs`). The `rppd_*` tables are not in `yaxaha--0.5.sql`: ytserv creates them
+# (`rmc.rs`). The `rppd_*` tables are not in `yt_cluster--0.5.sql`: ytserv creates them
 # (2026-10-16, `[rppd-tables]`) - with serve_rppd on, by SchemaGuard over rppd's
 # own rppd.yaml, in the database rppd uses (the catalog here) - and no
 # `rppd_event` triggers, since the function does not exist. This test once
@@ -41,7 +41,7 @@ for n in "${NODES[@]}"; do
 	cfg_write "$n" serve_rppd C true
 done
 
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'on_commit_python' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'on_commit_python' | tail -1)"
 [ -n "$CFG" ] && ok "on_commit_python encodes to a config ($CFG)" \
 	|| bad "--encode-table-cfg 'on_commit_python' produced nothing"
 register_table public.sf_t "$CFG"
@@ -164,10 +164,10 @@ fi
 # `encodings`, and if the deb ships the `.so` without it there is nowhere for
 # the runtime to come from.
 echo "  python runtime on $L:"
-rh "docker exec $L sh -c 'ls /usr/local/lib/yaxaha/ 2>/dev/null | sed \"s/^/     lib: /\"; \
+rh "docker exec $L sh -c 'ls /usr/local/lib/yt-cluster/ 2>/dev/null | sed \"s/^/     lib: /\"; \
 	ls -d /usr/lib/python3.1* 2>/dev/null | sed \"s/^/     stdlib: /\" || echo \"     stdlib: NONE\"'" 2>/dev/null
 
-stdlib="$(rh "docker exec $L sh -c 'ls -d /usr/lib/python3.12 /usr/local/lib/yaxaha/python3.12 2>/dev/null | head -1'" 2>/dev/null || true)"
+stdlib="$(rh "docker exec $L sh -c 'ls -d /usr/lib/python3.12 /usr/local/lib/yt-cluster/python3.12 2>/dev/null | head -1'" 2>/dev/null || true)"
 [ -n "$stdlib" ] \
 	&& ok "a python 3.12 standard library is present ($stdlib)" \
 	|| bad "libpython3.12 is vendored with NO standard library, and 26.04 has no \

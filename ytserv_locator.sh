@@ -9,12 +9,12 @@
 #   error while loading shared libraries: libpython3.12.so.1.0
 #
 # This used to be `ls -l .../ytserv* | head -1 | awk '{print $9}'`, i.e.
-# whichever name sorted first — which is that one. `yxctl` picks
+# whichever name sorted first — which is that one. `ytctl` picks
 # `ytserv-glibc2_35` for the packaged install, so the tests were running a
 # different binary from the deployment even when they ran at all.
 set -Eeu
 
-dir=${YTSERV_DIR:-/usr/local/bin/yaxaha}
+dir=${YTSERV_DIR:-/usr/local/bin/yt-cluster}
 
 # A static build reports "not a dynamic executable" and no "not found",
 # so it passes this too.

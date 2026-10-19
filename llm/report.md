@@ -1,8 +1,8 @@
-# Asking a yaxaha cluster in plain language: one question, three engines
+# Asking a yt-cluster cluster in plain language: one question, three engines
 
 *A test report, 2026-09-30*
 
-A yaxaha cluster can answer a question written in plain language:
+A yt-cluster cluster can answer a question written in plain language:
 
 ```sql
 SELECT * FROM yt_llm('How many delivered orders were placed by customers of each country?')
@@ -16,14 +16,14 @@ that each node holds only its own rows. It may live in ClickHouse, next to the
 PostgreSQL cluster. It may also be a table you want computed by DataFusion
 rather than PostgreSQL.
 
-This report describes a test of exactly that on three yaxaha nodes and three
+This report describes a test of exactly that on three yt-cluster nodes and three
 ClickHouse nodes in docker. It covers ten questions asked on every node, and the
 bug the test found and that is now fixed. The final run was **101 checks, 101
 passed**.
 
 ## How a node answers a question
 
-`yt_llm` is a function of the yaxaha extension. The work happens in ytserv, the
+`yt_llm` is a function of the yt_cluster extension. The work happens in ytserv, the
 node's cluster daemon, in five steps.
 
 1. **The node describes what it can read, as three lists.** Each table goes on
@@ -62,7 +62,7 @@ node's share of the rows.
 
 ### What shards change
 
-yaxaha can shard a table over its nodes, and it has two kinds of shard.
+yt-cluster can shard a table over its nodes, and it has two kinds of shard.
 
 - **Pinned:** a column names the node that owns the row. A pinned table goes on
   the `df` list as "sharded". A question over it is answered from ClickHouse when
@@ -78,7 +78,7 @@ yaxaha can shard a table over its nodes, and it has two kinds of shard.
 
 ```
             ┌─────────────── docker network ───────────────┐
-            │  yt1  yt2  yt3   yaxaha nodes: PostgreSQL 18, │
+            │  yt1  yt2  yt3   yt-cluster nodes: PostgreSQL 18, │
             │                  ytserv, DataFusion 54        │
             │  ch1  ch2  ch3   ClickHouse 26.9: 3 shards,   │
             │                  Keeper on all three          │
@@ -88,13 +88,13 @@ yaxaha can shard a table over its nodes, and it has two kinds of shard.
                           llama.cpp, three models, CPU only
 ```
 
-- **Everything is found by name, not address.** Each yaxaha node shares a small
+- **Everything is found by name, not address.** Each yt-cluster node shares a small
   private network with its ClickHouse node, which answers to the name `ch` there.
   So one cluster-wide setting, `http://ch:8123`, makes every node read its own
   ClickHouse. The ClickHouse queries are then spread over the three shards.
 - **The configuration lives in the cluster's own config table.** That covers the
   node roster, the model service's address, and which tables DataFusion reads. It
-  also holds the ClickHouse cluster definition, which each yaxaha node renders
+  also holds the ClickHouse cluster definition, which each yt-cluster node renders
   into the file its ClickHouse node reads. The client key for the model service
   and the ClickHouse password are stored encrypted with the node's app key, which
   is new for every run.
@@ -216,7 +216,7 @@ had taken it.
 **The fix** is a few lines in ytserv's router. A statement the node had written
 for ClickHouse now looks its tables up among ClickHouse's own tables, shadowed
 ones included, and runs there when ClickHouse has them all. It has a unit test,
-and it shipped in yaxaha 0.16.7. The third run passed 101 of 101, and the fix is
+and it shipped in yt-cluster 0.16.7. The third run passed 101 of 101, and the fix is
 on our three-node lab cluster.
 
 ## Lessons
@@ -252,7 +252,7 @@ up, [results.md](results.md) is the detailed record, and the scripts are in the
 folder:
 
 ```
-cp env.example .env     # the model service's client certificate, the yaxaha package
+cp env.example .env     # the model service's client certificate, the yt-cluster package
 ./build.sh              # the node image
 ./up.sh                 # a new cluster: nodes, data, config, ClickHouse (~2 min)
 ./test.sh               # the questions on all three nodes (~12 min)

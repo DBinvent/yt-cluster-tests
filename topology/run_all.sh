@@ -3,7 +3,7 @@
 # script, failures recorded and the run carried on. Ends with one line the
 # nightly reads: "---- topology: <passed> passed, <failed> failed ----".
 #
-#   ./run_all.sh                 # YT_PGXT's newest deb, or YAXAHA_DEB
+#   ./run_all.sh                 # YT_PGXT's newest deb, or YT_CLUSTER_DEB
 #   ./90_down.sh                 # free the containers afterwards
 set -uo pipefail
 cd "$(dirname "$0")"

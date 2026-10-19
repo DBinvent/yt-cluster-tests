@@ -5,7 +5,7 @@
 -- Each table is <name>_local (MergeTree) on every node plus <name>, a Distributed
 -- table over them - the layout the lab uses. llm2 reads the Distributed ones.
 --   analytics.page_views  only in ClickHouse: the ch target
---   shop.web_events       ALL rows of two PostgreSQL tables sharded over the yaxaha
+--   shop.web_events       ALL rows of two PostgreSQL tables sharded over the yt-cluster
 --   shop.sessions         nodes (same generators as data/pg.sql): the routing targets
 
 CREATE DATABASE IF NOT EXISTS analytics ON CLUSTER yt;
@@ -60,7 +60,7 @@ SELECT toDateTime('2026-09-01 00:00:00') + number * 60,
   FROM numbers(30000)
 SETTINGS distributed_foreground_insert = 1;
 
--- the same rows data/pg.sql spreads over the three yaxaha nodes, all of them
+-- the same rows data/pg.sql spreads over the three yt-cluster nodes, all of them
 INSERT INTO shop.web_events
 SELECT number,
        ['view','view','view','click','click','cart','buy'][number % 7 + 1],

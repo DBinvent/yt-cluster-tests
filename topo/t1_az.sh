@@ -14,7 +14,7 @@ C=west
 . "$(dirname "$0")/lib.sh"
 topo_log t1
 for c in "${CLUSTERS[@]}"; do [ -s "$RUN/members.$c" ] || die "no $RUN/members.$c - run ../rmc/up.sh first"; done
-say "== topo T1 $(now) UTC, yaxaha $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yaxaha 2>/dev/null), cluster $C: $(members $C)"
+say "== topo T1 $(now) UTC, yt-cluster $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yt-cluster 2>/dev/null), cluster $C: $(members $C)"
 
 # az_line <node> <name>: one of yt_info('E')'s az lines on a node
 az_line() { info "$1" E "$2"; }

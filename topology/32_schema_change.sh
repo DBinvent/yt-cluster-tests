@@ -160,7 +160,7 @@ failed_cleanly() {
 }
 
 # ── setup ────────────────────────────────────────────────────────────────────
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
 for n in "${NODES[@]}"; do
 	q "$n" "drop table if exists $T; create table $T (id bigint primary key, v text, code varchar(20));" >/dev/null
 done
@@ -302,7 +302,7 @@ same_schema "S8 after the contract step (note dropped)"
 # A table that has had a column dropped keeps it in its descriptor (attisdropped,
 # "........pg.dropped.N........"). The trigger used to send it, and every member's
 # INSERT named it and failed with a syntax error - on every node, for good (fixed
-# in yaxaha.c, deb 1.18.84). UPDATE and DELETE send only changed and key columns;
+# in yt_cluster.c, deb 1.18.84). UPDATE and DELETE send only changed and key columns;
 # all three are asserted, each from another origin.
 e="$(cw "${VOTERS[0]}" "insert into $T (id, v, qty) values (4000, 'after-contract', 7)")"
 [ -z "$e" ] && ok "S8 an INSERT after the drop commits (from ${VOTERS[0]})" \

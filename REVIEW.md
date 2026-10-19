@@ -2,7 +2,7 @@
 
 Written 2026-08-25 after building the image from this `Dockerfile` and
 running `cargo make --env PG_VER=14 --env CNT=3` inside it against the
-current `yaxaha` package from the local apt host. Everything under
+current `yt-cluster` package from the local apt host. Everything under
 "Findings" was observed, not read off the source — where I am guessing, it
 says so.
 
@@ -13,7 +13,7 @@ before it. Four are fixed; the fifth needs a decision (see "Questions").
 
 | | | |
 |---|---|---|
-| 1 | `CREATE EXTENSION ytpgxt` → `yaxaha` | fixed, `it_init*.sql` |
+| 1 | `CREATE EXTENSION ytpgxt` → `yt-cluster` | fixed, `it_init*.sql` |
 | 2 | `psql_wait.sh` ran before the ytserv it waits for | fixed, `node.toml` |
 | 2a | `ytserv_locator.sh` picked a binary that cannot run here | fixed, rewritten |
 | 2b | ytserv's config-table argument was not being passed | fixed, `node.toml` + `node_runner.sh` |
@@ -57,14 +57,14 @@ psql:it_init.sql:28: ERROR: could not open extension control file
   "/usr/share/postgresql/14/extension/ytpgxt.control": No such file
 ```
 
-The shipped extension is `yaxaha` 0.5:
+The shipped extension is `yt-cluster` 0.5:
 
 ```
 $ psql -c "select name, default_version from pg_available_extensions where name like '%y%'"
- yaxaha | 0.5
+ yt-cluster | 0.5
 ```
 
-`docker_post_bootstrap.sh` already says `create extension yaxaha`, so the
+`docker_post_bootstrap.sh` already says `create extension yt_cluster`, so the
 rename landed everywhere except here. `HEAD` is "fixed renaming and tests";
 this file was missed.
 
@@ -83,11 +83,11 @@ broken build should take a minute to diagnose, not a wall-clock eternity.
 
 ### 2. After fixing that, it deadlocks: the wait precedes what it waits for
 
-Patching `ytpgxt` → `yaxaha` gets the extension loaded and produces a new
+Patching `ytpgxt` → `yt-cluster` gets the extension loaded and produces a new
 infinite loop:
 
 ```
-LOG:   yaxaha: extension loaded (version 0.5)
+LOG:   yt-cluster: extension loaded (version 0.5)
 ERROR: yt_info: curl error: Couldn't connect to server
 ```
 
@@ -119,7 +119,7 @@ as well, so a repeat of finding 1 reports itself instead of hanging.
 Starting ytserv immediately made this visible:
 
 ```
-/usr/local/bin/yaxaha/ytserv: error while loading shared libraries:
+/usr/local/bin/yt-cluster/ytserv: error while loading shared libraries:
   libpython3.12.so.1.0: cannot open shared object file
 ```
 
@@ -132,7 +132,7 @@ ytserv-musl       libraries resolve
 ```
 
 `ls -l …/ytserv* | head -1` picks the first by name, which is the one that
-cannot start on Ubuntu 22.04. `yxctl` picks `ytserv-glibc2_35` for the
+cannot start on Ubuntu 22.04. `ytctl` picks `ytserv-glibc2_35` for the
 packaged install, so the tests were aimed at a different binary from the
 deployment even in the years they ran. **Fixed**: the locator now skips any
 candidate with an unresolved library, prefers a suffixed glibc build, and
@@ -171,7 +171,7 @@ $ psql -c "show yt.node"
  0284d019-f47d-4ad5-87f2-b2ee1f63812c
 ```
 
-`yxctl` generates a UUID at setup time. Making the harness match is not a
+`ytctl` generates a UUID at setup time. Making the harness match is not a
 one-line change — the roster is shared, so three UUIDs have to be generated
 once per run and templated into every node's `it_init.sql`, and the `'N'`
 rows keyed on them. That is a change to the fixture design, so it is a
@@ -334,13 +334,13 @@ process that traps `SIGTERM`.
 
 ### The target shape
 
-The package already answers this. `yxctl` writes exactly this into the
+The package already answers this. `ytctl` writes exactly this into the
 container's bootstrap, and it is running right now:
 
 ```sh
-sudo su -c "/usr/local/bin/yaxaha/ytserv-glibc2_35 \
+sudo su -c "/usr/local/bin/yt-cluster/ytserv-glibc2_35 \
     'postgresql://postgres@/postgres?host=/var/run/postgresql&port=5432' \
-    public.yt_config" >> /var/log/yaxaha/ytserver.log postgres &
+    public.yt_config" >> /var/log/yt-cluster/ytserver.log postgres &
 ```
 
 `ytserv` as a background job, as `postgres`, over the local socket, beside
@@ -403,7 +403,7 @@ harness has to reimplement container lifecycle to get at it.
 
 Value lands early and nothing below depends on the rewrite:
 
-1. **Unbreak it.** `ytpgxt` → `yaxaha`, start `ytserv` before waiting on it,
+1. **Unbreak it.** `ytpgxt` → `yt-cluster`, start `ytserv` before waiting on it,
    the two that fell out of those (2a, 2b), and a cap on every wait (8) —
    **done**. Still open: the UUID node id (2c), which needs a decision about
    the fixtures rather than a patch.

@@ -9,7 +9,7 @@
 #        S*  PostgreSQL - tables whole on every node
 #        D*  DataFusion - tables named in C llm_df_tables, read by ytserv
 #        C*  ClickHouse - tables only ClickHouse has, over three shards
-#        R1  a table pinned-sharded over the yaxaha nodes that ClickHouse also
+#        R1  a table pinned-sharded over the yt-cluster nodes that ClickHouse also
 #            has: answered from ClickHouse, and the answer says why
 #        R2  a pinned-sharded table ClickHouse does not have: refused -
 #            DataFusion over shards is not built (yt-pgxt llm/llm2.md P4, P5)

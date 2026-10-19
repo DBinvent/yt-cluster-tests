@@ -16,7 +16,7 @@ LOG="$HERE/results/run-$(date -u +%Y%m%d-%H%M%S).log"
 exec > >(tee "$LOG") 2>&1
 
 for c in "${CLUSTERS[@]}"; do [ -s "$RUN/members.$c" ] || die "no $RUN/members.$c - run up.sh first"; done
-say "== rmc $(now) UTC, yaxaha $(docker exec "$(cname "$(members upper | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yaxaha 2>/dev/null)"
+say "== rmc $(now) UTC, yt-cluster $(docker exec "$(cname "$(members upper | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yt-cluster 2>/dev/null)"
 say "   upper: $(members upper)   east: $(members east)   west: $(members west)   load: $RMC_ORIGIN, ${RMC_TX_MS}ms"
 
 declare -A PHASE_RESULT

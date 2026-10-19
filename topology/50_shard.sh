@@ -12,7 +12,7 @@ for n in "${NODES[@]}"; do
 done
 sleep 2
 
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'shard=owner; outer=pin' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'shard=owner; outer=pin' | tail -1)"
 echo "  shard value: $CFG"
 # register_table, not yt_setup: yt_setup creates the trigger and writes the
 # module-A row in ONE transaction, and on a node whose config table is synced

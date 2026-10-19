@@ -90,7 +90,7 @@ for c in "${CLUSTERS[@]}"; do
 		q "$n" "drop table if exists q_t; create table q_t (id bigint primary key, v text);" >/dev/null
 	done
 done
-CFG_LOCAL="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'no_up; no_down' 2>/dev/null | tail -1)"
+CFG_LOCAL="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'no_up; no_down' 2>/dev/null | tail -1)"
 if [ -z "$CFG_LOCAL" ]; then
 	# not fatal: the table is still synced with default routing, which is enough to
 	# prove the party is local - it just also crosses, which section 5 covers

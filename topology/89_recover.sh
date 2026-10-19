@@ -15,11 +15,11 @@
 # keeps running, keeps its WAL position in memory, and comes back with
 # everything it had. A `docker stop` stops ytserv and PostgreSQL. On `start` the
 # entrypoint runs again from scratch, ytserv re-reads its config from the table,
-# and the node has to work out where it got to from `/var/yaxaha` alone. That is
+# and the node has to work out where it got to from `/var/yt-cluster` alone. That is
 # the failure operators have - a restart, a crash, a host reboot - and it is a
 # strictly harder test of catch-up.
 #
-# Deliberately NOT `restart_all`: that helper wipes `/var/yaxaha/*` before
+# Deliberately NOT `restart_all`: that helper wipes `/var/yt-cluster/*` before
 # restarting, which is right when a test wants a clean cluster and exactly wrong
 # here. The whole question is whether a node resumes from the WAL it kept.
 #
@@ -35,7 +35,7 @@ echo "== recover: a stopped node returns and catches up the writes it missed =="
 
 # recon=repair: catching up is the claim, and recon is what closes whatever the
 # WAL replay does not.
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
 
 for n in "${NODES[@]}"; do
 	q "$n" "drop table if exists rv_t; create table rv_t (id bigint primary key, v text);" >/dev/null
@@ -45,7 +45,7 @@ register_table public.rv_t "$CFG"
 # ## Quorum has to tolerate the outage, or there is nothing to catch up
 #
 # `min_cluster_size` is 6 here on a 7-node roster (the spare is excluded), and
-# that is what the SUPPORTED setup produces: `yxctl --peers` seeds
+# that is what the SUPPORTED setup produces: `ytctl --peers` seeds
 # `min_cluster_size = 1 + peers`, i.e. the entire roster. A cluster built the
 # documented way therefore tolerates ZERO node failures - measured on the first
 # run of this script, where 4 of 5 transactions were refused with one node

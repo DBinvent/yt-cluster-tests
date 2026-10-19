@@ -1,8 +1,8 @@
-# YaXAHA Cluster Integration Tests
+# YT Cluster Integration Tests
 
 We run our tests on Debian-based Linux distributions and can’t give any promises about the compatibility with many other versions and distros, except for those we use ourselves in development now. The suites below run in docker on Ubuntu 24.04 and 26.04 with PostgreSQL 18, and the package suite (lxc/) on Ubuntu 24.04; the cargo-make test further down runs in an Ubuntu 22.04 container with PostgreSQL 14 (`./docker.sh`).
 
-YaXAHA Cluster is written in Rust and out of habit we use cargo-make in the integration tests.
+YT Cluster is written in Rust and out of habit we use cargo-make in the integration tests.
 
 ## Other tests and reports
 
@@ -11,7 +11,7 @@ tests, each with its write-up:
 
 | | |
 |---|---|
-| [llm/](llm/README.md) | `yt_llm`: questions in plain language, answered by PostgreSQL, DataFusion or ClickHouse, on a docker cluster of three yaxaha and three ClickHouse nodes. The article: [llm/report.md](llm/report.md); the run: [llm/results.md](llm/results.md) |
+| [llm/](llm/README.md) | `yt_llm`: questions in plain language, answered by PostgreSQL, DataFusion or ClickHouse, on a docker cluster of three yt-cluster and three ClickHouse nodes. The article: [llm/report.md](llm/report.md); the run: [llm/results.md](llm/results.md) |
 | [rmc/](rmc/README.md) | resilience and membership under change: three linked clusters (one above two) keep every acknowledged write and their boundaries while nodes are added at runtime on every level, leadership moves, nodes restart, and a whole cluster is replaced one node at a time. The plan: [rmc/plan.md](rmc/plan.md); the run: [rmc/results.md](rmc/results.md) |
 | [cluster-test1.md](cluster-test1.md) | where the time goes in a 3-node cluster, against PostgreSQL's own synchronous replication; harness [cluster-test1-matrix.sh](cluster-test1-matrix.sh) |
 | [cluster-test2.md](cluster-test2.md) | HPC: subterm leases against the per-statement checkin round trip |
@@ -21,7 +21,7 @@ tests, each with its write-up:
 | [pipeline/](pipeline/README.md) | the on-commit chain pgbench → Python → etcd queue → Python → ClickHouse, and an etcd queue written straight into ClickHouse |
 | [topology/](topology/README.md) | one cluster of seven nodes in docker (fixture A, `run_all.sh`): az, tier, shard, write zones, reshape, recon, alerts, blocking, recovery, partitions, rppd server functions, the etcd API, the ClickHouse sink, MPP and DataFusion, jsonb merge, SKV join, the commit path, concurrency, network splits, peer streaming. The plan: [topology/PLAN.md](topology/PLAN.md) |
 | [hier/](hier/run_all.sh) | three linked clusters on one network: relations, quorum, dialling, tables across the boundary, neighbours, failover |
-| [lxc/](lxc/README.md) | the package in a disposable LXC container: install, `yxctl --batch`, purge and reinstall, the failure cases of each |
+| [lxc/](lxc/README.md) | the package in a disposable LXC container: install, `ytctl --batch`, purge and reinstall, the failure cases of each |
 | [topo/](topo/README.md) | the runtime topology jobs on the rmc layout: the job layer, az create/delete, moves with purge, approval from above and locks, split/combine, faults, refusals, membership |
 | [llm/lab/](llm/lab/test-yt-llm.sh) | `yt_llm` and the models against a live cluster (`YT_LLM_NODES`), not docker - run by hand |
 | [nightly/](nightly/nightly.sh) | every suite above but llm/lab, each night a watched repository changed; publishes the deb and the EL9 rpm when all pass. Results: [nightly/results.yaml](nightly/results.yaml); code coverage: [nightly/coverage.yaml](nightly/coverage.yaml) |
@@ -36,7 +36,7 @@ rmc/ and llm/ keep their own `.env`.
 
 1. fingerprints the `.rs` files of every watched repository (yt-pgxt and the
    local repositories its build uses - rppd, rdbm, diff-doc-rs - plus etcd,
-   yaxaha_dist, infra_apt; never this one), committed or not, and stops when no
+   ytcluster_dist, infra_apt; never this one), committed or not, and stops when no
    `.rs` file changed since the last tested run - then nothing is built, nothing
    appended to results.yaml, no package made;
 2. bumps the deb's patch version when it is already published (and ytserv's, when
@@ -62,7 +62,7 @@ next night measures again - with no `.rs`
 change it runs for that alone, and publishes nothing. `--coverage` measures in the
 run started by hand. [nightly/coverage.sh](nightly/coverage.sh) does the work:
 
-- an instrumented ytserv and yxctl (yt-pgxt's own crates only) in a second
+- an instrumented ytserv and ytctl (yt-pgxt's own crates only) in a second
   package, which every suite installs instead of the plain one - topology, hier,
   llm, rmc and topo mount a docker volume per suite where the processes write their
   counts, every 5 s so a killed node keeps them; lxc pushes the instrumented
@@ -98,7 +98,7 @@ After the log-in with the user created, you can copy-and-paste commands from the
 su - username
 ```
 
-Before you can start YaXAHA Cluster Integration Tests, you'll need to install [PostgreSQL](https://www.postgresql.org/download/linux/debian/) server with psql frontend, Rust, cargo-make tool with several dependencies and a few utilities we have adopted in the test scripts. Please run the following command:
+Before you can start YT Cluster Integration Tests, you'll need to install [PostgreSQL](https://www.postgresql.org/download/linux/debian/) server with psql frontend, Rust, cargo-make tool with several dependencies and a few utilities we have adopted in the test scripts. Please run the following command:
 
 ```shell
 sudo apt update && sudo apt install -y build-essential curl git uuid lsb-release postgresql
@@ -110,11 +110,11 @@ Now we can install Rust. To save time, we took the instructions from https://rus
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-![Installing Cargo](https://github.com/DBinvent/yaxaha/blob/main/images/cargo-installation.jpg?raw=true)
+![Installing Cargo](https://github.com/DBinvent/yt-cluster-tests/blob/main/images/cargo-installation.jpg?raw=true)
 
 Before Rust will be installed, the script will ask you to specify the settings. Default settings should be OK, you can press ```Enter``` here.
 
-![Configuring the current shell](https://github.com/DBinvent/yaxaha/blob/main/images/configure-shell-for-cargo.jpg?raw=true)
+![Configuring the current shell](https://github.com/DBinvent/yt-cluster-tests/blob/main/images/configure-shell-for-cargo.jpg?raw=true)
 
 After Rust is installed, we need to configure current shell:
 
@@ -128,52 +128,52 @@ In our last preparation step we need to install the _cargo-make_ tool that we he
 cargo install cargo-make
 ```
 
-Now, everything is ready for the YaXAHA Cluster installation and running the integration tests.
+Now, everything is ready for the YT Cluster installation and running the integration tests.
 
-## Installing YaXAHA Cluster
+## Installing YT Cluster
 
 Please download and install the public signing key:
 
 ```shell
-curl -fsSL https://apt.dbinvent.com/dev.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/yaxaha.gpg
+curl -fsSL https://apt.dbinvent.com/dev.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/yt-cluster.gpg
 ```
 
 Add our repository to your sources.list:
 
 ```shell
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/yaxaha.gpg] https://apt.dbinvent.com yaxaha restricted" | sudo tee /etc/apt/sources.list.d/yaxaha.list
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/yt-cluster.gpg] https://apt.dbinvent.com yt-cluster restricted" | sudo tee /etc/apt/sources.list.d/yt-cluster.list
 ```
 
 The repository is served over HTTPS, so `ca-certificates` must be installed; it is on a stock Ubuntu 20.04+ / Debian 10+.
 
-Install the YaXAHA Cluster package:
+Install the YT Cluster package:
 
 ```shell
-sudo apt update && sudo apt install yaxaha
+sudo apt update && sudo apt install yt-cluster
 ```
 
 The package is dual-licensed: see [License](#license).
 
-Then run `yxctl` to install the PostgreSQL extension, create the configuration table and register the service:
+Then run `ytctl` to install the PostgreSQL extension, create the configuration table and register the service:
 
 ```shell
-sudo yxctl
+sudo ytctl
 ```
 
-And now we are ready to perform the YaXAHA Cluster integration tests.
+And now we are ready to perform the YT Cluster integration tests.
 
 ## Running the tests
 
 Clone the repository:
 
 ```shell
-git clone https://github.com/DBinvent/yaxaha.git
+git clone https://github.com/DBinvent/yt-cluster-tests.git
 ```
 
-Then cd into the yaxaha directory.
+Then cd into the yt-cluster directory.
 
 ```shell
-cd yaxaha
+cd yt-cluster-tests
 ```
 
 Now you can run an integration test that will locally create three copies of PostgreSQL, run them on different ports as if they were three independent cluster nodes, then run some tests and shut down all nodes.
@@ -218,7 +218,7 @@ scripts, run in this order:
 
 | script | what it creates |
 |---|---|
-| `it_init.sql` | the `public.yt_config` table, the cluster roster and settings rows in it, the `yt` schema, and `CREATE EXTENSION yaxaha` |
+| `it_init.sql` | the `public.yt_config` table, the cluster roster and settings rows in it, the `yt` schema, and `CREATE EXTENSION yt_cluster` |
 | `it_prepare_test.sql` | the `yt_config_test_trigger` on `yt_config`, which calls `yt_synchronize()` on every insert, update and delete — this is what puts a row on the wire |
 | `it_test.sql` | a sample transaction, for running by hand. The automated cases in `testcases/` do their own inserts instead |
 
@@ -299,7 +299,7 @@ Now, you can run any SQL queries you like on one node and see how it affects the
 
 #### Playing with cluster
 
-After you managed to successfully start three nodes of the cluster in the previous section, you can execute any SQL queries you like. [YaXAHA Cluster](https://dbinvent.local/cluster/) does not have a dedicated master node, so you can start on any node.
+After you managed to successfully start three nodes of the cluster in the previous section, you can execute any SQL queries you like. [YT Cluster](https://www.dbinvent.com/cluster/) does not have a dedicated master node, so you can start on any node.
 
 You can also execute an existed SQL script, for example, try running a simple test:
 
@@ -352,7 +352,7 @@ see "The database is rebuilt every run" above. The container is disposable,
 and so is everything in it — `docker rm` leaves nothing behind but the
 `cluster/` directory on your side of the mount.
 
-The image installs the `yaxaha` package from the apt repository at build
+The image installs the `yt-cluster` package from the apt repository at build
 time, so a container is only as current as the image. Rebuild it to pick up
 a new package:
 
@@ -366,7 +366,7 @@ APT_HOST=<host> ./docker.sh      # another apt repo; APT_HOST_IP=<address> if DN
 This repository is dual-licensed the same way as the package: see
 [LICENSE](LICENSE) and [PolyForm-Noncommercial-1.0.0.md](PolyForm-Noncommercial-1.0.0.md).
 
-The suites install and test the `yaxaha` deb package from apt.dbinvent.com; the
+The suites install and test the `yt-cluster` deb package from apt.dbinvent.com; the
 nightly also publishes it as an EL9 rpm. The package is dual-licensed:
 
 1. **Free for noncommercial use**, under the
@@ -374,7 +374,7 @@ nightly also publishes it as an EL9 rpm. The package is dual-licensed:
 2. **A paid commercial license** from DBinvent for commercial use, on the
    DBinvent Commercial License terms.
 
-Both texts ship in the package, in `/usr/share/doc/yaxaha/`: `LICENSE` states
+Both texts ship in the package, in `/usr/share/doc/yt-cluster/`: `LICENSE` states
 the dual license and holds the commercial terms, and
 `PolyForm-Noncommercial-1.0.0.md` is the noncommercial license. Beside them,
 `lib-licenses.txt` lists the third-party libraries the binaries are built from,

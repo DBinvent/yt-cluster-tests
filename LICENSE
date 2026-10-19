@@ -1,9 +1,9 @@
-YaXAHA Cluster integration tests - dual license
+YT Cluster integration tests - dual license
 
 Copyright (C) 2021-2026 DBinvent
 
-This repository (the YaXAHA Cluster test suites, their scripts and their
-write-ups) is dual-licensed, the same way as the yaxaha package it tests. You may
+This repository (the YT Cluster test suites, their scripts and their
+write-ups) is dual-licensed, the same way as the yt-cluster package it tests. You may
 use it under either license:
 
   1. PolyForm Noncommercial License 1.0.0 - free of charge, for any
@@ -12,11 +12,11 @@ use it under either license:
      https://polyformproject.org/licenses/noncommercial/1.0.0
 
   2. DBinvent Commercial License - a paid license from DBinvent, for
-     commercial use, on the terms that ship with the yaxaha package
-     (/usr/share/doc/yaxaha/LICENSE).
+     commercial use, on the terms that ship with the yt-cluster package
+     (/usr/share/doc/yt-cluster/LICENSE).
      https://www.dbinvent.com/cluster/guide/licensing
 
-The yaxaha package these suites install keeps its own license, stated in the
+The yt-cluster package these suites install keeps its own license, stated in the
 package.
 
 Required Notice: Copyright (C) 2021-2026 DBinvent (https://www.dbinvent.com)

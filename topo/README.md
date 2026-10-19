@@ -1,6 +1,6 @@
 # topo test: runtime topology jobs
 
-Tests for the runtime topology jobs of yaxaha - a table's move between azs and
+Tests for the runtime topology jobs of yt-cluster - a table's move between azs and
 shards, the cleanup of stale copies, az create and delete, and cluster split and
 combine - all carried by one job layer: a synced `yt_job` table, decided by the
 cluster leader, one active job per table. Every step runs under a write load,

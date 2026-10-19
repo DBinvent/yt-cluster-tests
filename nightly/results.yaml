@@ -226,3 +226,53 @@
   published: null
   ab: "base cw 40.4/s ok, cwc 40.5/s ok, one-node 39.8/s ok | peer_stream cw 41.3/s ok, cwc 40.9/s ok | one_pc one-node 41.4/s ok, kill ok (row on every voter)"
   note: "not published: a suite failed"
+- run: "20261018-002830"
+  started: "2026-10-18T00:28:30Z"
+  finished: "2026-10-18T08:55:44Z"
+  minutes: 507
+  trigger: changes
+  changed: ["etcd", "yt-pgxt"]
+  sources: {"etcd": "dd78826", "infra_apt": "a74ff16+dirty", "yaxaha_dist": "d987e51+dirty", "yt-pgxt": "bae936f+dirty"}
+  version: {deb: "1.18.107", ytserv: "1.1.101", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 7}
+  suites:
+    - {name: "unit", passed: 683, failed: 0, minutes: 5, result: pass}
+    - {name: "topology", passed: 828, failed: 3, minutes: 111, result: fail}
+    - {name: "hier", passed: 110, failed: 1, minutes: 11, result: fail}
+    - {name: "lxc", passed: 96, failed: 0, minutes: 2, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 9, result: pass}
+    - {name: "topo", passed: 347, failed: 16, minutes: 48, result: fail}
+    - {name: "topo-faults", passed: 165, failed: 15, minutes: 38, result: fail}
+    - {name: "topo-membership", passed: 102, failed: 9, minutes: 17, result: fail}
+    - {name: "rmc", passed: 599, failed: 291, minutes: 259, result: fail}
+  totals: {passed: 3031, failed: 335}
+  result: fail
+  published: null
+  ab: "base cw 40.8/s ok, cwc 41.0/s ok, one-node 40.5/s ok | peer_stream cw 42.3/s ok, cwc 41.9/s ok | one_pc one-node 42.3/s ok, kill ok (row on every voter)"
+  note: "not published: a suite failed"
+- run: "20261018-124935"
+  started: "2026-10-18T12:49:35Z"
+  finished: "2026-10-18T17:19:24Z"
+  minutes: 270
+  trigger: changes
+  changed: ["yt-pgxt"]
+  sources: {"etcd": "dd78826", "infra_apt": "a74ff16+dirty", "yaxaha_dist": "d987e51+dirty", "yt-pgxt": "bae936f+dirty"}
+  version: {deb: "1.18.108", ytserv: "1.1.102", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 6}
+  suites:
+    - {name: "unit", passed: 690, failed: 0, minutes: 5, result: pass}
+    - {name: "topology", passed: 829, failed: 2, minutes: 111, result: fail}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 96, failed: 0, minutes: 2, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 8, result: pass}
+    - {name: "topo", passed: 370, failed: 11, minutes: 42, result: fail}
+    - {name: "topo-faults", passed: 181, failed: 14, minutes: 37, result: fail}
+    - {name: "topo-membership", passed: 124, failed: 1, minutes: 12, result: fail}
+    - {name: "rmc", passed: 1004, failed: 0, minutes: 37, result: pass}
+  totals: {passed: 3506, failed: 28}
+  result: fail
+  published: null
+  ab: "base cw 41.1/s ok, cwc 40.8/s ok, one-node 40.3/s ok | peer_stream cw 40.9/s ok, cwc 41.3/s ok | one_pc one-node 42.3/s ok, kill ok (row on every voter)"
+  note: "not published: a suite failed"

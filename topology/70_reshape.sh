@@ -23,7 +23,7 @@ for n in "${NODES[@]}"; do
 	cfg_delete "$n" reshape_run C
 done
 
-EAST="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'az=east' | tail -1)"
+EAST="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'az=east' | tail -1)"
 # register_table, not yt_setup: yt_setup creates the trigger and writes the
 # module-A row in one transaction, and on a node whose config table is synced
 # that write is refused unless the node is the leader - taking the CREATE
@@ -79,7 +79,7 @@ check "west holds nothing yet" "0" "$(q n5 "select count(*) from rs_t where id >
 # the BACKFILL is `Copy` over the transfer stream - recon converges rows both
 # sides know about and cannot enumerate a table for a node starting empty. That
 # was the claim this test disproved.
-BOTH="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'az=east,west; recon=repair' | tail -1)"
+BOTH="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'az=east,west; recon=repair' | tail -1)"
 for n in "${NODES[@]}"; do
 	cfg_write "$n" public.rs_t A "$BOTH"
 	cfg_write "$n" reshape_run C "$YX_DB.public.rs_t"

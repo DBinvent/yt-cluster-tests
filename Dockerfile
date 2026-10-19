@@ -35,18 +35,18 @@ RUN curl https://sh.rustup.rs -sSf | \
 
 RUN env CARGO_HOME=/opt/rust/cargo cargo install cargo-make
 
-RUN curl -fsSL http://$APT_HOST/dev.gpg.key | gpg --dearmor -o /usr/share/keyrings/yaxaha.gpg
+RUN curl -fsSL http://$APT_HOST/dev.gpg.key | gpg --dearmor -o /usr/share/keyrings/yt-cluster.gpg
 
-RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/yaxaha.gpg] http://$APT_HOST yaxaha restricted" > /etc/apt/sources.list.d/yaxaha.list
+RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/yt-cluster.gpg] http://$APT_HOST yt-cluster restricted" > /etc/apt/sources.list.d/yt-cluster.list
 
 RUN date >/build-date.txt
 
-RUN apt-get update && apt-get install -yq yaxaha
+RUN apt-get update && apt-get install -yq yt-cluster
 
-# yaxaha depends on the generic 'postgresql' meta-package, which pulls in the latest
+# yt-cluster depends on the generic 'postgresql' meta-package, which pulls in the latest
 # major version (e.g. 18) alongside the explicitly installed $POSTGRESQL_VERSION_MAJOR.
 # There's no update-alternatives entry for pg_config, so /usr/bin/pg_config silently
-# ends up pointing at the newer version's binary; yxctl invokes it unqualified and
+# ends up pointing at the newer version's binary; ytctl invokes it unqualified and
 # would install the extension into the wrong version's directory.
 RUN ln -sf /usr/lib/postgresql/$POSTGRESQL_VERSION_MAJOR/bin/pg_config /usr/bin/pg_config
 

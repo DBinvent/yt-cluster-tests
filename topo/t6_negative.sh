@@ -53,7 +53,7 @@ C=west
 . "$(dirname "$0")/lib.sh"
 topo_log t6
 for c in "${CLUSTERS[@]}"; do [ -s "$RUN/members.$c" ] || die "no $RUN/members.$c - run ../rmc/up.sh first"; done
-say "== topo T6 $(now) UTC, yaxaha $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yaxaha 2>/dev/null), cluster $C: $(members $C)"
+say "== topo T6 $(now) UTC, yt-cluster $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yt-cluster 2>/dev/null), cluster $C: $(members $C)"
 table_cfg
 [ -n "${CFG_LOCAL:-}" ] || die "no $RUN/tables.env - run ../rmc/up.sh first"
 
@@ -162,7 +162,7 @@ read -r X1 X2 Y _ <<< "$(for n in $(members $C); do [ "$n" = "$L" ] || echo "$n"
 F=$X1   # where this test asks for its jobs: a follower, never stopped
 U=$(follower upper)
 RULE_C=$(enc 'az=westc'); RULE_X=$(enc 'az=westx'); RULE_Y=$(enc 'az=westy'); RULE_NO=$(enc 'az=nosuchz')
-for r in "$RULE_C" "$RULE_X" "$RULE_Y" "$RULE_NO"; do [ -n "$r" ] || die "yxctl --encode-table-cfg gave nothing"; done
+for r in "$RULE_C" "$RULE_X" "$RULE_Y" "$RULE_NO"; do [ -n "$r" ] || die "ytctl --encode-table-cfg gave nothing"; done
 GHOST=$(node_uuid t6ghost)   # a valid node uuid no cluster holds
 say "   leader $L; zones to come: westx $X1 $X2, westy $Y; jobs asked on $F"
 

@@ -1,5 +1,5 @@
-# yaxaha code coverage: the lines of yt-pgxt's Rust workspace the nightly's tests ran -
-# the unit tests and every end-to-end suite, against an instrumented ytserv and yxctl
+# yt-cluster code coverage: the lines of yt-pgxt's Rust workspace the nightly's tests ran -
+# the unit tests and every end-to-end suite, against an instrumented ytserv and ytctl
 # (nightly/coverage.sh says what counts). Written by a nightly run that measured it,
 # and a run measures it when this file is MISSING, or lists fewer suites than a whole
 # run: rename or delete it and the next nightly measures again, even with no code
@@ -27,4 +27,4 @@ crates:
   - {name: "ytcluster-common", lines: 145, percent: 81.4, unit: 43.4, e2e: 52.4}
   - {name: "ytcluster-types", lines: 1317, percent: 74.8, unit: 63.0, e2e: 34.2}
   - {name: "ytserv", lines: 30574, percent: 81.4, unit: 43.5, e2e: 59.3}
-  - {name: "yxctl", lines: 10094, percent: 29.0, unit: 14.3, e2e: 17.5}
+  - {name: "ytctl", lines: 10094, percent: 29.0, unit: 14.3, e2e: 17.5}

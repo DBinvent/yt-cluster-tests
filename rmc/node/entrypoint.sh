@@ -1,5 +1,5 @@
 #!/bin/bash
-# A yaxaha node: PostgreSQL first, then ytserv once the config says so.
+# A yt-cluster node: PostgreSQL first, then ytserv once the config says so.
 #
 # On the first start up.sh (or test.sh, for a node added later) writes the
 # config; ytserv waits for the C row cfg_ready. On a restart the row is already
@@ -14,6 +14,8 @@ CFG_TABLE=public.yt_config
 # network, so any address on it is trusted. Nothing else can reach that network.
 cat > /etc/postgresql/18/main/conf.d/yt.conf <<EOF
 max_prepared_transactions = 100
+# [xa] as ytctl writes it: the extension's COMMIT PREPARED hook in every backend
+shared_preload_libraries = 'yt_cluster'
 listen_addresses = '*'
 yt.node = '${NODE_UUID}'
 EOF
@@ -56,8 +58,8 @@ for _ in $(seq 1 30); do
 done
 su postgres -c "psql -tAc \"select 1 from pg_database where datname='${DB}'\"" | grep -q 1 \
     || su postgres -c "createdb ${DB}"
-su postgres -c "psql -v ON_ERROR_STOP=1 -q -d ${DB} -c 'create extension if not exists yaxaha'" \
-    || { echo "[node] FATAL: create extension yaxaha failed"; sleep infinity; }
+su postgres -c "psql -v ON_ERROR_STOP=1 -q -d ${DB} -c 'create extension if not exists yt_cluster'" \
+    || { echo "[node] FATAL: create extension yt_cluster failed"; sleep infinity; }
 
 if [ -n "$CLONED" ]; then
     # Not the source's opinion of who leads (membership.md), and this node's own
@@ -85,6 +87,6 @@ if [ -n "${SECRET:-}" ]; then
     YT_ENV=/run/yt/ytserv.env
 fi
 # not exec: when ytserv exits the container stays up, so its output can still be read
-su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yaxaha/ytserv 'postgresql://postgres@localhost/${DB}?host=/var/run/postgresql' ${CFG_TABLE}" \
+su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yt-cluster/ytserv 'postgresql://postgres@localhost/${DB}?host=/var/run/postgresql' ${CFG_TABLE}" \
     || echo "[node] ytserv exited $? - container held open for inspection"
 sleep infinity

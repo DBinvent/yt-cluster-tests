@@ -3,8 +3,8 @@
 # link is refused unless both clusters run them, so this is part of bringing the
 # fixture up - right after 10_up.sh, before any script that needs a link. Set up the
 # way an operator does it (H6): the store and genesis in each cluster, every node
-# approved, TLS on, the links declared with yxctl from both ends and each lower CA
-# approved on the upper leader with the line yxctl printed.
+# approved, TLS on, the links declared with ytctl from both ends and each lower CA
+# approved on the upper leader with the line ytctl printed.
 #
 # Every node runs with an app key of its own (H7: "$YX_HIER_SECRET-<node>", env.sh).
 #
@@ -12,19 +12,19 @@
 #
 # S1 each cluster: the store on, genesis on its leader, every node approved
 # S2 peer_tls on everywhere: every node holds a certificate of its own cluster's CA
-# S3 yxctl --link-lower on the upper leader prints the upper's root and the line
+# S3 ytctl --link-lower on the upper leader prints the upper's root and the line
 #    each lower's operator runs; until its CA is approved the upper refuses a
-#    lower's sign-in (H4: the CA admits it); yxctl --link-upper on each lower leader
+#    lower's sign-in (H4: the CA admits it); ytctl --link-upper on each lower leader
 #    pins the root (Z top.root) and prints the approval the upper's operator runs
 # S4 the operator approves each lower's CA on the upper leader with the printed
 #    line; an approval naming another key is refused
 # S5 each lower cluster's CA is countersigned by the upper, the upper's root held;
 #    east and west, neighbours under that upper, admit each other with no approval
-#    (H3) - yxctl --link-neighbor prints what each side runs
+#    (H3) - ytctl --link-neighbor prints what each side runs
 # S6 every cluster requires TLS - links included
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../topology/skv_lib.sh"
-echo "== hier store: every cluster on the secret store and TLS, the links set up with yxctl =="
+echo "== hier store: every cluster on the secret store and TLS, the links set up with ytctl =="
 
 [ -n "${YX_HIER_SECRET:-}" ] || { bad "YX_HIER_SECRET is empty: the nodes run with no app key, so there is no secret store"; summary; }
 await_clusters
@@ -48,7 +48,7 @@ for c in "${CLUSTERS[@]}"; do
 		|| bad "S2 $c: no certificate on:$(tls_not "certificates v1")"
 done
 
-# ── S3 the links, from both ends (yxctl, H6) ─────────────────────────────────
+# ── S3 the links, from both ends (ytctl, H6) ─────────────────────────────────
 in_cluster upper
 UL="$L"
 o=""
@@ -73,7 +73,7 @@ for c in east west; do
 	o="$(yx "$L" --link-upper "top=$hosts" --link-root "$UROOT")"
 	# `|| true`: under env.sh's `set -e` a line not printed ended the whole script here
 	APPROVAL[$c]="$(printf '%s\n' "$o" | grep -o -- '--skv-approve [0-9a-f-]* --fingerprint SHA256:[A-Za-z0-9+/]*' | head -1 || true)"
-	[ -n "${APPROVAL[$c]}" ] && ok "S3 --link-upper on $c's leader prints the approval: yxctl ${APPROVAL[$c]}" \
+	[ -n "${APPROVAL[$c]}" ] && ok "S3 --link-upper on $c's leader prints the approval: ytctl ${APPROVAL[$c]}" \
 		|| bad "S3 --link-upper on $c: $(echo "$o" | tail -3 | tr '\n' ' ')"
 	pinned=0
 	for _ in $(seq 1 15); do

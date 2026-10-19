@@ -14,7 +14,7 @@
 set -euo pipefail
 
 TESTS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Settings: yaxaha-tests/.env (not committed, see env.example). A variable already
+# Settings: yt-cluster-tests/.env (not committed, see env.example). A variable already
 # set in the environment wins over it.
 if [ -f "$TESTS_ROOT/.env" ]; then
 	_yx_keep="$(export -p)"; set -a; . "$TESTS_ROOT/.env"; set +a; eval "$_yx_keep"; unset _yx_keep
@@ -35,7 +35,7 @@ YX_DB="${YX_DB:-yxtopo}"
 YX_CFG="${YX_CFG:-public.yt_config}"
 YX_PORT="${YX_PORT:-7421}"
 # [skv] The app key every node's ytserv runs with (marg SECRET): what a join
-# approval is an HMAC under (98_skv_join.sh, yxctl --skv-approve). A fixture
+# approval is an HMAC under (98_skv_join.sh, ytctl --skv-approve). A fixture
 # value, not a secret; given to each container at creation (10_up.sh), so a
 # change needs the containers made again.
 YX_SECRET="${YX_SECRET:-yxtopo-fixture-app-key}"
@@ -133,11 +133,11 @@ qe() { # qe <node> <sql> [db] - q, with psql's errors in the output
 	fi
 }
 
-# the deterministic node identity yxctl's --peers roster uses:
-# uuid5(YAXAHA_NS, host). Every node computes the same one, so no UUID ever has
+# the deterministic node identity ytctl's --peers roster uses:
+# uuid5(YT_CLUSTER_NS, host). Every node computes the same one, so no UUID ever has
 # to be written into a config file.
-YAXAHA_NS="6a9f5c2e-1b3d-5e47-9a08-0bf99b3e0275"
-node_uuid() { python3 -c "import uuid,sys; print(uuid.uuid5(uuid.UUID('$YAXAHA_NS'), sys.argv[1]))" "$1"; }
+YT_CLUSTER_NS="6a9f5c2e-1b3d-5e47-9a08-0bf99b3e0275"
+node_uuid() { python3 -c "import uuid,sys; print(uuid.uuid5(uuid.UUID('$YT_CLUSTER_NS'), sys.argv[1]))" "$1"; }
 
 # yt_info returns JSON in this build ([{name,value,module},...]), not a record
 # set - an older build needed `as x(name,value,module)` and that form now errors
@@ -304,7 +304,7 @@ wait_writable() {
 
 # Roll back every orphaned 2PC prepared transaction.
 #
-# This is the one piece of cluster state `rm -rf /var/yaxaha/*` does NOT reach,
+# This is the one piece of cluster state `rm -rf /var/yt-cluster/*` does NOT reach,
 # and it is the reason a killed run poisons the next one. A cluster write that
 # dies between PREPARE and COMMIT leaves a `PREPARE TRANSACTION` behind; those
 # survive a PostgreSQL restart by design and hold their table locks forever, so
@@ -383,9 +383,9 @@ node_up()   { rh "docker network connect    $YX_NET $1 >/dev/null 2>&1; true"; e
 # certificate, so a cluster requiring TLS never elects again (hier 30_quorum after
 # 15_store, the nightly of 2026-10-17).
 wipe_keep_key() { # wipe_keep_key <node>
-	rh "docker exec $1 sh -c 'k=\$(find /var/yaxaha -name node.key | head -1); if [ -n \"\$k\" ]; then d=\$(dirname \"\$k\");
-		find /var/yaxaha -mindepth 1 -maxdepth 1 ! -path \"\$d\" -exec rm -rf {} +;
-		find \"\$d\" -mindepth 1 ! -name node.key ! -name node.pub -exec rm -rf {} +; else rm -rf /var/yaxaha/*; fi'" \
+	rh "docker exec $1 sh -c 'k=\$(find /var/yt-cluster -name node.key | head -1); if [ -n \"\$k\" ]; then d=\$(dirname \"\$k\");
+		find /var/yt-cluster -mindepth 1 -maxdepth 1 ! -path \"\$d\" -exec rm -rf {} +;
+		find \"\$d\" -mindepth 1 ! -name node.key ! -name node.pub -exec rm -rf {} +; else rm -rf /var/yt-cluster/*; fi'" \
 		>/dev/null 2>&1 || true
 }
 
@@ -393,7 +393,7 @@ restart_all() {
 	# Clear the cluster WAL with the restart. A restarted node re-issues from
 	# sub-term 1 while the old WAL still holds one, and every write then aborts
 	# with "Sub-term 1 version 1 already exists" - the same collision a purge
-	# leaves behind on a real node (rm -rf /var/yaxaha/*). Each test phase is
+	# leaves behind on a real node (rm -rf /var/yt-cluster/*). Each test phase is
 	# meant to start from a clean cluster anyway.
 	#
 	# CLEAN, not half: every ytserv stops BEFORE any WAL goes. Wiping it under
@@ -410,11 +410,11 @@ restart_all() {
 	# cold start instead needs all six nodes up inside one window, and these
 	# restarts come one at a time). Not `reshape_run` either: 70_reshape sets it
 	# right before a restart, on purpose.
-	for n in "${NODES[@]}"; do rh "docker exec $n pkill -f yaxaha/ytserv >/dev/null 2>&1; true"; done
+	for n in "${NODES[@]}"; do rh "docker exec $n pkill -f yt-cluster/ytserv >/dev/null 2>&1; true"; done
 	sleep 2
 	for n in "${NODES[@]}"; do
 		if [ -n "${YX_KEEP_NODE_KEYS:-}" ]; then wipe_keep_key "$n"
-		else rh "docker exec $n sh -c 'rm -rf /var/yaxaha/*' >/dev/null 2>&1; true"; fi
+		else rh "docker exec $n sh -c 'rm -rf /var/yt-cluster/*' >/dev/null 2>&1; true"; fi
 		cfg_delete "$n" least C
 	done
 	clear_prepared

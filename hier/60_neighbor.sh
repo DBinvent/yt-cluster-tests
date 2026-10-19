@@ -22,7 +22,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== neighbor: sharded crosses sideways, unsharded does not =="
 
-enc() { "$REPO_ROOT"/target/release/yxctl --encode-table-cfg "$1" 2>/dev/null | tail -1; }
+enc() { "$REPO_ROOT"/target/release/ytctl --encode-table-cfg "$1" 2>/dev/null | tail -1; }
 # `q` drops psql's stderr, so a refused write came back as an empty string and the
 # FAIL line could not say why. This keeps it: the refusal reason is the diagnosis.
 qerr() { # qerr <node> <sql>
@@ -44,7 +44,7 @@ qerr() { # qerr <node> <sql>
 #
 # Ring-hash with the default outer policy is what this test wants: any value maps to
 # some owner, and the only variable left is whether the table is SHARDED at all -
-# which is what the sideways rule keys off. The default outer is `reject` (yxctl
+# which is what the sideways rule keys off. The default outer is `reject` (ytctl
 # model.rs), so a non-owner neither stores nor writes the row: only the key's HRW
 # owner may originate a write, under every outer policy (`Outer::writes()`).
 CFG_SHARDED="$(enc 'az=eastc,westc; shard=owner')"

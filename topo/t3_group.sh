@@ -19,7 +19,7 @@ C=west
 . "$(dirname "$0")/lib.sh"
 topo_log t3
 for c in "${CLUSTERS[@]}"; do [ -s "$RUN/members.$c" ] || die "no $RUN/members.$c - run ../rmc/up.sh first"; done
-say "== topo T3 $(now) UTC, yaxaha $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yaxaha 2>/dev/null)"
+say "== topo T3 $(now) UTC, yt-cluster $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yt-cluster 2>/dev/null)"
 
 g() { echo "$DB.public.topo_g$1"; }
 # part <node> <table> <from-az> <job>: the state of that cluster's part in the job

@@ -18,7 +18,7 @@ C=west
 . "$(dirname "$0")/lib.sh"
 topo_log t4
 for c in "${CLUSTERS[@]}"; do [ -s "$RUN/members.$c" ] || die "no $RUN/members.$c - run ../rmc/up.sh first"; done
-say "== topo T4 $(now) UTC, yaxaha $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yaxaha 2>/dev/null), cluster $C: $(members $C)"
+say "== topo T4 $(now) UTC, yt-cluster $(docker exec "$(cname "$(members $C | cut -d' ' -f1)")" dpkg-query -W -f='${Version}' yt-cluster 2>/dev/null), cluster $C: $(members $C)"
 
 cfgval() { QT=20 q "$1" -c "select value from $CFG where module = '$2' and name = '$3'" 2>/dev/null; }
 rows()   { QT=20 q "$1" -c "select count(*) from $2" 2>/dev/null; }
@@ -87,6 +87,18 @@ check "J9 westx records west above it" UPPER "$(cfgval "$X1" Z westc.level)"
 wait_for 90 leader_among "$X1" "$X2" && XL=$(leader_among "$X1" "$X2") || XL=""
 [ -n "$XL" ] && ok "J9 westx elects its own leader: $XL" || bad "J9 westx elects a leader within 90s: $X1=$(node_state "$X1") $X2=$(node_state "$X2")"
 XF=$X1; [ "$XL" = "$X1" ] && XF=$X2
+# [skv] westx's own store (yt-pgxt skv-secrets.md H9): its genesis on the leaving
+# nodes' keys makes a master key and a CA of its own, wrapped for both, and its
+# leader pins that CA for westx's joiners (H12) - a genesis that refused the store
+# left westx with neither, so no TLS and no link to west (the nightly of 2026-10-18)
+xs_mk() { case "$(mk_line "$1")" in "v1 held"*) return 0;; esac; return 1; }
+xs_pinned() { local r; r=$(info "$1" X @ca/1); [ -n "$r" ] && [ "$(cfgval "$1" C skv_ca_root)" = "$r" ]; }
+for n in "$X1" "$X2"; do
+    wait_for 120 xs_mk "$n" && ok "J9 $n holds westx's own master key: $(mk_line "$n")" \
+        || bad "J9 $n holds westx's own master key: $(mk_line "$n")"
+done
+wait_for 60 xs_pinned "${XL:-$X1}" && ok "J9 westx pins its own CA for its joiners: $(info "${XL:-$X1}" X @ca/1)" \
+    || bad "J9 westx pins its own CA: skv_ca_root [$(cfgval "${XL:-$X1}" C skv_ca_root)], its CA [$(info "${XL:-$X1}" X @ca/1)]"
 
 # ── its tables ──────────────────────────────────────────────────────────────
 check "J9 the zone's table went with it ($X1)" 20 "$(rows "$X1" topo_s1)"
@@ -116,6 +128,11 @@ p=$(QT=20 q "$L" -c "select state || ' ' || reason from $JT where kind = 'partic
 case "$p" in done*admitted*) ok "J9 west admitted them: ${p#done }";; *) bad "west's part reads admitted: [$p]";; esac
 wait_for 180 good "$X1" Good && wait_for 60 good "$X2" Good && ok "J9 both follow west's leader" \
     || bad "J9 both Good members of west: $X1=$(node_state "$X1") $X2=$(node_state "$X2")"
+# the combine happened, in west's own view: the two checks below also pass in a
+# westx that never went back (the nightly of 2026-10-18)
+counted() { case "$(info "$L" E "$(node_uuid "$1")")" in *Good*) return 0;; esac; return 1; }
+wait_for 60 counted "$X1" && wait_for 30 counted "$X2" && ok "J9 $L (west) counts both Good" \
+    || bad "J9 $L (west) counts both Good: $X1=[$(info "$L" E "$(node_uuid "$X1")")] $X2=[$(info "$L" E "$(node_uuid "$X2")")]"
 check "J9 west's catalogue has no westx any more" "" "$(cfgval "$L" Z westx.level)"
 check "J9 $X1 holds what was written in westx" 21 "$(rows "$X1" topo_s1)"
 cwrite "$X1" "insert into topo_s1 values (23, 'in west again')" >/dev/null || bad "write topo_s1 on $X1 in west"

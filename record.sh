@@ -13,7 +13,7 @@
 set -Eeuo pipefail
 cd "$(dirname "$0")"
 
-CONTAINER=yaxaha-demo
+CONTAINER=yt-cluster-demo
 KEEP=0
 TAPES=()
 
@@ -43,7 +43,7 @@ EOF
   exit 1
 fi
 
-# Same build arguments docker.sh uses — the yaxaha package comes from
+# Same build arguments docker.sh uses — the yt-cluster package comes from
 # apt.dbinvent.com unless told otherwise.
 APT_HOST="${APT_HOST:-apt.dbinvent.com}"
 APT_HOST_IP="${APT_HOST_IP:-}"
@@ -51,13 +51,13 @@ BUILD_ARGS=(--build-arg "APT_HOST=$APT_HOST")
 [[ -n "$APT_HOST_IP" ]] && BUILD_ARGS+=(--add-host "$APT_HOST:$APT_HOST_IP")
 
 echo "building the image (cached unless the Dockerfile changed)"
-docker image build "${BUILD_ARGS[@]}" -t yaxaha . >/dev/null
+docker image build "${BUILD_ARGS[@]}" -t yt-cluster . >/dev/null
 
 echo "booting $CONTAINER and waiting for its bootstrap"
 docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 # -dt, not -d: the entrypoint ends in an interactive bash, which exits
 # immediately on EOF without a tty and takes the container with it.
-docker run -dt --name "$CONTAINER" -v "$(pwd):/home/rust" yaxaha >/dev/null
+docker run -dt --name "$CONTAINER" -v "$(pwd):/home/rust" yt-cluster >/dev/null
 
 # Probed with a query rather than by grepping the logs for the bootstrap's
 # closing message: docker_post_bootstrap.sh runs psql without `-P pager=off`,

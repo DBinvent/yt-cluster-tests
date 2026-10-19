@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # [skv] The secret store, phases P3-P5 (yt-pgxt ytserv/skv-secrets.md): the
 # cluster master key made by the operator on the leader (Protocol A), values
-# sealed under it - put, get, rm - through yxctl over ytserv's unix socket; every
+# sealed under it - put, get, rm - through ytctl over ytserv's unix socket; every
 # other node enrolling and approved (P4); rotation, retirement, recovery (P5).
 #
 # Every node of this fixture runs with the app key (10_up.sh gives each container
@@ -132,7 +132,7 @@ check "K6 the X row reached the follower, as ciphertext" "1" \
 # ── K7 ls, rm ────────────────────────────────────────────────────────────────
 case "$(info "$L" X db_password)" in "v1 seq "*" B") ok "K7 yt_info('X') names it with its version, not its value" ;;
 	*) bad "K7 yt_info('X') db_password: $(info "$L" X db_password)" ;; esac
-case "$(yx "$L" --skv ls)" in *"db_password = v1 seq"*) ok "K7 yxctl --skv ls lists it" ;; *) bad "K7 --skv ls does not list it" ;; esac
+case "$(yx "$L" --skv ls)" in *"db_password = v1 seq"*) ok "K7 ytctl --skv ls lists it" ;; *) bad "K7 --skv ls does not list it" ;; esac
 o="$(yx "$L" --skv rm db_password)"
 case "$o" in *"removed"*) ok "K7 rm on the leader" ;; *) bad "K7 rm failed: $(echo "$o" | tail -1)" ;; esac
 for _ in $(seq 1 10); do d=""; for n in "${NODES[@]}"; do [ "$(q "$n" "select count(*) from $YX_CFG where module='X' and name='db_password'")" = 0 ] || d="$d $n"; done; [ -z "$d" ] && break; sleep 2; done
@@ -304,9 +304,9 @@ case "$o" in *"master key v1 made"*"recovery wrap is kept"*) ok "K14 genesis --d
 	*) bad "K14 genesis with a recovery key: $(echo "$o" | tail -2)" ;; esac
 skv_wait 90 "every node holds the new v1" all_hold 1 || true
 printf '%s' "$V-rec" | yx "$L" --skv put recovered >/dev/null
-# every node loses its node.key (fs_dir is /var/yaxaha here; restart_all wipes
+# every node loses its node.key (fs_dir is /var/yt-cluster here; restart_all wipes
 # the cluster WAL there too), restarted together
-for n in "${NODES[@]}"; do rh "docker exec $n sh -c 'find /var/yaxaha -name node.key -delete'" >/dev/null 2>&1 || true; done
+for n in "${NODES[@]}"; do rh "docker exec $n sh -c 'find /var/yt-cluster -name node.key -delete'" >/dev/null 2>&1 || true; done
 restart_all 40
 await_cluster
 L="$(leader)"

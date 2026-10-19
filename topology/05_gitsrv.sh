@@ -52,19 +52,19 @@ check "the fixture repositories exist" "fn.git sql.git" \
 # design (a key path replicated cluster-wide names a different file on every
 # node), so each node needs its own copy.
 for n in "${NODES[@]}"; do
-	rh "docker exec $n mkdir -p /var/yaxaha/ssh"
-	rh "docker cp $KEYDIR/id_ed25519 $n:/var/yaxaha/ssh/git_key"
-	rh "docker exec $n chown postgres:postgres /var/yaxaha/ssh/git_key"
-	rh "docker exec $n chmod 600 /var/yaxaha/ssh/git_key"
+	rh "docker exec $n mkdir -p /var/yt-cluster/ssh"
+	rh "docker cp $KEYDIR/id_ed25519 $n:/var/yt-cluster/ssh/git_key"
+	rh "docker exec $n chown postgres:postgres /var/yt-cluster/ssh/git_key"
+	rh "docker exec $n chmod 600 /var/yt-cluster/ssh/git_key"
 done
-echo "  deploy key installed on ${#NODES[@]} node(s) at /var/yaxaha/ssh/git_key"
+echo "  deploy key installed on ${#NODES[@]} node(s) at /var/yt-cluster/ssh/git_key"
 
 # One node proves the whole path end to end. `StrictHostKeyChecking=accept-new`
 # is what both ssh_command implementations use, so this exercises the real
 # first-contact behaviour rather than a pre-seeded known_hosts.
 probe="${NODES[0]}"
 out="$(rh "docker exec -u postgres $probe env \
-	GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/var/yaxaha/ssh/known_hosts -o IdentitiesOnly=yes -i /var/yaxaha/ssh/git_key' \
+	GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/var/yt-cluster/ssh/known_hosts -o IdentitiesOnly=yes -i /var/yt-cluster/ssh/git_key' \
 	git ls-remote ssh://git@gitsrv/srv/git/fn.git" 2>&1 | head -3)"
 case "$out" in
 	*refs/heads/*) ok "$probe can clone over ssh from gitsrv" ;;
@@ -75,5 +75,5 @@ echo
 echo "  remotes for the tests:"
 echo "    ssh://git@gitsrv/srv/git/fn.git    (rppd_function.source_git)"
 echo "    ssh://git@gitsrv/srv/git/sql.git   (sg_history.source_git)"
-echo "    rppd_git_ssh_key = /var/yaxaha/ssh/git_key"
+echo "    rppd_git_ssh_key = /var/yt-cluster/ssh/git_key"
 summary

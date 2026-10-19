@@ -1,8 +1,8 @@
-# A three-node YaXAHA cluster starting, electing a leader, replicating a
+# A three-node YT Cluster starting, electing a leader, replicating a
 # transaction, and shutting down — recorded from a real run.
 #
 #   ../record.sh          builds the image, boots a container, records this
-#   vhs tapes/cluster.tape  if you already have a bootstrapped `yaxaha-demo`
+#   vhs tapes/cluster.tape  if you already have a bootstrapped `yt-cluster-demo`
 #
 # It records `docker exec` into an already-bootstrapped container on purpose.
 # The container's entrypoint spends a minute on apt, ytsetup and a Postgres
@@ -26,11 +26,11 @@ Set TypingSpeed 40ms
 # still wall-clock seconds of the real run.
 Set PlaybackSpeed 2.0
 
-Type "# Three PostgreSQL nodes, one YaXAHA cluster, on one machine."
+Type "# Three PostgreSQL nodes, one YT Cluster, on one machine."
 Enter
 Sleep 2s
 
-Type "docker exec -it yaxaha-demo bash -lc 'cd /home/rust && cargo make --env PG_VER=14 --env CNT=3'"
+Type "docker exec -it yt-cluster-demo bash -lc 'cd /home/rust && cargo make --env PG_VER=14 --env CNT=3'"
 Enter
 
 # Guessed, not measured — nobody has recorded this yet. Watch the result and

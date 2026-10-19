@@ -19,7 +19,7 @@ Why it exists (BENCH.md §0): up to ten hardware nodes, and "homogeneous, or
 say so". A synchronous protocol runs at the speed of its slowest participant,
 so a scale curve that bends when node 7 joins may be describing node 7. This
 gives every node a capacity number before the run, and afterwards divides
-measured TPS by it (`normalize`), so the curve is about YaXAHA rather than
+measured TPS by it (`normalize`), so the curve is about YT Cluster rather than
 about which box got which CPU.
 
 THE MODEL, in full — so it can be argued with:

@@ -18,7 +18,7 @@ started directly — and on a host that also runs Docker it needs the macvlan
 workaround in `../lxc/env.sh`, because Docker's `FORWARD DROP` policy cuts
 lxdbr0 off from the network. Six nodes cost ~256 MB and share one 170 MB image.
 
-`../lxc/` stays as-is: it is a single-node `yxctl --batch` install test, a
+`../lxc/` stays as-is: it is a single-node `ytctl --batch` install test, a
 different question.
 
 ## Layout
@@ -33,8 +33,8 @@ cluster, `select_party` could offer 1, and every write aborted.
 
 ## Running
 
-    cargo build --release -p ytserv -p yxctl
-    cargo deb -p yxctl --variant pg18 --no-build
+    cargo build --release -p ytserv -p ytctl
+    cargo deb -p ytctl --variant pg18 --no-build
     ./run_all.sh          # 00_build, 10_up, then every test below
     ./90_down.sh          # free the containers
 
@@ -49,7 +49,7 @@ Rust source the cycle is **`00_build.sh` then `10_up.sh`**, never `00_build.sh`
 plus a restart — that combination silently tests the old binary, and the tests
 look like they are exercising a fix that was never deployed. Check with:
 
-    docker exec n1 grep -ac '<a string from your change>' /usr/local/bin/yaxaha/ytserv
+    docker exec n1 grep -ac '<a string from your change>' /usr/local/bin/yt-cluster/ytserv
 
 ## What each test asserts
 
@@ -79,7 +79,7 @@ look like they are exercising a fix that was never deployed. Check with:
 | `92d_rppd_shaper.sh` | rppd traffic shaper, per function per node: max_parallel = 2 never runs more than 2 at once; rate_per_sec = 2 spaces the starts; a capped function does not delay another; max_backlog sends one 'over' and one 'under' |
 | `92c_rppd_cadence.sh` | rppd cadence: a pp queue fed on time stays ok; silence -> watch messages (retried), one deadline message, ok on recovery; watch 0 -> deadline at once; bad rows refused; the watch survives the leader stopping |
 | `97_mpp.sh`, `98_mpp_df.sh`, `98_skv_join.sh` | the MPP partition layout and DataFusion, the SKV join challenge |
-| `34_skv_store.sh` | the secret store (yt-pgxt ytserv/skv-secrets.md): genesis on the leader, put/get/rm through yxctl, no plaintext in any row, the etcd `/secret/` mirror refused to remote callers, every node enrolling and approved, rotation with readers that never fail (the old key retired only once every node confirmed the new one), retirement with the honest converse, recovery with an offline recovery key. Not in the nightly yet (needs the skv build) |
+| `34_skv_store.sh` | the secret store (yt-pgxt ytserv/skv-secrets.md): genesis on the leader, put/get/rm through ytctl, no plaintext in any row, the etcd `/secret/` mirror refused to remote callers, every node enrolling and approved, rotation with readers that never fail (the old key retired only once every node confirmed the new one), retirement with the honest converse, recovery with an offline recovery key. Not in the nightly yet (needs the skv build) |
 | `35_skv_mtls.sh` | `peer_tls`: the cluster CA and a certificate per node, TLS required once every member has one (plaintext peer RPCs refused, `register`/`skv_enroll`/`ping` still answered), a peer's certificate on the wire, a **cold start with TLS required**, a rotation under load falling back between two certificate versions, `peer_tls` off again. Not in the nightly yet |
 | `36_skv_rppd.sh` | a python server function reading `SECRET.get(name)` for the names its `rppd_function.secret_names` lists, refused any other, the plaintext in no table. Not in the nightly yet |
 | `skv_lib.sh` | helpers the three share (sourced) |
@@ -112,7 +112,7 @@ node:
 - **ytserv refuses to start on a stale `.s.YT.*.pid`**, and a restarted
   container always has one. systemd owns that lifecycle on a real node; here the
   entrypoint clears it.
-- **Clear `/var/yaxaha` when you restart to pick up config**, or writes abort
+- **Clear `/var/yt-cluster` when you restart to pick up config**, or writes abort
   with `Sub-term 1 version 1 already exists` — the same collision a purge leaves
   behind on a real node.
 - **`yt_setup`'s 4th argument is the CONFIG table**, not the table being set up:
@@ -139,7 +139,7 @@ node:
   `as x(name,value,module)`, which now errors with "a column definition list is
   only allowed for functions returning record".
 - **A killed run poisons the next one through 2PC, not through the WAL.**
-  `rm -rf /var/yaxaha/*` is not a full reset: a cluster write that dies between
+  `rm -rf /var/yt-cluster/*` is not a full reset: a cluster write that dies between
   PREPARE and COMMIT leaves a `PREPARE TRANSACTION` behind, those survive a
   PostgreSQL restart by design, and they hold their table locks forever. The
   next test's opening `drop table if exists …` then blocks and the run produces

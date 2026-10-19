@@ -13,17 +13,17 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 TOPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../topology" && pwd)"
 
-DEB="${YAXAHA_DEB:-$(ls -t "$REPO_ROOT"/target/debian/yaxaha_*_amd64.deb 2>/dev/null | head -1)}"
-[ -n "$DEB" ] || { echo "no deb in target/debian — run: cargo deb -p yxctl --variant pg18 --no-build" >&2; exit 1; }
+DEB="${YT_CLUSTER_DEB:-$(ls -t "$REPO_ROOT"/target/debian/yt-cluster_*_amd64.deb 2>/dev/null | head -1)}"
+[ -n "$DEB" ] || { echo "no deb in target/debian — run: cargo deb -p ytctl --variant pg18 --no-build" >&2; exit 1; }
 echo "Using $(basename "$DEB")"
 
 STAGE=/tmp/yxhier-build
 rh "rm -rf $STAGE && mkdir -p $STAGE"
 if [ "$YX_HOST" = "local" ]; then
-	cp "$DEB" $STAGE/yaxaha.deb
+	cp "$DEB" $STAGE/yt-cluster.deb
 	cp "$TOPO"/Dockerfile "$TOPO"/node-entrypoint.sh "$TOPO"/pg_setup.sql $STAGE/
 else
-	scp -q "$DEB" "$YX_HOST:$STAGE/yaxaha.deb"
+	scp -q "$DEB" "$YX_HOST:$STAGE/yt-cluster.deb"
 	scp -q "$TOPO"/Dockerfile "$TOPO"/node-entrypoint.sh "$TOPO"/pg_setup.sql "$YX_HOST:$STAGE/"
 fi
 

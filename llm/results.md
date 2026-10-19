@@ -13,14 +13,14 @@ output is `results/run-20260930-145549.log`, which is not committed.
 
 | | |
 |---|---|
-| node image `ytllm-node` | Ubuntu 26.04, PostgreSQL 18, yaxaha 0.16.7 (ytserv 0.19.7), datafusion 54.0.0, pyarrow 25.0.1 |
-| yaxaha cluster | `yt1`, `yt2`, `yt3`: one leader, term 1, one cluster uuid on all three. Each node wrote the ClickHouse cluster file from `yt_config`, the same text on all three |
+| node image `ytllm-node` | Ubuntu 26.04, PostgreSQL 18, yt-cluster 0.16.7 (ytserv 0.19.7), datafusion 54.0.0, pyarrow 25.0.1 |
+| yt-cluster cluster | `yt1`, `yt2`, `yt3`: one leader, term 1, one cluster uuid on all three. Each node wrote the ClickHouse cluster file from `yt_config`, the same text on all three |
 | ClickHouse | 26.9.6.6, cluster `yt` of three shards, Keeper on all three |
 | model service | `gpc:8080`, the Windows box: default XiYanSQL-QwenCoder-7B (`sql`, `df`), `route` Qwen3-4B-Instruct, `ch` Qwen2.5-Coder-7B-Instruct, all on the CPU |
 
 The data, as the nodes held it:
 
-| | on each yaxaha node | in ClickHouse |
+| | on each yt-cluster node | in ClickHouse |
 |---|---|---|
 | `shop.customers`, `shop.orders`, `shop.products`, `shop.order_items` | all rows: 50, 400, 20, 997 | - |
 | `shop.web_events` (pinned shard) | a third: 300 of 900 | all 900: 314 / 295 / 291 per shard |
@@ -92,7 +92,7 @@ whole in PostgreSQL, which rightly stays `sql`.
 **Fix:** `route::decide_written`. A statement the node had written for ClickHouse
 looks its tables up among ClickHouse's own, the shadowed ones included, and runs
 there when ClickHouse has them all. Anything else is decided as before. It has a
-unit test in `route.rs`, and ytserv's tests pass: 232. It ships as yaxaha
+unit test in `route.rs`, and ytserv's tests pass: 232. It ships as yt-cluster
 0.16.7. With it, R1 is answered in one call to the model, about 13 s. The answer
 carries the note "read from ClickHouse, which has every table of the statement:
 shop.web_events (sharded: each holder has only its own rows) - not whole on this
@@ -113,7 +113,7 @@ The first run taught two things about the test:
 
 ## What the runs showed about shards
 
-yt_llm treats yaxaha's two kinds of shard differently, as the code means to:
+yt_llm treats yt-cluster's two kinds of shard differently, as the code means to:
 - **pinned** (`shard=owner; outer=pin`): the table is on the DataFusion list as
   "sharded". When ClickHouse has it, the question is answered from ClickHouse,
   and the answer says why (R1). When ClickHouse does not, it is refused naming
@@ -132,7 +132,7 @@ gives a partial number.
 - D2: ytserv read `shop.order_items` as one partition, and said why in the
   answer's notes: it has no single integer primary key to split on (its key is
   `order_id, product_id`).
-- The yaxaha nodes' ClickHouse file names no shard for them. Its hosts are
+- The yt-cluster nodes' ClickHouse file names no shard for them. Its hosts are
   `ch1`-`ch3` and the nodes are `yt1`-`yt3`, so ytserv adds no `<macros>`. Nothing
   here needs them: the tables are `Distributed` over `MergeTree`, with no
   `{shard}` macro.

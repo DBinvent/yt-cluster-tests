@@ -128,7 +128,7 @@ for a test below rather than housekeeping.
 | P6 | `10_up.sh`: `serve_etcd=true` | every SKV flow, the etcd and queue tests | **done** |
 | P6b | `pg_setup.sql`: `yt_join_gate`, byte-identical to `join_gate.rs::join_gate_sql` | `98_skv_join.sh` §5 | **done** |
 | P6c | `10_up.sh`: spare nodes get a TCP `DB_URL`; `min_cluster_size` excludes them | `24_db_local.sh`, `35_queue_spare.sh` | **done** |
-| P7a | `cargo build --release`, `cargo deb --variant pg18` → `yaxaha_0.14.1_amd64.deb` | everything | **done** |
+| P7a | `cargo build --release`, `cargo deb --variant pg18` → `yt-cluster_0.14.1_amd64.deb` | everything | **done** |
 | P7b | `00_build.sh` → image `6834e351`, 190 MB, carrying `git`/`ssh`/`ip` and the new binary | everything | **done** |
 | P7c | `10_up.sh` — **recreates the containers, destroying `n1`–`n6`** | everything | **first step of the run** |
 
@@ -170,7 +170,7 @@ when 0.18 ships.
 rebuild: `ytpgc` compiles `base`, `db`, `diff_doc` and `rppc`, and the only
 proto this session changed is `leader.proto`, which it does not.
 
-The fixture never runs `yxctl --batch` — it bakes the extension into the image
+The fixture never runs `ytctl --batch` — it bakes the extension into the image
 and writes config rows by hand — so `JoinGateAction` never fires and
 `yt_join_gate` does not exist. `98_skv_join.sh` §5 asserts that trigger refuses
 an unarmed `ok`, and without P6b it would fail for a reason that has nothing to
@@ -235,7 +235,7 @@ Both are first runs: neither has ever executed, because the image has no git.
 | **`98_skv_join.sh`** | written. Negative control (skv off = unchallenged), refusal with skv on reaching **neither Follower nor Spare**, the `J` row and its challenge, challenge **stability across retries**, the fingerprint field, the trigger refusing an unarmed `ok`, `CFGLC` on a follower, a forged `ok` admitting nothing, the sweep, the `K` row and its leader restriction. Extend with Protocols B and A once genesis has run here |
 | `99_skv_rotate.sh` | §10.2 items 14–20: mixed versions and **no read fails at any point**; a kill mid-pass loses nothing; two concurrent requests publish one version; advancing `keyver` early strands nobody; **no chain** — `MK_n` plus all of `@meta/` does not yield `MK_(n+1)`; removal (drop `N`, drop `K`, rotate) denies the new key, and the honest converse: what that node already read is still readable from its own store |
 | `93_skv_tls.sh` | `peer_tls` on all four → the cluster forms; a node with it **off** cannot talk to one with it on (the all-or-nothing property, asserted rather than documented); an anchor in `<fs_dir>/peers/` whose key the `K` row does not name is **refused**; a stranger certificate is refused |
-| `94_skv_consumers.sh` | `yxctl --skv put/get/ls/rm`; `db_secret_name` resolving into `db_password` for a real migration; `source_secret_name` producing a git credential file that a clone from `gitsrv` actually uses; a missing secret yielding **Pending** (row retried, not failed) and then succeeding once pushed; with `log_statement=all`, **no secret value anywhere** in the Postgres log, `pg_stat_statements`, or `~/.psql_history` |
+| `94_skv_consumers.sh` | `ytctl --skv put/get/ls/rm`; `db_secret_name` resolving into `db_password` for a real migration; `source_secret_name` producing a git credential file that a clone from `gitsrv` actually uses; a missing secret yielding **Pending** (row retried, not failed) and then succeeding once pushed; with `log_statement=all`, **no secret value anywhere** in the Postgres log, `pg_stat_statements`, or `~/.psql_history` |
 
 The `log_statement=all` grep in `94` is the one that matters most: every other
 claim in §6 about values not reaching SQL is a claim about code, and this is the
@@ -324,7 +324,7 @@ writes JSON straight through.
 | | |
 |---|---|
 | **git server** | **ssh only** — a deploy key, matching the real deployments. Phase 6's git-credential branch therefore has unit coverage only (see §2 A) |
-| **on failure** | **record and carry on.** Every red is written up in §7 with evidence and a verdict — defect in the feature, or defect in the test — and the run continues. No source changes to ytserv/yxctl mid-run |
+| **on failure** | **record and carry on.** Every red is written up in §7 with evidence and a verdict — defect in the feature, or defect in the test — and the run continues. No source changes to ytserv/ytctl mid-run |
 | **scope** | **all 8 groups, one pass** |
 | **docker host** | `n1`–`n6` are destroyed and recreated (required by P7; nothing on them is preserved). All fixtures, including ClickHouse, are **left running** at the end so a red script can be re-run against live state without a rebuild. `90_down.sh` frees them |
 
@@ -367,7 +367,7 @@ Named here rather than left to be discovered missing.
   distributes over the KV plane and that is what is tested; the join-time
   handoff is bound by the fingerprint but the channel itself is only
   authenticated once `peer_tls` is on, which `93` covers separately.
-* **pgbouncerxa.** Removed from the deb; the `yaxaha.auto_complete` GUC does the
+* **pgbouncerxa.** Removed from the deb; the `yt_cluster.auto_complete` GUC does the
   same at the extension level, and no test here needs a pooler.
 * **Upgrade / mixed-version clusters.** A real gap, and a pass of its own.
 * **`queue-p2p-route.md` Phase 4** — the persistent peer stream. Not built, so
@@ -379,7 +379,7 @@ Named here rather than left to be discovered missing.
 
 ## 7. Deliverables
 
-* 16 new or first-run scripts under `yxctl/tests/topology/`.
+* 16 new or first-run scripts under `ytctl/tests/topology/`.
 * `env.sh` gaining the partition/up/down helpers and fixture parameterisation.
 * `Dockerfile` + `gitsrv` image.
 * `run_all.sh` split into `run_a.sh` / `run_b.sh`, since the two fixtures have
@@ -685,7 +685,7 @@ cause and the package name, instead of an operator finding a fatal python error
 on stdout days later with nothing pointing at the config that caused it.
 
 **F6a — the original diagnosis, kept because the shape recurs.**
-`libpython3.12.so.1.0` (9MB) is vendored into `/usr/local/lib/yaxaha/` because
+`libpython3.12.so.1.0` (9MB) is vendored into `/usr/local/lib/yt-cluster/` because
 Ubuntu 26.04 dropped python 3.12 from its archive — but only the `.so` is
 shipped, and a shared library is not an interpreter: `Py_Initialize` needs the
 stdlib, starting with `encodings`. On 26.04 there is nowhere for it to come
@@ -819,7 +819,7 @@ the owner's judgement, not on mine.
 
 **Secondary, from the same script:** commit success with one node down is
 erratic even at a majority quorum - 4 of 5 on one run, 2 of 5 on the next. At
-the SUPPORTED default it is 0 of 5: `yxctl --peers` seeds
+the SUPPORTED default it is 0 of 5: `ytctl --peers` seeds
 `min_cluster_size = 1 + peers`, the whole roster, so a cluster built the
 documented way tolerates zero failures. For a product page that says "Nothing to
 promote, so nothing to fail over", that is worth a deliberate decision.

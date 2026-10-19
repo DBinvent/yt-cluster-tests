@@ -44,7 +44,7 @@ verify_cluster() { # verify_cluster <cluster>
 # I5: one leader per cluster, three different ones, no collision, every member
 # participating (Good or Leader)
 leaders_check() {
-    local c n l st seen="" s
+    local c n l st seen="" s nl
     for c in "${CLUSTERS[@]}"; do
         l=$(leader_of "$c")
         [ -n "$l" ] || { bad "I5 $c has a leader"; continue; }
@@ -61,6 +61,11 @@ leaders_check() {
         else
             ok "I5 $c: leader $l, term $(node_term "$l"),$st"
         fi
+        # one Leader among the members: a node cut off from all of them once "won" an
+        # election alone and read Leader beside the live one, which leader_of then
+        # named (the nightly of 2026-10-18, P3: u2=Leader ... u4=Leader passed)
+        nl=$(echo "$st" | tr ' ' '\n' | grep -c '=Leader$')
+        [ "$nl" -le 1 ] && ok "I5 $c: one member reports Leader" || bad "I5 $c: $nl members report Leader:$st"
     done
 }
 
@@ -266,7 +271,7 @@ add_node() { # add_node <cluster> <node>
     u=$(node_uuid "$n")
     say "-- $(now) add $n to $c ($RMC_JOIN)"
     mark
-    ext_ready() { [ "$(q "$1" <<< "select count(*) from pg_extension where extname = 'yaxaha'" 2>/dev/null)" = 1 ]; }
+    ext_ready() { [ "$(q "$1" <<< "select count(*) from pg_extension where extname = 'yt_cluster'" 2>/dev/null)" = 1 ]; }
     learn() { # its own cluster learns it at runtime: Z, then N, each its own cluster transaction
         cfg_tx "$c" "insert into $CFG (name, module, value) values ('$u', 'Z', '${AZ[$c]}')" \
             && ok "add $n: Z row written on $c's leader" || bad "add $n: Z row on $c"

@@ -37,7 +37,7 @@ echo "== blocking/table: a schema-drifted table is held out of comparison =="
 
 # recon=repair so a round would actually do something if the gate let it - a
 # gate asserted against a table recon was never going to touch proves nothing.
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'recon=repair; recon_rows=1' | tail -1)"
 
 for n in "${NODES[@]}"; do
 	q "$n" "drop table if exists sb_t; create table sb_t (id bigint primary key, v text);

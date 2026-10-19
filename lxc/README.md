@@ -1,4 +1,4 @@
-# YaXaHa integration tests (LXC)
+# YT Cluster integration tests (LXC)
 
 Integration tests run in a disposable LXC container so install/purge cycles never
 touch the host. Unit tests stay in the crates (`cargo test`); everything that needs
@@ -8,12 +8,12 @@ root + a real PostgreSQL runs here.
 
 ```
 lxc/
-  (audit_locale.sh, the en.yml docs audit, stays in yt-pgxt/yxctl/tests/)
+  (audit_locale.sh, the en.yml docs audit, stays in yt-pgxt/ytctl/tests/)
   lxc/
     env.sh            # shared config: container name, image, artifact paths
     00_create.sh      # launch container, install PostgreSQL
-    10_push.sh        # push yxctl/ytserv binaries (or the .deb) into the container
-    20_batch.sh       # batch mode: sudo yxctl --batch → assert service + yt_info
+    10_push.sh        # push ytctl/ytserv binaries (or the .deb) into the container
+    20_batch.sh       # batch mode: sudo ytctl --batch → assert service + yt_info
     30_purge.sh       # purge → assert clean → re-install (clean re-install cycle)
     40_cargo_ignored.sh # run root-gated cargo tests (--ignored) inside the container
     90_destroy.sh     # delete the container
@@ -30,7 +30,7 @@ lxc/run_all.sh
 lxc/00_create.sh
 lxc/10_push.sh
 lxc/20_batch.sh
-lxc exec yxctl-test -- bash        # poke around
+lxc exec ytctl-test -- bash        # poke around
 lxc/90_destroy.sh
 ```
 
@@ -64,6 +64,6 @@ binaries are pushed from `target/release`).
 - **batch** (`20_batch.sh`): fully scripted, asserted here.
 - **purge + re-install** (`30_purge.sh`): fully scripted, asserted here.
 - **setup TUI wizard** (`--setup`) and **control TUI**: interactive — verified manually
-  inside the container (`lxc exec $YX_CONTAINER -- sudo yxctl --setup`). The wizard's
+  inside the container (`lxc exec $YX_CONTAINER -- sudo ytctl --setup`). The wizard's
   non-interactive pre-checks (connect diagnostics, role/db bootstrap under sudo) are
   exercised by the batch scripts and unit tests.

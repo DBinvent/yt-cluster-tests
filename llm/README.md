@@ -1,6 +1,6 @@
 # yt_llm test: plain-language questions over PostgreSQL, DataFusion and ClickHouse
 
-A yaxaha cluster on docker that answers questions in plain language through
+A yt-cluster cluster on docker that answers questions in plain language through
 `yt_llm`. The node asks a text-to-SQL model which tables a question needs, then
 answers it where those tables are. It uses PostgreSQL for tables it holds whole,
 DataFusion for the tables named in `llm_df_tables`, and ClickHouse for ClickHouse's
@@ -13,7 +13,7 @@ record of the last run is in [results.md](results.md).
 
 | name | what | where |
 |---|---|---|
-| `yt1`, `yt2`, `yt3` | yaxaha nodes: PostgreSQL 18, the yaxaha extension and ytserv, DataFusion in `/opt/llm-df` (`node/requirements.txt`) | docker (containers `ytllm-yt1`...) |
+| `yt1`, `yt2`, `yt3` | yt-cluster nodes: PostgreSQL 18, the yt_cluster extension and ytserv, DataFusion in `/opt/llm-df` (`node/requirements.txt`) | docker (containers `ytllm-yt1`...) |
 | `ch1`, `ch2`, `ch3` | ClickHouse 26.9: cluster `yt`, one shard per node, Keeper on all three | docker (`ytllm-ch1`...) |
 | `gpc:8080` | the model service: llama.cpp behind a mutual-TLS proxy | the Windows box `gpc`, outside docker |
 
@@ -65,9 +65,9 @@ models, and `agent.md` explains all of it.
 
 Requirements, on the docker host: docker with its own daemon (compose is not
 needed), python3, OpenSSL 3, curl, and about 3 GB of free RAM. You also need a
-yaxaha package, 0.16.7 or newer. The llm2 targets came in 0.15, and the
+yt-cluster package, 0.16.7 or newer. The llm2 targets came in 0.15, and the
 ClickHouse fallback for a pinned shard (R1) works from 0.16.7. It is built in
-yt-pgxt with `cargo deb -p yxctl --no-build`.
+yt-pgxt with `cargo deb -p ytctl --no-build`.
 
 ```
 cp env.example .env     # the client certificate, the package; YTLLM_DOCKER_HOST
@@ -87,7 +87,7 @@ chat completion, asked for up to `PROBE_WAIT` seconds (default 300). When one ne
 answers, the test exits 77 and nothing is tested, and the nightly run reports the
 suite as skipped rather than failed. The nightly run also probes before it builds
 anything, and again after a failed test. If the model service stopped answering by
-then, the failures say nothing about yaxaha, so that run is reported as skipped too.
+then, the failures say nothing about yt-cluster, so that run is reported as skipped too.
 
 ## What up.sh configures
 
@@ -96,7 +96,7 @@ written last, and ytserv starts on it.
 
 | module | rows | |
 |---|---|---|
-| `N` | `yt1:7421`, `yt2:7421`, `yt3:7421` | node uuids are uuid5 of the host name, like `yxctl --peers` |
+| `N` | `yt1:7421`, `yt2:7421`, `yt3:7421` | node uuids are uuid5 of the host name, like `ytctl --peers` |
 | `C` | `cluster` | a new cluster uuid for each run |
 | `C` | `min_cluster_size` 3, `tcp_timeout_ms` 2000, `log_level` info | |
 | `C` | `serve_llm`, `llm_host` (`gpc:8080`), `llm_ca` / `llm_cert` / `llm_key` | the last three name the `K` rows |
@@ -109,7 +109,7 @@ written last, and ytserv starts on it.
 | `A` | `shop.sessions`, `shop.refunds` | ring-hash shards: `shard=id; outer=reject`. The owners follow the live ring, and a non-owner keeps nothing |
 
 The sample data is `data/pg.sql` on every node and `data/ch.sql` in ClickHouse, both
-deterministic. Each yaxaha node loads its own third of each sharded table, and a
+deterministic. Each yt-cluster node loads its own third of each sharded table, and a
 pinned row names that node as its owner. ClickHouse holds all the rows of
 `shop.web_events` and `shop.sessions`, and has no `shop.clicks` or `shop.refunds`.
 

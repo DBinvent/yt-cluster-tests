@@ -33,7 +33,7 @@ for n in "${NODES[@]}"; do
 	q "$n" "drop table if exists rv2_t; create table rv2_t (id bigint primary key, v text, note text);" >/dev/null
 done
 # no recon config: recon's own rounds stay off this table, the compare is T2's alone
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'ignore_col=note' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'ignore_col=note' | tail -1)"
 register_table "$T" "$CFG"
 restart_all
 await_cluster

@@ -1,4 +1,4 @@
--- Sample data for the yt_llm test, loaded on EVERY yaxaha node by up.sh before
+-- Sample data for the yt_llm test, loaded on EVERY yt-cluster node by up.sh before
 -- ytserv starts (psql -v node_index=0|1|2 -v node_uuid=<this node's uuid>).
 -- Deterministic: every node computes the same rows, so a question has one
 -- answer wherever it is asked.
@@ -7,7 +7,7 @@
 --   shop.customers, shop.orders           questions answered by PostgreSQL
 --   shop.products, shop.order_items       named in C llm_df_tables: answered by DataFusion
 -- Sharded over the three nodes - no node holds them whole, which is what the
--- routing questions are about. yaxaha has two kinds of shard, and yt_llm treats
+-- routing questions are about. yt-cluster has two kinds of shard, and yt_llm treats
 -- them differently:
 --   pinned (module A shard=owner; outer=pin: the owner column names the node)
 --     shop.web_events   also in ClickHouse: answered from there, and it says so

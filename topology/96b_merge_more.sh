@@ -42,12 +42,12 @@
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== merge: counters (all_fields), text (text_col), arrays by position =="
 
-YXCTL="$REPO_ROOT/target/release/yxctl"
-CNT_CFG="$("$YXCTL" --encode-table-cfg 'merge_all_fields' | tail -1)"
-TXT_CFG="$("$YXCTL" --encode-table-cfg 'merge_text=body; cluster_commit=all' | tail -1)"
-ARR_CFG="$("$YXCTL" --encode-table-cfg 'merge; cluster_commit=all' | tail -1)"
+YTCTL="$REPO_ROOT/target/release/ytctl"
+CNT_CFG="$("$YTCTL" --encode-table-cfg 'merge_all_fields' | tail -1)"
+TXT_CFG="$("$YTCTL" --encode-table-cfg 'merge_text=body; cluster_commit=all' | tail -1)"
+ARR_CFG="$("$YTCTL" --encode-table-cfg 'merge; cluster_commit=all' | tail -1)"
 for v in "$CNT_CFG" "$TXT_CFG" "$ARR_CFG"; do
-	[ -n "$v" ] || { bad "yxctl --encode-table-cfg gave an empty value - is $YXCTL built from this tree?"; summary; }
+	[ -n "$v" ] || { bad "ytctl --encode-table-cfg gave an empty value - is $YTCTL built from this tree?"; summary; }
 done
 
 # `doc` second: wait_writable probes with `insert ... values (<id>, '{}')`, which

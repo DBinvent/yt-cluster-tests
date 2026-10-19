@@ -17,7 +17,7 @@
 #    one the last run tested. A code change is a .rs change and nothing else: no
 #    .rs change, no run - nothing built, nothing appended, no package. This
 #    repository is never watched: a change to a test is not a change to test.
-# 2. Version: when the deb version in yt-pgxt/yxctl/Cargo.toml is already
+# 2. Version: when the deb version in yt-pgxt/ytctl/Cargo.toml is already
 #    published, its patch is bumped (and ytserv's, when ytserv's sources changed
 #    since its version was published) - in the working tree, uncommitted.
 # 3. Build: the extension for every PostgreSQL major, the release binaries, the
@@ -45,7 +45,7 @@
 # suites than a whole run, measures it - so renaming or deleting that file has
 # the next night measure again, and with no .rs change it runs for that alone (trigger: coverage; nothing bumped or
 # published, there is nothing new to publish). Such a run builds an instrumented
-# ytserv and yxctl into a second package (nightly/coverage.sh) that every suite
+# ytserv and ytctl into a second package (nightly/coverage.sh) that every suite
 # installs in place of the plain one, runs the unit tests under cargo llvm-cov,
 # collects each suite's counts from its docker volume (lxc: from the container)
 # and writes nightly/coverage.yaml plus a `coverage:` percent in its results.yaml
@@ -69,7 +69,7 @@ if [ -f "$TESTS/.env" ]; then
 fi
 GIT_ROOT="$(cd "$TESTS/.." && pwd)"
 YT_PGXT="${YT_PGXT:-$GIT_ROOT/yt-pgxt}"
-DIST="${DIST:-$GIT_ROOT/yaxaha_dist}"
+DIST="${DIST:-$GIT_ROOT/ytcluster_dist}"
 INFRA_APT="${INFRA_APT:-$GIT_ROOT/infra_apt}"
 REPO_DIR="${REPO_DIR:-}"   # the apt repository root, yum/el9 under it: .env
 GPG_KEY="${GPG_KEY:-D9988976429AE53380B9E08C47C722E2BC8094E8}"
@@ -129,7 +129,11 @@ watch_list() {
 	if [ -n "${NIGHTLY_WATCH:-}" ]; then echo "$NIGHTLY_WATCH"; return; fi
 	{
 		echo yt-pgxt
-		(cd "$YT_PGXT" && timeout 300 cargo metadata --format-version 1 --offline 2>/dev/null) | python3 -c '
+		# --filter-platform: unfiltered, the resolve also wants other platforms' crates
+		# (macOS core-foundation) that no Linux build ever fetched, so --offline failed
+		# and rppd, rdbm and diff-doc-rs silently fell off this list
+		(cd "$YT_PGXT" && timeout 300 cargo metadata --format-version 1 --offline \
+			--filter-platform "$(rustc -vV | sed -n 's/^host: //p')" 2>/dev/null) | python3 -c '
 import json, os, subprocess, sys
 try: m = json.load(sys.stdin)
 except Exception: sys.exit(0)
@@ -138,7 +142,7 @@ for p in m["packages"]:
         d = os.path.dirname(p["manifest_path"])
         r = subprocess.run(["git", "-C", d, "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
         print(os.path.basename(r or d))'
-		echo etcd yaxaha_dist infra_apt
+		echo etcd ytcluster_dist infra_apt
 	} | tr ' ' '\n' | grep -v '^$' | grep -vx "$(basename "$TESTS")" | sort -u | tr '\n' ' '
 }
 
@@ -198,8 +202,10 @@ bump_patch() { # <Cargo.toml>
 	local v n; v="$(cargo_version "$1")"; n="${v%.*}.$(( ${v##*.} + 1 ))"
 	sed -i "0,/^version = \"$v\"/s//version = \"$n\"/" "$1"; echo "$n"
 }
-published_deb() { reprepro -b "$REPO_DIR" list yaxaha 2>/dev/null | awk '/yaxaha /{print $NF; exit}'; }
-DEB_V="$(cargo_version "$YT_PGXT/yxctl/Cargo.toml")"
+# the package and the repository codename are both yt-cluster since 2026-10-18; the
+# old codename yaxaha keeps the old package 0.12.1 until it is removed by hand
+published_deb() { reprepro -b "$REPO_DIR" list yt-cluster 2>/dev/null | awk '$2 == "yt-cluster" {print $NF; exit}'; }
+DEB_V="$(cargo_version "$YT_PGXT/ytctl/Cargo.toml")"
 YTS_V="$(cargo_version "$YT_PGXT/ytserv/Cargo.toml")"
 PUB_V="$(published_deb)"
 BUMPED=false
@@ -214,7 +220,7 @@ if [ "$DRY" = 1 ]; then
 fi
 
 if [ "$NEED_BUMP" = 1 ]; then
-	while dpkg --compare-versions "$DEB_V" le "$PUB_V"; do DEB_V="$(bump_patch "$YT_PGXT/yxctl/Cargo.toml")"; done
+	while dpkg --compare-versions "$DEB_V" le "$PUB_V"; do DEB_V="$(bump_patch "$YT_PGXT/ytctl/Cargo.toml")"; done
 	if [ "$(ytserv_fp)" != "$(cat "$STATE/published.ytserv.fp" 2>/dev/null)" ] \
 	   && [ "$YTS_V" = "$(cat "$STATE/published.ytserv.version" 2>/dev/null)" ]; then
 		YTS_V="$(bump_patch "$YT_PGXT/ytserv/Cargo.toml")"
@@ -269,20 +275,25 @@ suite() {
 }
 
 # ── 3. the build the suites install ─────────────────────────────────────────────
-DEB="$LOGS/yaxaha_${DEB_V}_amd64-pg18.deb"
+DEB="$LOGS/yt-cluster_${DEB_V}_amd64-pg18.deb"
 SUITE_DEB="$DEB"   # a coverage run: the instrumented one
 COV="$LOGS/coverage"
+# Each step checked by hand, as release() below: `if suite build build` is where
+# bash ignores `set -e`, and a failed cargo build went on to copy whatever deb of
+# this version target/debian still held - the suites would test an older build.
 build() {
-	set -e
-	cd "$YT_PGXT"
-	FORCE=1 bash ytpgc/build-all-ytpgc.sh
-	cargo build --release -p ytserv -p yxctl
+	cd "$YT_PGXT" || return 1
+	FORCE=1 bash ytpgc/build-all-ytpgc.sh || { echo "  FAIL  build: the extension (build-all-ytpgc.sh)"; return 1; }
+	cargo build --release -p ytserv -p ytctl || { echo "  FAIL  build: cargo build ytserv ytctl"; return 1; }
 	# the third-party crates by license tag, shipped beside LICENSE (the list in the
 	# tree stays when this fails)
-	python3 -I yxctl/lib-licenses.py || echo "  WARN  lib-licenses.txt not refreshed"
-	(cd yxctl && cargo deb --variant pg18 --no-build)
-	cp "target/debian/yaxaha_${DEB_V}_amd64.deb" "$DEB"
-	if [ -d "$GIT_ROOT/etcd" ]; then (cd "$GIT_ROOT/etcd" && cargo build --release --example yxetcd); fi
+	python3 -I ytctl/lib-licenses.py || echo "  WARN  lib-licenses.txt not refreshed"
+	rm -f "target/debian/yt-cluster_${DEB_V}_amd64.deb"
+	(cd ytctl && cargo deb --variant pg18 --no-build) || { echo "  FAIL  build: cargo deb"; return 1; }
+	cp "target/debian/yt-cluster_${DEB_V}_amd64.deb" "$DEB" || { echo "  FAIL  build: no yt-cluster_${DEB_V}_amd64.deb"; return 1; }
+	if [ -d "$GIT_ROOT/etcd" ]; then
+		(cd "$GIT_ROOT/etcd" && cargo build --release --example yxetcd) || { echo "  FAIL  build: etcd's yxetcd"; return 1; }
+	fi
 	echo "  OK    built $(basename "$DEB")"
 }
 
@@ -295,7 +306,7 @@ on_docker_host() {
 }
 s_topology() {
 	cd "$TESTS/topology"
-	export YAXAHA_DEB="$SUITE_DEB" YX_NODES="n1 n2 n3 n4 n5 n6 n7"
+	export YT_CLUSTER_DEB="$SUITE_DEB" YX_NODES="n1 n2 n3 n4 n5 n6 n7"
 	# a failed script's ytserv logs, one file per node (topology/env.sh save_node_logs)
 	export YX_FAIL_LOGS="$LOGS/topology-nodes"
 	local rc=0
@@ -306,7 +317,9 @@ s_topology() {
 }
 s_hier() {
 	cd "$TESTS/hier"
-	export YAXAHA_DEB="$SUITE_DEB"
+	export YT_CLUSTER_DEB="$SUITE_DEB"
+	# a failed script's ytserv logs, one file per node (hier/run_all.sh, as topology's)
+	export YX_FAIL_LOGS="$LOGS/hier-nodes"
 	local rc=0
 	./00_build.sh && ./run_all.sh || rc=1
 	[ -x ./90_down.sh ] && ./90_down.sh || true
@@ -318,13 +331,13 @@ s_lxc() { cd "$TESTS/lxc" && ./run_all.sh; }
 # address and the mTLS client certs of that host); empty: here.
 # The model service is asked first (llm/probe.sh): not answering, the suite is
 # skipped (77) before anything is built. Asked again after a failed run: if it
-# stopped answering meanwhile, the failures say nothing about yaxaha - skipped too.
+# stopped answering meanwhile, the failures say nothing about the cluster - skipped too.
 LLM_SSH="${LLM_SSH-$RMC_SSH}"
 s_llm() {
 	local rc=0
 	if [ -z "$LLM_SSH" ]; then
 		cd "$TESTS/llm"
-		export YAXAHA_DEB="$SUITE_DEB"
+		export YT_CLUSTER_DEB="$SUITE_DEB"
 		./probe.sh || return $?
 		./build.sh && ./up.sh && ./test.sh || rc=1
 		./down.sh || true
@@ -338,7 +351,7 @@ s_llm() {
 	ssh -o BatchMode=yes "$LLM_SSH" "$at && ./probe.sh" || return $?
 	rsync -a "$SUITE_DEB" "$LLM_SSH:$RMC_DIR/" \
 	&& ssh -o BatchMode=yes -o ServerAliveInterval=30 "$LLM_SSH" "$at \
-		&& export YAXAHA_DEB=\$HOME/$RMC_DIR/$(basename "$SUITE_DEB") YX_COV_MOUNT='${YX_COV_MOUNT:-}' && rc=0; ./build.sh && ./up.sh && ./test.sh || rc=1; ./down.sh >/dev/null 2>&1; exit \$rc" \
+		&& export YT_CLUSTER_DEB=\$HOME/$RMC_DIR/$(basename "$SUITE_DEB") YX_COV_MOUNT='${YX_COV_MOUNT:-}' && rc=0; ./build.sh && ./up.sh && ./test.sh || rc=1; ./down.sh >/dev/null 2>&1; exit \$rc" \
 	|| rc=1
 	[ "$rc" -eq 0 ] || ssh -o BatchMode=yes "$LLM_SSH" "$at && PROBE_WAIT=60 ./probe.sh" || return $?
 	return $rc
@@ -353,7 +366,7 @@ rmc_sync() {
 }
 rmc_deb() { if [ -n "$RMC_SSH" ]; then echo "\$HOME/$RMC_DIR/$(basename "$SUITE_DEB")"; else echo "$SUITE_DEB"; fi; }
 on_rmc() { # <command line, run in the rmc/ folder>
-	local env="unset DOCKER_HOST; export YAXAHA_DEB=$(rmc_deb) YX_COV_MOUNT='${YX_COV_MOUNT:-}' RMC_ORIGIN=\${RMC_ORIGIN:-all} RMC_JOIN=\${RMC_JOIN:-clone} RMC_LOG_LEVEL=\${RMC_LOG_LEVEL:-info}"
+	local env="unset DOCKER_HOST; export YT_CLUSTER_DEB=$(rmc_deb) YX_COV_MOUNT='${YX_COV_MOUNT:-}' RMC_ORIGIN=\${RMC_ORIGIN:-all} RMC_JOIN=\${RMC_JOIN:-clone} RMC_LOG_LEVEL=\${RMC_LOG_LEVEL:-info}"
 	if [ -n "$RMC_SSH" ]; then
 		ssh -o BatchMode=yes -o ServerAliveInterval=30 "$RMC_SSH" "cd $RMC_DIR/rmc && $env && $1"
 	else
@@ -362,20 +375,32 @@ on_rmc() { # <command line, run in the rmc/ folder>
 }
 RMC_BUILT=0
 rmc_prepare() { [ "$RMC_BUILT" = 1 ] && return 0; rmc_sync && on_rmc "./build.sh" && RMC_BUILT=1; }
-# a fresh layout, or the suite fails with up.sh's last lines in its log
-RMC_UP="( ./up.sh > /tmp/nightly-rmc-up.log 2>&1 || { tail -30 /tmp/nightly-rmc-up.log; echo '  FAIL  rmc up.sh'; exit 1; } )"
-s_topo()            { rmc_prepare && on_rmc "$RMC_UP && cd ../topo && rc=0 && for t in t0_jobs t1_az t2_move t3_group t6_negative t4_split; do [ -x ./\$t.sh ] || continue; echo \"== \$t\"; ./\$t.sh || rc=1; done; exit \$rc"; }
-s_topo_faults()     { rmc_prepare && on_rmc "$RMC_UP && cd ../topo && ./t5_faults.sh"; }
-s_topo_membership() { rmc_prepare && on_rmc "$RMC_UP && cd ../topo && ./t7_membership.sh"; }
-s_rmc()             { rmc_prepare && on_rmc "$RMC_UP && ./test.sh"; }
+# a fresh layout: up.sh's own checks counted in the suite's log, and on a stop its
+# last lines and a FAIL (rmc/up_logged.sh). A step of up.sh that fails reports and
+# goes on - only a layout that cannot come up at all stops the suite
+RMC_UP="./up_logged.sh /tmp/nightly-rmc-up.log"
+s_topo()            { rmc_prepare && on_rmc "$RMC_UP && cd ../topo && rc=0 && for t in t0_jobs t1_az t2_move t3_group t6_negative t4_split; do [ -x ./\$t.sh ] || continue; echo \"== \$t\"; ./\$t.sh || rc=1; done; exit \$rc" || rmc_logs topo; }
+s_topo_faults()     { rmc_prepare && on_rmc "$RMC_UP && cd ../topo && ./t5_faults.sh" || rmc_logs topo-faults; }
+s_topo_membership() { rmc_prepare && on_rmc "$RMC_UP && cd ../topo && ./t7_membership.sh" || rmc_logs topo-membership; }
+s_rmc()             { rmc_prepare && on_rmc "$RMC_UP && ./test.sh" || rmc_logs rmc; }
+# a failed suite's node logs, one file per container, before the next suite's
+# layout replaces the containers; returns 1, the suite stays failed
+rmc_logs() { # <suite>
+	local d="$LOGS/$1-nodes" c
+	mkdir -p "$d" 2>/dev/null || return 1
+	for c in $(on_rmc "docker ps -a --format '{{.Names}}' | grep '^rmc-'" 2>/dev/null); do
+		on_rmc "docker logs $c 2>&1 | tail -c 20000000" > "$d/$c.log" 2>/dev/null || true
+	done
+	return 1
+}
 rmc_down() { on_rmc "./down.sh >/dev/null 2>&1; true" || true; }
 
 # ── coverage (a run that measures it) ───────────────────────────────────────────
 # A suite's instrumented processes write their counts into a docker volume of its
-# own, yaxaha-cov-<suite>, on the host its containers run on - the suites add
+# own, yt-cluster-cov-<suite>, on the host its containers run on - the suites add
 # YX_COV_MOUNT to their `docker run`. lxc pulls the directory out of its container
 # before deleting it (YX_COV_OUT) and pushes the instrumented binaries (YX_BIN_DIR).
-cov_vol() { echo "yaxaha-cov-$1"; }
+cov_vol() { echo "yt-cluster-cov-$1"; }
 cov_on() { # <suite> <command line>: run it where that suite's containers run
 	local to
 	case "$1" in
@@ -402,11 +427,11 @@ cov_suite() { # <suite>: where it writes its counts - a fresh volume, or lxc's f
 		unit|none) ;;
 		lxc) mkdir -p "$COV/e2e/lxc"
 			export YX_COV_OUT="$COV/e2e/lxc" YX_BIN_DIR="$YT_PGXT/target/coverage/release" ;;
-		*) export YX_COV_MOUNT="-v $(cov_vol "$1"):/var/lib/yaxaha-cov"
+		*) export YX_COV_MOUNT="-v $(cov_vol "$1"):/var/lib/yt-cluster-cov"
 			cov_on "$1" "docker volume rm -f $(cov_vol "$1") >/dev/null 2>&1; true" ;;
 	esac
 }
-cov_build() { bash "$HERE/coverage.sh" build "$DEB" "$LOGS/yaxaha_${DEB_V}_amd64-pg18-coverage.deb"; }
+cov_build() { bash "$HERE/coverage.sh" build "$DEB" "$LOGS/yt-cluster_${DEB_V}_amd64-pg18-coverage.deb"; }
 s_unit_cov() { bash "$HERE/coverage.sh" unit; }
 cov_report() {
 	local s
@@ -424,7 +449,7 @@ cov_report() {
 RESULT=pass; BUILD=pass; PUBLISHED_DEB=""; PUBLISHED_RPM=""; NOTE=""; COVERAGE_PCT=""; COV_NOTE=""
 if suite build build; then
 	if [ "$COVERAGE" = 1 ]; then
-		if suite coverage-build cov_build; then SUITE_DEB="$LOGS/yaxaha_${DEB_V}_amd64-pg18-coverage.deb"
+		if suite coverage-build cov_build; then SUITE_DEB="$LOGS/yt-cluster_${DEB_V}_amd64-pg18-coverage.deb"
 		else COVERAGE=0; COV_NOTE="coverage not measured: its build failed"; echo "$TESTED_FP" > "$STATE/coverage.tried.fp"; fi
 	fi
 	for s in $NIGHTLY_SUITES; do
@@ -460,30 +485,68 @@ fi
 echo "$TESTED_FP" > "$STATE/tested.fp"
 
 # ── 5. publish ──────────────────────────────────────────────────────────────────
+# Every step checked by hand, never by `set -e`: these run as the condition of an
+# `if` (suite release release && suite publish publish), where bash ignores it - so
+# a failed release build went on to "OK" with no file, publish "published" nothing,
+# and the runs of 2026-10-12 and 13 recorded 0.18.81 and 1.18.86 as published and
+# renewed the badge while apt still served 0.12.1.
 release() {
-	set -e
-	cd "$YT_PGXT"
-	BASE_IMAGE=almalinux:9 GLIBC_TAG=2_34 ./build_glibc.sh
+	cd "$YT_PGXT" || return 1
+	BASE_IMAGE=almalinux:9 GLIBC_TAG=2_34 ./build_glibc.sh \
+		|| { echo "  FAIL  release: build_glibc.sh (EL9, glibc 2.34) exited $?"; return 1; }
 	local out; out="$(mktemp)"
-	EL9=1 FORCE=1 BUILD_HOST="${DOCKER_HOST:-}" GITHUB_OUTPUT="$out" "$DIST/build.sh" "$GIT_ROOT"
-	SKIP_EXT=1 SKIP_GLIBC=1 GITHUB_OUTPUT="$out" "$DIST/build_rpm.sh" "$GIT_ROOT"
+	EL9=1 FORCE=1 BUILD_HOST="${DOCKER_HOST:-}" GITHUB_OUTPUT="$out" "$DIST/build.sh" "$GIT_ROOT" \
+		|| { echo "  FAIL  release: ytcluster_dist build.sh exited $?"; rm -f "$out"; return 1; }
+	SKIP_EXT=1 SKIP_GLIBC=1 GITHUB_OUTPUT="$out" "$DIST/build_rpm.sh" "$GIT_ROOT" \
+		|| { echo "  FAIL  release: ytcluster_dist build_rpm.sh exited $?"; rm -f "$out"; return 1; }
 	REL_DEB="$(grep -oP '(?<=^deb=).*' "$out" | tail -1)"
 	REL_RPM="$(grep -oP '(?<=^rpm=).*' "$out" | tail -1)"
 	rm -f "$out"
-	[ -f "$REL_DEB" ] && [ -f "$REL_RPM" ]
+	{ [ -f "$REL_DEB" ] && [ -f "$REL_RPM" ]; } \
+		|| { echo "  FAIL  release: the build named no deb or rpm that exists (deb=${REL_DEB:-none} rpm=${REL_RPM:-none})"; return 1; }
 	echo "deb=$REL_DEB" > "$LOGS/release.out"; echo "rpm=$REL_RPM" >> "$LOGS/release.out"
 	echo "  OK    release build: $(basename "$REL_DEB"), $(basename "$REL_RPM")"
 }
 publish() {
-	set -e
 	local deb rpm
-	deb="$(grep -oP '(?<=^deb=).*' "$LOGS/release.out")"; rpm="$(grep -oP '(?<=^rpm=).*' "$LOGS/release.out")"
-	DEB="$deb" REPO_DIR="$REPO_DIR" CONF_DIR="$DIST/repo-conf" PACKAGE=yaxaha GPG_KEY="$GPG_KEY" \
-		INSTALL_HTML="$DIST/install.html" "$INFRA_APT/scripts/publish-apt.sh"
+	deb="$(grep -oP '(?<=^deb=).*' "$LOGS/release.out" 2>/dev/null)"; rpm="$(grep -oP '(?<=^rpm=).*' "$LOGS/release.out" 2>/dev/null)"
+	{ [ -f "$deb" ] && [ -f "$rpm" ]; } \
+		|| { echo "  FAIL  publish: no release build to publish (deb=${deb:-none} rpm=${rpm:-none})"; return 1; }
+	DEB="$deb" REPO_DIR="$REPO_DIR" CONF_DIR="$DIST/repo-conf" CODENAME=yt-cluster PACKAGE=yt-cluster GPG_KEY="$GPG_KEY" \
+		INSTALL_HTML="$DIST/install.html" "$INFRA_APT/scripts/publish-apt.sh" \
+		|| { echo "  FAIL  deb not published: publish-apt.sh exited $?"; return 1; }
+	# what apt now serves: the version this run built, or it was not published
+	local now; now="$(published_deb)"
+	[ "$now" = "$DEB_V" ] || { echo "  FAIL  deb not published: the repository lists ${now:-nothing}, not $DEB_V"; return 1; }
+	# only the latest: the signatures of the versions before it go
+	find "$REPO_DIR" -maxdepth 1 -name 'yt-cluster_*_amd64.deb.sig' ! -name "$(basename "$deb").sig" -delete
 	echo "  OK    deb published: $(basename "$deb")"
-	# its createrepo fallback bind-mounts the local repository: this host's daemon
-	DOCKER_HOST=unix:///var/run/docker.sock RPM="$rpm" REPO_DIR="$REPO_DIR" GPG_KEY="$GPG_KEY" "$DIST/publish_rpm.sh"
+	# its createrepo fallback bind-mounts the local repository: this host's daemon;
+	# KEEP=1: only the latest rpm stays in yum/el9
+	DOCKER_HOST=unix:///var/run/docker.sock KEEP=1 RPM="$rpm" REPO_DIR="$REPO_DIR" GPG_KEY="$GPG_KEY" "$DIST/publish_rpm.sh" \
+		|| { echo "  FAIL  rpm not published: publish_rpm.sh exited $?"; return 1; }
 	echo "  OK    rpm published: $(basename "$rpm")"
+	# what anyone can install now, as the internet sees it
+	public_available "$DEB_V" "$(basename "$rpm")"
+}
+# [publish] The apt index and the rpm as the internet sees them: through public
+# DNS, not this host's /etc/hosts, which may name the apt host's LAN address. Up to
+# a minute, for the edge to revalidate (the index is served max-age=0).
+PUBLIC_APT="${PUBLIC_APT:-https://apt.dbinvent.com}"
+public_get() { curl -fsS -m 20 --doh-url https://1.1.1.1/dns-query "$@"; }
+public_available() { # <deb version> <rpm file name>
+	local v="" i
+	for i in $(seq 1 12); do
+		v="$(public_get "$PUBLIC_APT/dists/yt-cluster/restricted/binary-amd64/Packages" 2>/dev/null \
+			| awk '/^Package: yt-cluster$/ {p = 1} p && /^Version:/ {print $2; exit}')"
+		[ "$v" = "$1" ] && break
+		sleep 5
+	done
+	[ "$v" = "$1" ] || { echo "  FAIL  deb not available: $PUBLIC_APT serves ${v:-nothing}, not $1"; return 1; }
+	echo "  OK    deb available: $PUBLIC_APT serves yt-cluster $1"
+	public_get -o /dev/null -I "$PUBLIC_APT/yum/el9/packages/$2" 2>/dev/null \
+		|| { echo "  FAIL  rpm not available: $PUBLIC_APT/yum/el9/packages/$2"; return 1; }
+	echo "  OK    rpm available: $PUBLIC_APT/yum/el9/packages/$2"
 }
 if [ "$RESULT" = pass ] && [ "$NIGHTLY_PUBLISH" = 1 ]; then
 	if suite release release && suite publish publish; then
@@ -526,7 +589,7 @@ suites = [r for r in rows if r[0] not in STEPS]
 steps = [r for r in rows if r[0] in STEPS]
 out = []
 if not os.path.exists(e["RESULTS"]) or os.path.getsize(e["RESULTS"]) == 0:
-    out.append("# yaxaha nightly end-to-end runs, oldest first - one entry per run, appended by\n"
+    out.append("# YT Cluster nightly end-to-end runs, oldest first - one entry per run, appended by\n"
                "# nightly/nightly.sh. A page lists them newest first by reading in reverse.\n")
 out.append(f"- run: {q(e['RUN_ID'])}")
 out.append(f"  started: {q(e['START'])}")

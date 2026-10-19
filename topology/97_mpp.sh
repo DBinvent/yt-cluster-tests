@@ -37,7 +37,7 @@ PARTS="${YX_MPP_PARTS:-4}"
 # Sharded by owner column, pinned to the az that owns it - the shape that makes
 # rows live on SOME nodes rather than all of them, which is what makes the
 # placement catalog worth asking.
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg \
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg \
 	'shard=owner; outer=pin; recon=report' | tail -1)"
 [ -n "$CFG" ] && ok "the shard config encodes ($CFG)" \
 	|| { bad "--encode-table-cfg produced nothing for a shard spec"; summary; }

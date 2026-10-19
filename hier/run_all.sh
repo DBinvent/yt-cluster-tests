@@ -8,7 +8,7 @@
 # Order is by dependency, not by cost:
 #
 #   10_up        destructive; recreates all nine containers
-#   15_store     the store and TLS in every cluster, the links set up with yxctl:
+#   15_store     the store and TLS in every cluster, the links set up with ytctl:
 #                a hierarchy runs on them (H2), every script after needs a link
 #   20_relations the relation layer is configured, loaded and derived at all
 #   30_quorum    ...and an external link is excluded from quorum/election/party
@@ -45,6 +45,9 @@ step() {
 	local src sums p f
 	echo
 	echo "───────── $1 ─────────"
+	# [nightly] when it began on the docker host's clock, for its nodes' logs below
+	local t0; t0="$(bash -c 'source ./env.sh; rh "date +%s"' 2>/dev/null | tail -1)"
+	case "$t0" in ''|*[!0-9]*) t0="$(date +%s)" ;; esac
 	./"$1" 2>&1 | tee "$step_out"
 	src=${PIPESTATUS[0]}
 	sums="$(grep -oE -- '---- [0-9]+ passed, [0-9]+ failed ----' "$step_out")"
@@ -54,6 +57,8 @@ step() {
 		echo "── $1: PASS"
 	else
 		echo "── $1: FAIL (recorded; continuing)"
+		# a failed script's ytserv logs, one file per node, as ../topology/run_a.sh keeps them
+		[ -z "${YX_FAIL_LOGS:-}" ] || bash -c 'source ./env.sh; save_node_logs "$0" "$1"' "$t0" "$1" || true
 		rc=1
 		if [ "$f" -eq 0 ]; then
 			echo "  (counted as one failure: exit $src with no failed check in a summary)"

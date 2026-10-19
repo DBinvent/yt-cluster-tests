@@ -3,14 +3,14 @@
 set -euo pipefail
 
 TESTS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Settings: yaxaha-tests/.env (not committed, see env.example); the environment wins.
+# Settings: yt-cluster-tests/.env (not committed, see env.example); the environment wins.
 if [ -f "$TESTS_ROOT/.env" ]; then
 	_yx_keep="$(export -p)"; set -a; . "$TESTS_ROOT/.env"; set +a; eval "$_yx_keep"; unset _yx_keep
 fi
 # The yt-pgxt checkout: YT_PGXT, or a sibling of this repository.
 REPO_ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-pgxt}"
 
-YX_CONTAINER="${YX_CONTAINER:-yxctl-test}"
+YX_CONTAINER="${YX_CONTAINER:-ytctl-test}"
 YX_IMAGE="${YX_IMAGE:-ubuntu:24.04}"
 # path to a built .deb; when unset, raw binaries are pushed from target/release
 YX_DEB="${YX_DEB:-}"

@@ -1,6 +1,6 @@
 # rmc test: resilience and membership under change
 
-Three linked yaxaha clusters on docker, one above two, take a steady write load
+Three linked yt-cluster clusters on docker, one above two, take a steady write load
 while their membership changes underneath it. Nodes are added at runtime on
 every level, leadership is moved, nodes and leaders are restarted or lost, and
 one cluster has all of its original nodes replaced, one by one. After every
@@ -14,14 +14,14 @@ correctness, not speed.
 - [results.md](results.md): every run, what each found, and the fixes;
 - `results/run-<time>.log`: the full output of each run.
 
-YaXaHa itself: [articles](https://vkrinitsyn.github.io/yt/),
+YT Cluster itself: [articles](https://vkrinitsyn.github.io/yt/),
 [product page](https://www.dbinvent.com/cluster/).
 
 ## What runs where
 
 | name | what | cluster |
 |---|---|---|
-| `u1`…`u5` | yaxaha nodes: PostgreSQL 18, the yaxaha extension and ytserv | upper (az `top`, tier 0) |
+| `u1`…`u5` | yt-cluster nodes: PostgreSQL 18, the yt_cluster extension and ytserv | upper (az `top`, tier 0) |
 | `a1`…`a8` | the same | east (az `eastc`, tier 1) |
 | `b1`…`b6` | the same | west (az `westc`, tier 1) |
 | `load` | the three writers (`load/writer.sh`), with psql | none |
@@ -37,9 +37,9 @@ sign-in key for each.
 ## Run it
 
 Requirements, on the docker host: docker (compose is not needed), python3, and
-about 2 GB of free RAM for up to 18 containers. You also need a yaxaha package
+about 2 GB of free RAM for up to 18 containers. You also need a yt-cluster package
 for PostgreSQL 18, built in yt-pgxt with
-`cargo deb -p yxctl --variant pg18 --no-build`.
+`cargo deb -p ytctl --variant pg18 --no-build`.
 
 The scripts can drive a remote docker daemon (`RMC_DOCKER_HOST`), but every check
 is a `docker exec`, so they run several times faster on the docker host itself.
@@ -65,7 +65,7 @@ publish until it is built). Since the relay (ytserv 0.20.22) no check reports on
 |---|---|
 | `lib.sh` | settings, the layout, docker and psql helpers, the config rows |
 | `steps.sh` | the checks (I1 to I9) and the steps: add, retire, move leadership, restart, lose a leader |
-| `store.sh` | the clusters on the secret store and TLS, a hierarchy's must (yt-pgxt skv-secrets.md H2): the store and genesis in each, every node approved, TLS required, the links set up with yxctl and each lower CA approved on the upper leader, the CA pinned for joiners; a node added at runtime approved (`store_join`). Every node has an app key of its own, `$RMC_SECRET-<node>` |
+| `store.sh` | the clusters on the secret store and TLS, a hierarchy's must (yt-pgxt skv-secrets.md H2): the store and genesis in each, every node approved, TLS required, the links set up with ytctl and each lower CA approved on the upper leader, the CA pinned for joiners; a node added at runtime approved (`store_join`). Every node has an app key of its own, `$RMC_SECRET-<node>` |
 | `verify.py` | judges one cluster's ledger against its writer's log (I1 to I4) |
 | `load/writer.sh` | one cluster's writer |
 | `node/` | the node image: Dockerfile and entrypoint |

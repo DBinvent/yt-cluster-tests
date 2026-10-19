@@ -17,7 +17,7 @@ fi
 # the docker daemon to run on: RMC_DOCKER_HOST, when set, over the shell's DOCKER_HOST
 [ -n "${RMC_DOCKER_HOST:-}" ] && export DOCKER_HOST="$RMC_DOCKER_HOST"
 
-YAXAHA_DEB=${YAXAHA_DEB:-}
+YT_CLUSTER_DEB=${YT_CLUSTER_DEB:-}
 # How long one step may take to settle, in seconds: a new node to follow, a
 # leader to be elected, members to converge.
 RMC_WAIT=${RMC_WAIT:-180}
@@ -45,8 +45,8 @@ PORT=7421
 IMAGE=rmc-node
 NET=rmc
 LOAD=load
-# the namespace yxctl's --peers roster derives node uuids in: uuid5(ns, host name)
-YAXAHA_NS=6a9f5c2e-1b3d-5e47-9a08-0bf99b3e0275
+# the namespace ytctl's --peers roster derives node uuids in: uuid5(ns, host name)
+YT_CLUSTER_NS=6a9f5c2e-1b3d-5e47-9a08-0bf99b3e0275
 
 CLUSTERS=(upper east west)
 declare -A AZ=([upper]=top [east]=eastc [west]=westc)
@@ -67,7 +67,7 @@ declare -A ID_BASE=([upper]=1000000000000 [east]=2000000000000 [west]=3000000000
 declare -A SIGNIN=([eastc]=eastc-signin-key-placeholder [westc]=westc-signin-key-placeholder)
 # [skv] each node's app key, its own (skv-secrets.md H7): "$RMC_SECRET-<node>". The
 # store and TLS a hierarchy runs on need it (H2, store.sh).
-RMC_SECRET=${RMC_SECRET:-yaxaha-rmc-fixture}
+RMC_SECRET=${RMC_SECRET:-yt-cluster-rmc-fixture}
 secret_of() { printf '%s' "$RMC_SECRET-$1"; }
 
 say() { printf '%s\n' "$*"; }
@@ -85,7 +85,7 @@ node_ip() {
         "$LOAD") echo "$RMC_SUBNET.5";;
     esac
 }
-node_uuid() { python3 -c 'import sys, uuid; print(uuid.uuid5(uuid.UUID(sys.argv[1]), sys.argv[2]))' "$YAXAHA_NS" "$1"; }
+node_uuid() { python3 -c 'import sys, uuid; print(uuid.uuid5(uuid.UUID(sys.argv[1]), sys.argv[2]))' "$YT_CLUSTER_NS" "$1"; }
 # the short form ytserv prints and matches (node_run, yt_info('e:...')): XX..YYYYYY
 node_u8() { local u; u=$(node_uuid "$1"); echo "${u:0:2}..${u:30}"; }
 
@@ -187,7 +187,7 @@ wait_for() {
 }
 
 # ── config rows ──────────────────────────────────────────────────────────────
-enc() { docker run --rm --entrypoint /usr/local/bin/yxctl "$IMAGE" --encode-table-cfg "$1" 2>/dev/null | tail -1 | tr -d '\r'; }
+enc() { docker run --rm --entrypoint /usr/local/bin/ytctl "$IMAGE" --encode-table-cfg "$1" 2>/dev/null | tail -1 | tr -d '\r'; }
 
 # The cluster's config rows: the same rows, with the same ids, on every member.
 # The ids matter because yt_config is itself synced: a row written later on the
@@ -262,6 +262,8 @@ SQL
         echo "drop trigger if exists zytsync_${t}_trigger on public.$t;"
         echo "create trigger zytsync_${t}_trigger after insert or update or delete on public.$t for each row execute procedure public.yt_synchronize();"
     done
+    # [skv] the join-approval gate ytctl --batch installs on a real node (join_gate.sql)
+    cat "$HERE/join_gate.sql"
 }
 
 # A config change while running: one row per cluster transaction, on the

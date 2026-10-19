@@ -146,10 +146,10 @@ on_exit() {
 # ── setup ────────────────────────────────────────────────────────────────────
 
 [ "$NV" -ge 3 ] || { bad "needs three non-spare nodes, has $NV"; summary; }
-PAR_CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'parallel; cluster_commit=nodes>=1' | tail -1 || true)"
-ONE_CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'cluster_commit=nodes>=1' | tail -1 || true)"
+PAR_CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'parallel; cluster_commit=nodes>=1' | tail -1 || true)"
+ONE_CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'cluster_commit=nodes>=1' | tail -1 || true)"
 [ -n "$PAR_CFG" ] && [ -n "$ONE_CFG" ] && [ "$PAR_CFG" != "$ONE_CFG" ] \
-	|| { bad "yxctl --encode-table-cfg does not know 'parallel' (is $REPO_ROOT built?)"; summary; }
+	|| { bad "ytctl --encode-table-cfg does not know 'parallel' (is $REPO_ROOT built?)"; summary; }
 trap on_exit EXIT
 drop_tables
 for n in "${NODES[@]}"; do
@@ -245,7 +245,9 @@ echo "     P4: $((A4 - A3)) subterm(s) in parallel, $((R4 - R3)) of them again i
 # ── no divergence logged ────────────────────────────────────────────────────
 div=""
 for n in "${NODES[@]}"; do
-	c="$(rh "docker logs --since $T0 $n 2>&1 | grep -c 'CLUSTER DIVERGENCE'" 2>/dev/null)"
+	# `|| true`: grep -c exits 1 on a node with none, and under set -e that ended the
+	# script here - this check and the summary never ran (the nightly of 2026-10-17)
+	c="$(rh "docker logs --since $T0 $n 2>&1 | grep -c 'CLUSTER DIVERGENCE'" 2>/dev/null || true)"
 	[ "${c:-0}" = 0 ] || div+="$n=$c "
 done
 check "no node logged a CLUSTER DIVERGENCE" "" "${div% }"

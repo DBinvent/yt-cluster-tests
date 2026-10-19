@@ -83,7 +83,7 @@ esac
 
 # ── turn it on ───────────────────────────────────────────────────────────────
 # O5/O6: ot_t fires a python function on commit, which records the TRACE it sees
-CFG="$("$REPO_ROOT"/target/release/yxctl --encode-table-cfg 'on_commit_python' | tail -1)"
+CFG="$("$REPO_ROOT"/target/release/ytctl --encode-table-cfg 'on_commit_python' | tail -1)"
 [ -n "$CFG" ] || bad "--encode-table-cfg 'on_commit_python' produced nothing"
 OT_FN="try:
     t = TRACE

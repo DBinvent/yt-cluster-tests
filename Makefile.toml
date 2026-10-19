@@ -61,7 +61,7 @@ then
   echo YTSERV_BIN: $YTSERV_BIN
 else
   echo NO YTSERV_BIN BINARY SET
-  echo set using --env YTSERV_BIN=path/to/ytserv, default search is /usr/local/bin/yaxaha/ytserv*
+  echo set using --env YTSERV_BIN=path/to/ytserv, default search is /usr/local/bin/yt-cluster/ytserv*
   exit 1
 fi
 '''
