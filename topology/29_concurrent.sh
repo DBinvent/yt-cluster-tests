@@ -19,8 +19,9 @@
 # a stale copy was admitted too (the CAS apply then matched 0 rows on the
 # others). Since 0.20.61 the first writer of a row wins ([rmw], checkin.rs):
 # a later UPDATE/DELETE of a row another origin wrote and this origin has not
-# applied is refused with 40001, and the client retries it. Refused increments
-# are not acknowledged, so the sums still have to agree.
+# applied is refused - 55409 since 2026-10-22, "do not retry; review the row", or
+# 40001 for a session with yt_cluster.delta, as an increment's is (37_delta_retry.sh).
+# Refused increments are not acknowledged, so the sums still have to agree.
 #
 # C12: under load a row in flight read as a gap for about a second and refused
 # writes to every synced table (`Recon::mark_outdated` is coarse on purpose).

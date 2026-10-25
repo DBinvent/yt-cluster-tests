@@ -15,14 +15,14 @@ wd=$dirprefix$nid
 
 echo "[IT] Probing YT extension for Node$nid at $dirprefix $prefix..."
 
-# Postgres up and the extension answering. Fatal here — without `|| exit 1`
+# Postgres up and the extension answering. Fatal here - without `|| exit 1`
 # this script has no `set -e` and would carry on into waits that cannot
 # possibly succeed.
 ./psql_wait.sh "$port" "$wd" "$nid" || exit 1
 
-# Was unbounded. A cluster that never elects a leader — a roster pointing at
+# Was unbounded. A cluster that never elects a leader - a roster pointing at
 # the wrong port, a node id ytserv refuses, peers that cannot see each
-# other — waited here for as long as anyone let it.
+# other - waited here for as long as anyone let it.
 leader_elected() {
   [ "$(psql -p "$port" -h "$wd" -P pager=off -c "select * from yt_info('O')" -t \
        | grep -v None | grep -c Leader)" -ge 1 ]
@@ -39,7 +39,7 @@ it_wait_for "node$nid to report Good or Leader" node_is_good
 
 # Already bounded, and deliberately left advisory: the test cases use
 # first_node.sql in a `condition_script`, so if no node qualifies they skip
-# rather than fail. That is its own problem (REVIEW.md, finding 3) — but it
+# rather than fail. That is its own problem (REVIEW.md, finding 3) - but it
 # is a pass/fail question, not a hang, so this only says so out loud now
 # instead of giving up in silence.
 runs=0

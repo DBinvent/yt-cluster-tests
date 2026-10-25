@@ -11,9 +11,9 @@ socket="$wd/.s.PGSQL.$port"
 
 socket_exists() { [ -e "$socket" ]; }
 
-# Was an unbounded `while [ ! -e "$socket" ]`. If Postgres failed to start —
+# Was an unbounded `while [ ! -e "$socket" ]`. If Postgres failed to start -
 # a bad initdb, a port already taken, a data directory from another major
-# version — this waited for a socket that was never coming, forever.
+# version - this waited for a socket that was never coming, forever.
 echo "[IT] Waiting for '$socket'"
 it_wait_for "the Postgres socket $socket (node$nid)" socket_exists
 

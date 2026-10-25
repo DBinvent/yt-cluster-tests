@@ -4,7 +4,7 @@
 #
 # DDL does not travel on the replication path (rumba.md §1): a schema change is
 # applied to each node in turn - followers first, the leader last (the order
-# rumba's `yt_migrate()` planner queues them) - while the application keeps
+# Schema Guard Enterprise's (sge) `yt_migrate()` planner queues them) - while the application keeps
 # writing. For as long as the roll takes, some nodes have the new shape and some
 # the old, so a rolled change has to be an EXPAND step first (a nullable column,
 # a column with a default, an index - rumba.md §6), the writes leave the new

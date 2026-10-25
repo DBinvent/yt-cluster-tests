@@ -1,22 +1,22 @@
-# Precomputed base64 for a `module='A'` row's `value` — a
+# Precomputed base64 for a `module='A'` row's `value` - a
 # ConfigValue{ table: CfgTabl{ cluster_commit } } protobuf. yt_ct_encode() in
 # the C extension is a stub, so these come from ytcluster-types
 # (`ConfigValue::encode_to_str`; see the `tests::cc_b64_print` test in
 # ytcluster-types/src/lib.rs). `party_size` / `min_commit` on the deployed
-# ytserv is what actually decides the behaviour — see the note per row.
+# ytserv is what actually decides the behaviour - see the note per row.
 #
-# ALWAYS register a synced table with an EXPLICIT value below — never leave the
+# ALWAYS register a synced table with an EXPLICIT value below - never leave the
 # `module='A'` value empty. An empty value falls back to `def_cluster_commit`
 # ("half"), and on a mis-configured / behind cluster ytserv then takes the fast
 # async path: yt_synchronize() returns in ~7ms, the background cluster_apply to
 # the peer times out unseen, pgbench reports success, and the nodes silently
-# diverge. An explicit `all` makes every commit synchronous — it either lands
+# diverge. An explicit `all` makes every commit synchronous - it either lands
 # on all nodes or the client gets an error to retry.
 
 #  proto value                     base64       effect
-CfgTabl{}                          ""           DO NOT USE — empty -> def_cluster_commit fallback, see note above.
+CfgTabl{}                          ""           DO NOT USE - empty -> def_cluster_commit fallback, see note above.
 Half                               CgISAA==     synchronous to half the nodes (round up).
-All                                CgIaAA==     synchronous to ALL nodes — commit lands everywhere or errors.  <-- bench `sync` condition
+All                                CgIaAA==     synchronous to ALL nodes - commit lands everywhere or errors.  <-- bench `sync` condition
 Nodes{ at_least: 0 }               CgIiAA==     stock ytserv: 0usize-1 underflow -> every write aborts.
                                                 with the checkin/cluster.rs "+1" patch: origin-only + async apply_all.
 Nodes{ at_least: 1 }               CgQiAggB     stock ytserv: origin-only + async apply_all  <-- bench `nodes1` default

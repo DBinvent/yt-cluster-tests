@@ -169,7 +169,7 @@ sleep 15
 state="$(info "$L" E "$SUBJECT_UUID")"
 case "$state" in
 	*Good*|*Leader*) ok "skv off: the subject resumed unchallenged" ;;
-	*) bad "skv off: the subject did not resume — [$state]" ;;
+	*) bad "skv off: the subject did not resume - [$state]" ;;
 esac
 check "skv off: no J row is written" "" "$(j_row "$L")"
 
@@ -200,7 +200,7 @@ sleep 20
 state="$(info "$L" E "$SUBJECT_UUID")"
 case "$state" in
 	*Good*|*Leader*)
-		bad "skv on: the subject was admitted WITHOUT proof — the gate is not gating" ;;
+		bad "skv on: the subject was admitted WITHOUT proof - the gate is not gating" ;;
 	*) ok "skv on: the subject is not a Follower" ;;
 esac
 # §6.1: neither Follower NOR Spare. Spare still receives the replication
@@ -215,8 +215,8 @@ esac
 row="$(j_row "$L")"
 case "$row" in
 	pending:*:*) ok "a pending join row was written with a challenge and an expiry" ;;
-	"")  bad "no J row on the leader — an operator has nothing to approve" ;;
-	*)   bad "J row is not 'pending:<challenge>:<expires>:<fingerprint>' — [$row]" ;;
+	"")  bad "no J row on the leader - an operator has nothing to approve" ;;
+	*)   bad "J row is not 'pending:<challenge>:<expires>:<fingerprint>' - [$row]" ;;
 esac
 ch1="$(printf '%s' "$row" | cut -d: -f2)"
 check "the challenge is 32 bytes base64" "44" "$(printf '%s' "$ch1" | wc -c | tr -d ' ')"
@@ -255,7 +255,7 @@ err="$(q "$L" "update $YX_CFG set value='ok' where module='J' and name='$SUBJECT
 after="$(j_row "$L")"
 case "$after" in
 	pending:*) ok "an unarmed 'ok' was refused and nothing was stored" ;;
-	ok)        bad "an unarmed 'ok' was STORED — the yt_join_gate trigger is missing" ;;
+	ok)        bad "an unarmed 'ok' was STORED - the yt_join_gate trigger is missing" ;;
 	*)         bad "J row is now [$after]" ;;
 esac
 
@@ -268,7 +268,7 @@ F="$(good_follower)" || F=n1
 out="$(q "$F" "update $YX_CFG set value='ok' where module='J' and name='$SUBJECT_UUID';" 2>&1)"
 fr="$(j_row "$F")"
 case "$fr" in
-	ok) bad "a follower stored an approval — module J is not leader-restricted" ;;
+	ok) bad "a follower stored an approval - module J is not leader-restricted" ;;
 	*)  ok "a follower cannot store an approval" ;;
 esac
 
@@ -286,7 +286,7 @@ sleep 20
 state="$(info "$L" E "$SUBJECT_UUID")"
 case "$state" in
 	*Good*|*Leader*)
-		bad "a forged 'ok' row admitted the node — admission is reading the row" ;;
+		bad "a forged 'ok' row admitted the node - admission is reading the row" ;;
 	*) ok "a forged 'ok' row admits nothing: the arming is the decision" ;;
 esac
 

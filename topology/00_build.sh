@@ -3,18 +3,20 @@
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 DEB="${YT_CLUSTER_DEB:-$(ls -t "$REPO_ROOT"/target/debian/yt-cluster_*_amd64.deb 2>/dev/null | head -1)}"
-[ -n "$DEB" ] || { echo "no deb in target/debian — run: cargo deb -p ytctl --variant pg18 --no-build" >&2; exit 1; }
+[ -n "$DEB" ] || { echo "no deb in target/debian - run: cargo deb -p ytctl --variant pg18 --no-build" >&2; exit 1; }
 echo "Using $(basename "$DEB")"
 
-STAGE=/tmp/yxtopo-build
-rh "rm -rf $STAGE && mkdir -p $STAGE"
-if [ "$YX_HOST" = "local" ]; then
+# one per image: topology and topology-py build theirs on the same build host at once
+STAGE="/tmp/yxtopo-build-${YX_IMAGE//[^A-Za-z0-9_.-]/_}"
+bh "rm -rf $STAGE && mkdir -p $STAGE"   # [build-host] built there, run on YX_HOST
+if [ "$YX_BUILD_HOST" = "local" ]; then
 	cp "$DEB" $STAGE/yt-cluster.deb; cp Dockerfile node-entrypoint.sh pg_setup.sql $STAGE/
 else
-	scp -q "$DEB" "$YX_HOST:$STAGE/yt-cluster.deb"
-	scp -q Dockerfile node-entrypoint.sh pg_setup.sql "$YX_HOST:$STAGE/"
+	scp -q "$DEB" "$YX_BUILD_HOST:$STAGE/yt-cluster.deb"
+	scp -q Dockerfile node-entrypoint.sh pg_setup.sql "$YX_BUILD_HOST:$STAGE/"
 fi
 
 echo "Building image $YX_IMAGE (first run pulls ubuntu:24.04 + PGDG postgresql-18)..."
-rh "cd $STAGE && docker build -q -t $YX_IMAGE ." | tail -1
+bh "cd $STAGE && docker build -q -t $YX_IMAGE ." | tail -1
+ship_image "$YX_IMAGE" || exit 1
 rh "docker image inspect $YX_IMAGE --format '  image {{.Id}} {{.Size}} bytes'"

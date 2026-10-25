@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bench/tps_calc.py — pgbench TPS from a CPU's estimated FLOPS.
+"""bench/tps_calc.py - pgbench TPS from a CPU's estimated FLOPS.
 
     python3 bench/tps_calc.py cpu
     python3 .../tps_calc.py predict --config C1 --clients 8
@@ -9,8 +9,8 @@
     python3 .../tps_calc.py required --tps 20000 --config CN --nodes 10
 
 WHAT THIS IS, STATED UP FRONT: pgbench executes no floating point. TFLOPS is
-used here as a *capacity index* — cores x clock x SIMD width, which is the
-thing that actually varies between the machines in the rig — not as a claim
+used here as a *capacity index* - cores x clock x SIMD width, which is the
+thing that actually varies between the machines in the rig - not as a claim
 that OLTP throughput is FP-bound. The number that turns capacity into TPS (A,
 below) is therefore never guessed: it comes from a measured run, and the tool
 refuses to print an absolute TPS until one exists.
@@ -22,14 +22,14 @@ gives every node a capacity number before the run, and afterwards divides
 measured TPS by it (`normalize`), so the curve is about YT Cluster rather than
 about which box got which CPU.
 
-THE MODEL, in full — so it can be argued with:
+THE MODEL, in full - so it can be argued with:
 
     peak_tflops = sockets x cores x GHz x flops_per_cycle(ISA) / 1000
     tps         = A x peak_tflops x clients / (clients + c0)
 
 A and c0 are fitted from measured anchors, per configuration. The second line
-was going to be `tps = k x peak x min(clients, cores)/cores` — one client per
-busy backend, cores as the ceiling — and the first three measured anchors
+was going to be `tps = k x peak x min(clients, cores)/cores` - one client per
+busy backend, cores as the ceiling - and the first three measured anchors
 refuted it: 4 clients on 4 cores gave 1159 tps and 8 gave 1846, a 59% gain
 where that rule predicts none. Oversubscription paying off is backends
 blocking on WAL fsync while others compute, so the model needed a shape with a
@@ -37,7 +37,7 @@ soft knee. c0 is the client count reaching half the ceiling; over 4/8/16
 clients the hyperbola lands within 4.9% rms.
 
 The linear rule survives only as the fallback when a configuration has a
-single anchor, where one client count cannot identify c0 — and it says so in
+single anchor, where one client count cannot identify c0 - and it says so in
 the output rather than pretending to a curve.
 
 Everything printed is tagged MEASURED (from bench/calibration.json) or
@@ -132,7 +132,7 @@ def _sysfs_max_ghz() -> float | None:
 def detect_cpu() -> dict:
     blocks = _proc_cpuinfo()
     if not blocks:
-        raise SystemExit("cannot read /proc/cpuinfo — pass --cores/--ghz/--isa instead")
+        raise SystemExit("cannot read /proc/cpuinfo - pass --cores/--ghz/--isa instead")
 
     model = blocks[0].get("model name", "unknown")
     flags = set(blocks[0].get("flags", "").split())
@@ -177,7 +177,7 @@ def detect_cpu() -> dict:
 
 
 def cpu_from_args(args) -> dict:
-    """Detected values, with every field overridable — the point is to price a
+    """Detected values, with every field overridable - the point is to price a
     node you have specs for but no shell on."""
     cpu = detect_cpu() if not args.no_detect else {
         "model": "(described)", "sockets": 1, "cores": None, "threads": None,
@@ -204,7 +204,7 @@ def cpu_from_args(args) -> dict:
         )
     for field in ("cores", "isa", "ghz"):
         if not cpu.get(field):
-            raise SystemExit(f"could not determine {field} — pass --{field}")
+            raise SystemExit(f"could not determine {field} - pass --{field}")
 
     cpu["fma_units"] = args.fma_units
     cpu["flops_per_cycle"] = flops_per_cycle(cpu["isa"], args.fma_units)
@@ -221,7 +221,7 @@ def usable_tflops(cpu: dict, clients: int) -> float:
 
 
 # --------------------------------------------------------------------------
-# Configurations — BENCH.md §1 and §7
+# Configurations - BENCH.md §1 and §7
 # --------------------------------------------------------------------------
 
 CONFIGS = ("S1", "S1x", "C1", "CN")
@@ -230,13 +230,13 @@ CONFIGS = ("S1", "S1x", "C1", "CN")
 # would read like a result. None means the plan makes no prediction.
 PREDICTED_VS_S1 = {
     "S1": (1.0, 1.0),          # baseline, by definition
-    "S1x": None,               # "the extension costs something" — unquantified
+    "S1x": None,               # "the extension costs something" - unquantified
     "C1": (0.40, 0.80),        # "C1 is 20-60% below S1"
     "CN": None,                # per-node; use CN_EFFICIENCY against C1
 }
 
 # CN aggregate = N x C1 x efficiency. §7 predicts >= 0.8 at N=3 and a bend
-# somewhere between 3 and 10 — naming where is what the rig is for, so above
+# somewhere between 3 and 10 - naming where is what the rig is for, so above
 # N=3 the lower bound is not claimed.
 CN_EFFICIENCY = {"disjoint": (0.8, 1.0), "overlapping": (0.0, 1.0)}
 
@@ -275,12 +275,12 @@ def fit_saturation(anchors: list[dict]) -> dict | None:
     """Fit  tps = A x peak_tflops x c/(c + c0)  over the anchors.
 
     Why this and not min(clients, cores): the first two measured anchors
-    disagreed by 46% — 4 clients on 4 cores gave 1159 tps, 8 clients gave 1846.
+    disagreed by 46% - 4 clients on 4 cores gave 1159 tps, 8 clients gave 1846.
     Oversubscription buying 59% more throughput is not a CPU running out of
     cores, it is backends blocking on WAL fsync while others compute. The
     hyperbola has the right shape for that (linear when idle, flat when
-    saturated) and c0 — the client count at which half the asymptote is
-    reached — is the fitted stand-in for that wait.
+    saturated) and c0 - the client count at which half the asymptote is
+    reached - is the fitted stand-in for that wait.
 
     Needs at least two distinct client counts, or c0 is unidentifiable.
     c0 by grid search, A in closed form for each c0: no dependencies, and with
@@ -398,12 +398,12 @@ def cmd_predict(args) -> int:
             # Two points fit two parameters exactly; an rms of 0 there is
             # arithmetic, not agreement, and printing it as a fit quality
             # would be the most flattering lie this tool could tell.
-            quality = ("exact — 2 points, 2 parameters, no residual to report"
+            quality = ("exact - 2 points, 2 parameters, no residual to report"
                        if fit["n"] <= 2 else f"rms {fit['rms_pct']:.1f}%")
             return (predict_tps(fit, cpu["peak_tflops"], clients),
                     f"saturating fit, {fit['n']} anchors at -c {seen}, {quality}")
         k = statistics.median([anchor_k(a) for a in anchors])
-        return (k * u, f"1 anchor at -c {anchors[0]['clients']}, linear cap — "
+        return (k * u, f"1 anchor at -c {anchors[0]['clients']}, linear cap - "
                        f"one client count cannot show saturation")
 
     # 1. Direct: anchors for this very configuration.
@@ -449,7 +449,7 @@ def cmd_predict(args) -> int:
     per_node = (lo, hi)
     rows.append(("per node",
                  (f"{fmt_tps(lo)} tps" if lo == hi
-                  else f"{fmt_tps(lo)} – {fmt_tps(hi)} tps"), src))
+                  else f"{fmt_tps(lo)} - {fmt_tps(hi)} tps"), src))
     out["predictions"].append({"scope": "per_node", "tps_low": lo, "tps_high": hi,
                                "source": src, "anchors": n_anchor})
 
@@ -460,9 +460,9 @@ def cmd_predict(args) -> int:
         agg_hi = per_node[1] * n * eff[1]
         note = f"PREDICTED  (x N x efficiency {eff[0]}-{eff[1]}, BENCH.md §7)"
         if n > 3 and args.workload == "disjoint":
-            note += "; above N=3 the lower bound is not claimed — the bend is the finding"
+            note += "; above N=3 the lower bound is not claimed - the bend is the finding"
         rows.append((f"aggregate, N={n}",
-                     f"{fmt_tps(agg_lo)} – {fmt_tps(agg_hi)} tps", note))
+                     f"{fmt_tps(agg_lo)} - {fmt_tps(agg_hi)} tps", note))
         out["predictions"].append({"scope": "aggregate", "nodes": n,
                                    "tps_low": agg_lo, "tps_high": agg_hi, "source": note})
 
@@ -480,7 +480,7 @@ def cmd_predict(args) -> int:
         if ratio > 2 or ratio < 0.5:
             rows.append(("extrapolation",
                          f"{ratio:.1f}x",
-                         "CAUTION — no anchor within 2x of this machine; the "
+                         "CAUTION - no anchor within 2x of this machine; the "
                          "TPS-per-TFLOP slope is assumed, not measured, across hosts"))
 
     f = out.get("fit")
@@ -557,7 +557,7 @@ def cmd_required(args) -> int:
     else:
         base = tps_per_peak_tflop("S1")
         if not base:
-            print("No calibration anchor — see `calibrate`. Nothing to invert.")
+            print("No calibration anchor - see `calibrate`. Nothing to invert.")
             return 3
         factor = PREDICTED_VS_S1.get(base_config)
         if factor is None:
@@ -580,17 +580,17 @@ def cmd_required(args) -> int:
           + (f" aggregate over N={args.nodes} ({args.workload})" if args.config == "CN" else "")
           + f" on {args.config}:")
     print()
-    print(f"  per node          {fmt_tps(per_node[0])} – {fmt_tps(per_node[1])} tps"
+    print(f"  per node          {fmt_tps(per_node[0])} - {fmt_tps(per_node[1])} tps"
           f"   at -c {args.clients}")
     # peak TFLOPS needed = tps / rate; the worst case uses the pessimistic rate
     need_lo = per_node[0] / ks[1]
     need_hi = per_node[1] / ks[0] if ks[0] else float("inf")
-    print(f"  peak capacity     {need_lo:.3f} – {need_hi:.3f} TFLOPS   [{src}]")
+    print(f"  peak capacity     {need_lo:.3f} - {need_hi:.3f} TFLOPS   [{src}]")
     for isa, ghz in (("avx2", 3.0), ("avx512", 3.0)):
         fpc = flops_per_cycle(isa, args.fma_units)
         c_lo = need_lo * 1000 / (ghz * fpc)
         c_hi = need_hi * 1000 / (ghz * fpc)
-        print(f"    as {isa:<6} @{ghz}GHz   {c_lo:.1f} – {c_hi:.1f} physical cores")
+        print(f"    as {isa:<6} @{ghz}GHz   {c_lo:.1f} - {c_hi:.1f} physical cores")
     print()
     print("  Capacity is necessary, not sufficient: this ignores WAL fsync, the")
     print("  network RTT floor under a synchronous commit, and disk entirely.")
@@ -658,7 +658,7 @@ def run_measurement(args, cpu: dict) -> dict:
         raise SystemExit(f"cannot reach PostgreSQL: {exists.stderr.strip()}")
     if exists.stdout.strip() == "1":
         raise SystemExit(
-            f"database {db!r} already exists — refusing to initialise pgbench "
+            f"database {db!r} already exists - refusing to initialise pgbench "
             f"tables into it. Drop it yourself or pass --dbname <other>.")
 
     threads = min(args.clients, cpu["sockets"] * cpu["cores"])
@@ -677,7 +677,7 @@ def run_measurement(args, cpu: dict) -> dict:
                   "-c", str(args.clients), "-j", str(threads), "-M", "prepared"]
 
         if args.ramp > 0:
-            print(f"  warmup {args.ramp}s (discarded — BENCH.md §3 ramp rule)")
+            print(f"  warmup {args.ramp}s (discarded - BENCH.md §3 ramp rule)")
             subprocess.run(common + ["-T", str(args.ramp), db],
                            check=True, capture_output=True, text=True)
 
@@ -780,7 +780,7 @@ def cmd_calibrate(args) -> int:
               f"({min(ks):,.0f} … {max(ks):,.0f})")
         print("  That spread is the model's error bar. A large one at differing")
         print("  client counts means min(clients,cores) is the wrong saturation")
-        print("  rule for this host — likely fsync wait, not CPU.")
+        print("  rule for this host - likely fsync wait, not CPU.")
     else:
         print()
         print("  One anchor is a point, not a curve. Calibrate again at a different")
@@ -820,7 +820,7 @@ def cmd_list(args) -> int:
 
 
 def cmd_selftest(args) -> int:
-    """Arithmetic only — it checks the model is computed as documented, which
+    """Arithmetic only - it checks the model is computed as documented, which
     is the only thing a test can check here. It cannot validate the model."""
     fails = []
 
@@ -860,7 +860,7 @@ def cmd_selftest(args) -> int:
         check("fit predicts a held-out point",
               predict_tps(fit, 0.2, 64), 10000 * 0.2 * 64 / 70, tol=25.0)
 
-    # One client count cannot identify c0 — the tool must decline, not guess.
+    # One client count cannot identify c0 - the tool must decline, not guess.
     if fit_saturation([{"clients": 8, "peak_tflops": 0.2, "tps": 1000.0},
                        {"clients": 8, "peak_tflops": 0.4, "tps": 2000.0}]) is not None:
         fails.append("fit_saturation accepted a single client count")

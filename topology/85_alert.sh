@@ -63,7 +63,7 @@ done
 #
 # An exact tie is the whole premise: recon must find no majority, refuse to
 # guess, block the row and file an alert. Anything else is repairable, and a
-# repairable row is the feature working — not the case under test.
+# repairable row is the feature working - not the case under test.
 #
 # Half of `NODES`, computed rather than the literal `n4 n5 n6` this used to
 # carry. On the seven-node fixture that literal produced 3-vs-4, recon found a

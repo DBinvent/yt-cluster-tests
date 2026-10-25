@@ -1,6 +1,6 @@
 # yt_llm test: plain-language questions over PostgreSQL, DataFusion and ClickHouse
 
-A yt-cluster cluster on docker that answers questions in plain language through
+A YT Cluster on docker that answers questions in plain language through
 `yt_llm`. The node asks a text-to-SQL model which tables a question needs, then
 answers it where those tables are. It uses PostgreSQL for tables it holds whole,
 DataFusion for the tables named in `llm_df_tables`, and ClickHouse for ClickHouse's
@@ -87,7 +87,7 @@ chat completion, asked for up to `PROBE_WAIT` seconds (default 300). When one ne
 answers, the test exits 77 and nothing is tested, and the nightly run reports the
 suite as skipped rather than failed. The nightly run also probes before it builds
 anything, and again after a failed test. If the model service stopped answering by
-then, the failures say nothing about yt-cluster, so that run is reported as skipped too.
+then, the failures say nothing about YT Cluster, so that run is reported as skipped too.
 
 ## What up.sh configures
 
@@ -109,7 +109,7 @@ written last, and ytserv starts on it.
 | `A` | `shop.sessions`, `shop.refunds` | ring-hash shards: `shard=id; outer=reject`. The owners follow the live ring, and a non-owner keeps nothing |
 
 The sample data is `data/pg.sql` on every node and `data/ch.sql` in ClickHouse, both
-deterministic. Each yt-cluster node loads its own third of each sharded table, and a
+deterministic. Each YT Cluster node loads its own third of each sharded table, and a
 pinned row names that node as its owner. ClickHouse holds all the rows of
 `shop.web_events` and `shop.sessions`, and has no `shop.clicks` or `shop.refunds`.
 

@@ -1,4 +1,4 @@
-# A yt-cluster node for the rmc test: PostgreSQL 18, the yt-cluster package (the
+# A YT Cluster node for the rmc test: PostgreSQL 18, the yt-cluster package (the
 # extension and ytserv). The same image runs the load client, with its own
 # entrypoint (lib.sh load_run), for psql.
 FROM ubuntu:26.04

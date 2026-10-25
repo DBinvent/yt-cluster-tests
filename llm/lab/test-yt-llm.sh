@@ -82,7 +82,7 @@ if [ -f "$TESTS_ROOT/.env" ]; then
 fi
 # The yt-pgxt checkout: YT_PGXT, or a sibling of this repository. Its llm/ holds
 # the client settings, the question file and the sample data this test reads.
-ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-pgxt}"
+ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster}"
 HERE="${LLM_DIR:-$ROOT/llm}"
 EXT_SQL="$ROOT/ytpgc/yt_cluster--0.5.sql"
 ENV_FILE="${LLM_CLIENT_ENV:-$HERE/llm-client.env}"
@@ -1047,7 +1047,7 @@ for n in "${NODES[@]}"; do
         continue
     fi
     tally "$n" <<< "$(node_sql "$n" <<< "SELECT 'INFO node: PostgreSQL ' || current_setting('server_version')
-        || ', yt-cluster ' || extversion || ' in schema $x of ' || current_database() FROM pg_extension WHERE extname = 'yt_cluster'")"
+        || ', yt_cluster ' || extversion || ' in schema $x of ' || current_database() FROM pg_extension WHERE extname = 'yt_cluster'")"
 
     # 1
     tally "$n" <<< "$(install_sql "$x" | node_sql "$n")"

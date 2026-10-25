@@ -7,13 +7,13 @@
 # condition) restarts ytserver on all nodes together so the new module='A'
 # rows load. Sourced pieces come from lib.sh.
 #
-#   nosync  tables not registered at all — per-node ceiling / denominator
-#   sync    ClusterCommitAll (CgIaAA==) — every commit synchronous to ALL nodes:
+#   nosync  tables not registered at all - per-node ceiling / denominator
+#   sync    ClusterCommitAll (CgIaAA==) - every commit synchronous to ALL nodes:
 #           it lands everywhere or the client gets an error to retry. No silent
 #           divergence. This is the correct/consistent cluster condition.
-#   nodes1  ClusterCommitNodes — origin-guarded + async fan-out (see cluster_commit.b64).
+#   nodes1  ClusterCommitNodes - origin-guarded + async fan-out (see cluster_commit.b64).
 #
-# Every registered table gets an EXPLICIT module='A' value — never empty (an
+# Every registered table gets an EXPLICIT module='A' value - never empty (an
 # empty value = def_cluster_commit fallback + the silent-divergence fast path).
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,10 +27,10 @@ BENCH_SYNC_TABLES=${BENCH_SYNC_TABLES:-"pgbench_branches pgbench_tellers pgbench
 
 # nodes1 = origin commits, checkin-guarded, async apply_all fan-out.
 #   stock ytserv     : ClusterCommitNodes{at_least:1} (CgQiAggB) -> party_size 0
-#   with the +1 patch: use {at_least:0} (CgIiAA==) instead — {1} then means
+#   with the +1 patch: use {at_least:0} (CgIiAA==) instead - {1} then means
 #                      origin + 1 synchronous peer. Override with BENCH_NODES1_B64.
 : "${BENCH_NODES1_B64:=CgQiAggB}"
-# ClusterCommitAll — every registered table commits synchronously to all nodes.
+# ClusterCommitAll - every registered table commits synchronously to all nodes.
 : "${BENCH_SYNC_B64:=CgIaAA==}"
 case "$COND" in
   nosync)       CC_VALUE="__DROP__" ;;
@@ -95,7 +95,7 @@ if [ "$COND" != nosync ]; then
   if cl_wait_for "cluster leader on all nodes after restart" "$lt" leader_up; then
     cl_log "cluster has a leader on all nodes"
   else
-    cl_fail "no leader ${lt}s after restart — cluster not forming (replication conditions need a healthy cluster)"
+    cl_fail "no leader ${lt}s after restart - cluster not forming (replication conditions need a healthy cluster)"
     exit 1
   fi
 fi

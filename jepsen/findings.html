@@ -1,0 +1,1313 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>YT Cluster Jepsen Findings</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of finding cards, most severe first; a sticky header with
+   counts and filters, a fixed pager at the bottom for going one by one. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --fg: #19212c;
+  --muted: #586273;
+  --line: #dbe0e8;
+  --accent: #2c5a88;
+  --accent-soft: #e3ecf6;
+  --sev-c: #b3222b;
+  --sev-c-soft: #fbe6e7;
+  --sev-hw: #b45300;
+  --sev-hw-soft: #fbeedf;
+  --sev-w: #7f6500;
+  --sev-w-soft: #f6f0d6;
+  --sev-l: #556677;
+  --sev-l-soft: #e7ebf0;
+  --ok: #1f6b45;
+  --ok-soft: #e1f2e8;
+  --wait: #6a4aa0;
+  --wait-soft: #eee7f8;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --head-h: 132px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131a; --surface: #161d27; --fg: #e5e9ef; --muted: #9aa5b4; --line: #283242;
+    --accent: #84b3e3; --accent-soft: #1c2b3d;
+    --sev-c: #ff7b7b; --sev-c-soft: #3a1c20; --sev-hw: #ffab5c; --sev-hw-soft: #3a2a18;
+    --sev-w: #e3c868; --sev-w-soft: #352f17; --sev-l: #a9b7c7; --sev-l-soft: #222c38;
+    --ok: #6fd39c; --ok-soft: #173326; --wait: #c4a8f0; --wait-soft: #2a2040;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131a; --surface: #161d27; --fg: #e5e9ef; --muted: #9aa5b4; --line: #283242;
+  --accent: #84b3e3; --accent-soft: #1c2b3d;
+  --sev-c: #ff7b7b; --sev-c-soft: #3a1c20; --sev-hw: #ffab5c; --sev-hw-soft: #3a2a18;
+  --sev-w: #e3c868; --sev-w-soft: #352f17; --sev-l: #a9b7c7; --sev-l-soft: #222c38;
+  --ok: #6fd39c; --ok-soft: #173326; --wait: #c4a8f0; --wait-soft: #2a2040;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--surface);
+}
+.wrap {
+  max-width: 720px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+code, .tag { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--accent-soft); padding: 0 4px; border-radius: 4px; overflow-wrap: anywhere; }
+
+/* header */
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.top .wrap { padding-block: 12px 10px; display: grid; gap: 8px; }
+.top h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 700;
+  font-size: 1.2rem; letter-spacing: 0.01em; text-wrap: balance;
+}
+.facts { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 0.86rem; }
+.facts b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: 600 0.84rem/1 var(--font-body); padding: 7px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+}
+.chip b { font-variant-numeric: tabular-nums; margin-left: 2px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.chip:focus-visible, .pager button:focus-visible, .seen-box input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* the headline note */
+.lead {
+  background: var(--accent-soft); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; display: grid; gap: 8px;
+}
+.lead h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 1.12rem; text-wrap: balance; }
+.lead p { margin: 0; color: var(--fg); max-width: 65ch; }
+.lead p.aside { color: var(--muted); font-size: 0.92rem; }
+/* intro */
+.intro { padding-block: 16px 4px; display: grid; gap: 10px; }
+.intro p { margin: 0; color: var(--muted); max-width: 65ch; }
+.intro a, .lead a { color: var(--accent); text-underline-offset: 2px; }
+.legend { display: grid; gap: 4px; font-size: 0.88rem; color: var(--muted); }
+.legend span.sev { margin-right: 6px; }
+
+/* cards */
+.list { display: grid; gap: 14px; padding-block: 12px 110px; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px 12px; display: grid; gap: 8px; min-width: 0;
+  scroll-margin-top: calc(var(--head-h) + env(safe-area-inset-top, 0px) + 10px);
+}
+.card.current { border-color: var(--accent); }
+.card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sev {
+  font: 700 0.72rem/1 var(--font-display); text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 5px 8px; border-radius: 4px;
+}
+.sev-c { color: var(--sev-c); background: var(--sev-c-soft); }
+.sev-hw { color: var(--sev-hw); background: var(--sev-hw-soft); }
+.sev-w { color: var(--sev-w); background: var(--sev-w-soft); }
+.why dd { color: var(--fg); }
+.why dt { color: var(--accent); }
+.sev-l { color: var(--sev-l); background: var(--sev-l-soft); }
+.num { font: 600 0.9rem var(--font-mono); color: var(--fg); }
+.rank { margin-left: auto; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.08rem;
+  line-height: 1.3; text-wrap: balance;
+}
+.seen { margin: 0; font-size: 0.86rem; color: var(--muted); }
+dl { margin: 0; display: grid; gap: 8px; }
+dl div { display: grid; gap: 1px; }
+dt {
+  font: 600 0.72rem/1.2 var(--font-body); text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--muted);
+}
+dd { margin: 0; overflow-wrap: anywhere; }
+.tag { color: var(--accent); white-space: nowrap; }
+.card-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  border-top: 1px solid var(--line); padding-top: 10px; margin-top: 2px;
+}
+.status { font-size: 0.84rem; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
+.status-ok { color: var(--ok); background: var(--ok-soft); }
+.status-retest { color: var(--wait); background: var(--wait-soft); }
+.seen-box { display: inline-flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--muted); cursor: pointer; }
+.seen-box input { width: 18px; height: 18px; accent-color: var(--accent); }
+.card.reviewed h2 { color: var(--muted); }
+
+/* pager */
+.pager {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pager .wrap { padding-block: 8px; display: flex; align-items: center; gap: 10px; }
+.pager button {
+  font: 600 0.95rem/1 var(--font-body); padding: 11px 16px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 84px;
+}
+.pager button.next { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.pager button:disabled { opacity: 0.45; cursor: default; }
+.pager .where { flex: 1; text-align: center; font-size: 0.88rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 0; }
+.pager .where b { color: var(--fg); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+
+<div class="top" id="top">
+  <div class="wrap">
+    <h1>YT Cluster Jepsen findings: every one fixed, none critical</h1>
+    <div class="facts">
+      <span><b>51</b> findings, every one fixed</span>
+      <span><b>0</b> critical, from the first run on</span>
+      <span><b>51</b> retested and passed</span>
+      <span>Reviewed <b id="rev-count">0</b> of 51</span>
+    </div>
+    <div class="chips" role="group" aria-label="Filter by severity">
+      <button type="button" class="chip" data-f="all" id="chip-all" aria-pressed="true">all <b>51</b></button><button type="button" class="chip" data-f="hw" id="chip-hw" aria-pressed="false">severe <b>24</b></button><button type="button" class="chip" data-f="w" id="chip-w" aria-pressed="false">warning <b>21</b></button><button type="button" class="chip" data-f="l" id="chip-l" aria-pressed="false">low <b>6</b></button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="intro">
+    <div class="lead">
+      <h2>51 findings, every one fixed - none critical, from the first run on</h2>
+      <p>From the first run on build 1.20.1, none of the first 30 findings was a crash or left the cluster going on from a divergent state, the two outcomes that would matter most: in the logs kept, every ytserv exit was the test's own kill or stop, and under <code>all</code> a row whose copies differed took no further write until it was repaired, so every failure stayed inside single rows, availability, or one node left behind.</p>
+      <p>That containment is the architecture YT Cluster was started on six years ago, and the first Jepsen runs prove it.</p>
+      <p>The retests that followed found rarer ones, and the nightly two more: two stopped a node from starting after a kill at the wrong moment, a WAL file or page half written (43, 45), and one gave a term two leaders (42). Every one is fixed, and the last build passed every run of the retest matrix.</p>
+      <p>Most of the fixes improve usability: they remove the need for workaround solutions, to meet the expectation of a high level of user-friendly experience.</p>
+      <p class="aside">Divergence under <code>half</code>, which takes no vote from the nodes outside a commit's party, is a misconfiguration: a guardrail can refuse it, and the code now blocks such a row (fix 29). <code>half</code> is available but nobody runs it, and the fix is in YT Cluster 1.20.</p>
+    </div>
+    <p><a href="https://jepsen.io">Jepsen</a> is the industry standard for testing data consistency in a cluster, designed to compromise data integrity on purpose: its synthetic faults (partitions, killed and paused processes, damaged packets) force in minutes the very rare cases a production cluster is very unlikely to meet. It is very picky and very aggressive, and <a href="https://github.com/jepsen-io/elle">Elle</a> checks every transaction the clients saw. Serious databases publish their results, in the independent <a href="https://jepsen.io/analyses">Jepsen analyses</a> (<a href="https://jepsen.io/analyses/postgresql-12.3">PostgreSQL</a>, <a href="https://jepsen.io/analyses/mysql-8.0.34">MySQL</a>, <a href="https://jepsen.io/analyses/etcd-3.4.3">etcd</a>, <a href="https://jepsen.io/analyses/mongodb-4.2.6">MongoDB</a>, <a href="https://jepsen.io/analyses/cockroachdb-beta-20160829">CockroachDB</a>, <a href="https://jepsen.io/analyses/yugabyte-db-1.3.1">YugabyteDB</a>, <a href="https://jepsen.io/analyses/tidb-2.1.7">TiDB</a>) and on their own sites: <a href="https://mongodb.com/jepsen">MongoDB</a>, <a href="https://www.cockroachlabs.com/blog/cockroachdb-beta-passes-jepsen-testing/">Cockroach Labs</a> (and <a href="https://www.cockroachlabs.com/blog/jepsen-tests-lessons/">nightly</a>), <a href="https://docs.yugabyte.com/stable/benchmark/resilience/jepsen-testing/">YugabyteDB</a>. These runs use the open-source <a href="https://github.com/jepsen-io/jepsen">Jepsen framework</a>; they are not an analysis by Jepsen.</p>
+    <p>Five nodes, jepsen-io/sql's <code>append</code> and <code>rw</code> workloads judged by Elle, with partitions, killed and paused ytserv, and packet faults. On build 1.20.1 every run was invalid. The night matrix covered 26 cases (sequential, strong, and <code>half</code> for node bouncing, each also with <code>recon</code>): 35 of 37 runs passed on the night's last build, against 21 failed runs of 122 before its fixes. The retests ran the matrix again on seven builds with fixes, 2026-10-23 to 25: 397 runs, 15 of them failed, each a finding fixed before the next build - and the last build passed all 49 of its runs. Four of the cases run in the nightly as a suite of their own. The findings in full, with every retest: <a href="https://github.com/DBinvent/yt-cluster-tests/blob/main/jepsen/findings.md">findings.md</a>; the test: <a href="https://github.com/DBinvent/yt-cluster-tests/tree/main/jepsen">jepsen/</a> in the public tests repository.</p>
+    <p>We continue improving and monitoring YT Cluster as new features come, and the Jepsen test project is updated with them.</p>
+    <div class="legend">
+      <div><span class="sev sev-hw">severe</span>one row: its copies differ, a committed write there is lost or invisible, or the row is locked; or one node's copy left behind while the cluster runs on - the damage stays in that row or that node</div>
+      <div><span class="sev sev-w">warning</span>availability, or a guarantee weaker than configured, with no data difference; or a difference only a misconfiguration (<code>half</code>) produces, which a guardrail can refuse</div>
+      <div><span class="sev sev-l">low</span>no data difference: a false alarm or a wrong error code</div>
+    </div>
+    <p>Severity by what a finding left between the nodes, most severe first; a row lock is severe. None is critical, from the first run on. Every card gives why it has its level. Ticks are kept in this browser only.</p>
+    <p>A copy of <a href="https://claude.ai/artifact/Dtu2vx8WUyNm19J8NBjRFH">the findings page shared on 2026-10-23</a>, brought up to date on 2026-10-25.</p>
+  </section>
+  <section class="list" id="list" aria-label="Findings">
+<article class="card" id="f1" data-sev="hw" data-n="1" data-i="0">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#1</span>
+    <span class="rank">1 of 51</span>
+  </header>
+  <h2>A duplicate insert committed although every member refused it</h2>
+  <p class="seen">sequential, append, partition + kill + pause (2026-10-22, build 1.20.1)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>Under <code>all</code>, the four other nodes failed a second insert of the same key with a duplicate-key error. Each was dropped from the party, the origin committed alone, and its trigger returned no error. Both inserts were acknowledged to their clients.</dd></div>
+    <div><dt>Left behind</dt><dd>Two copies of one key: one node holds a value no other has.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair takes the majority&#x27;s copy, so the lone acknowledged write is lost. With <code>recon</code> off (the default) the row is blocked.</dd></div>
+    <div><dt>Fix</dt><dd>A member holding the key refuses the insert as a conflict, the leader checks an INSERT as it checks an UPDATE, and a party that lost every member is vetoed. <span class="tag">[party-lost]</span> <span class="tag">[party-cas]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>One row: two acknowledged inserts of one key, one node&#x27;s copy different; the row is blocked, and a repair from the majority drops the lone acknowledged write.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev1" data-n="1"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f42" data-sev="hw" data-n="42" data-i="1">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#42</span>
+    <span class="rank">2 of 51</span>
+  </header>
+  <h2>Two leaders of one term, its subterm numbers issued twice</h2>
+  <p class="seen">sequential, rw, partition + kill + pause, 300 s (2026-10-24)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node back from a kill asked for the term it knew of plus one and won the term three members already stood in.</dd></div>
+    <div><dt>Left behind</dt><dd>Subterm numbers issued twice; the first leader&#x27;s commits lost on two nodes.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> where a strict majority holds one copy.</dd></div>
+    <div><dt>Fix</dt><dd>A vote refuses a term the voter holds now, and a candidate behind the voter. <span class="tag">[term-vote]</span> <span class="tag">[vote-data]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows: committed writes lost on two nodes - one term with two leaders, its subterm numbers issued twice.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev42" data-n="42"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f40" data-sev="hw" data-n="40" data-i="2">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#40</span>
+    <span class="rank">3 of 51</span>
+  </header>
+  <h2>A row on three nodes of five, its write failed</h2>
+  <p class="seen">strong, partition + kill + pause, 300 s (2026-10-24)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>Every ytserv was paused as a client inserted a row: the statement failed and the origin rolled back, but the pull served the row as committed - a poll on a checkout closed the origin&#x27;s record committed over its rollback.</dd></div>
+    <div><dt>Left behind</dt><dd>A row on three nodes of five whose write had failed.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair takes the majority&#x27;s copy - here the wrong one.</dd></div>
+    <div><dt>Fix</dt><dd>An origin polls only for a commit of its own not yet closed, and a checkout leaves a decided record as it is. <span class="tag">[checkout-decided]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>One row: a write its client saw fail stood on three nodes of five, and a repair from the majority kept it.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev40" data-n="40"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f13" data-sev="hw" data-n="13" data-i="3">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#13</span>
+    <span class="rank">4 of 51</span>
+  </header>
+  <h2>A commit never sent</h2>
+  <p class="seen">sequential, pause (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node back from a pause opened the new term&#x27;s WAL twice at once and kept the second. Its write&#x27;s record went with the first, its commit found none, and COMMIT PREPARED never went out.</dd></div>
+    <div><dt>Left behind</dt><dd>Every member held the transaction prepared: its rows locked for good, a committed write invisible, the copies different.</dd></div>
+    <div><dt>Self-repair</dt><dd>No: the prepared transaction held its rows.</dd></div>
+    <div><dt>Fix</dt><dd>A term is opened once, and a decision that cannot be recorded after the local commit still goes out. <span class="tag">[term-race]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>One transaction&#x27;s rows: locked on every member and its committed write invisible there; contained in those rows.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev13" data-n="13"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f26" data-sev="hw" data-n="26" data-i="4">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#26</span>
+    <span class="rank">5 of 51</span>
+  </header>
+  <h2>A prepared record closed as committed</h2>
+  <p class="seen">half, kill (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>An origin killed between its PREPARE and its COMMIT sent, after its restart, the checkout that closes a subterm. A member holding the transaction prepared closed its record as committed and never committed the transaction.</dd></div>
+    <div><dt>Left behind</dt><dd>The write invisible on that member, its rows locked, every later decision passing it by as held.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>A checkout leaves a prepared record to its outcome, which the pull brings. <span class="tag">[checkout-prepared]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Row lock: the write invisible on a member and its rows locked; contained in those rows.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev26" data-n="26"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f22" data-sev="hw" data-n="22" data-i="5">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#22</span>
+    <span class="rank">6 of 51</span>
+  </header>
+  <h2>A prepared transaction with no record</h2>
+  <p class="seen">strong, repeated kills (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A member stopped right after its PREPARE came back with no record of the subterm while the transaction stayed prepared. The decided write was applied over the prepared one&#x27;s locks and waited on them for good.</dd></div>
+    <div><dt>Left behind</dt><dd>Rows locked on that member and its copy short of the others.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>The transactions prepared when ytserv starts are looked up once and finished by the decision. Since fix 28 they are also recorded as they finish, so the pull does not apply them again. <span class="tag">[prepared-norecord]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Row lock: the prepared transaction&#x27;s rows locked on a member.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev22" data-n="22"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f25" data-sev="hw" data-n="25" data-i="6">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#25</span>
+    <span class="rank">7 of 51</span>
+  </header>
+  <h2>A rollback that missed a prepared transaction</h2>
+  <p class="seen">half, pause (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>The rollback reached a member whose process no longer listed the transaction as prepared, so the rollback was only remembered.</dd></div>
+    <div><dt>Left behind</dt><dd>The prepared transaction kept its row locked.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>A decision finishes a prepared transaction by its name whenever the database holds it, listed or not. <span class="tag">[ptx-gid]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Row lock: a prepared transaction&#x27;s row locked on a member.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev25" data-n="25"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f20" data-sev="hw" data-n="20" data-i="7">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#20</span>
+    <span class="rank">8 of 51</span>
+  </header>
+  <h2>A prepared transaction left behind</h2>
+  <p class="seen">half, kill (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A member stopped right after its PREPARE had the transaction prepared and its record not moved yet. The rollback that reached it later was only recorded.</dd></div>
+    <div><dt>Left behind</dt><dd>Rows locked on that member.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running.</dd></div>
+    <div><dt>Fix</dt><dd>The database is asked whether the transaction is prepared. <span class="tag">[prepared-undecided]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Row lock: rows locked on a member by a transaction left prepared.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev20" data-n="20"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f8" data-sev="hw" data-n="8" data-i="8">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#8</span>
+    <span class="rank">9 of 51</span>
+  </header>
+  <h2><code>all</code> left a restarting node out</h2>
+  <p class="seen">sequential (2026-10-22)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node coming back from a restart was Spare, and <code>all</code> counted it out. Commits went on without it, and its pull got only part of them.</dd></div>
+    <div><dt>Left behind</dt><dd>A node missing the commits made meanwhile (a table empty there).</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair takes the majority&#x27;s copy; with <code>recon</code> off the rows are blocked.</dd></div>
+    <div><dt>Fix</dt><dd>Under sequential consistency every node counts in <code>all</code>. <span class="tag">[sc-all]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows a node lacked after a restart (a table empty there), in the strongest mode: the damage stays in that node&#x27;s rows.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev8" data-n="8"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f24" data-sev="hw" data-n="24" data-i="9">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#24</span>
+    <span class="rank">10 of 51</span>
+  </header>
+  <h2>A Spare node that never caught up</h2>
+  <p class="seen">half, pause (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>Back from a pause and Spare, a node asks to follow and is refused while it is behind, and the gap pull skipped a node that is not up.</dd></div>
+    <div><dt>Left behind</dt><dd>A node behind for good, its copy short of the others.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>Gaps are pulled whatever the node&#x27;s state. <span class="tag">[spare-pull]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>A node&#x27;s copy behind for good, while the cluster runs on and the data is whole on the others.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev24" data-n="24"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f27" data-sev="hw" data-n="27" data-i="10">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#27</span>
+    <span class="rank">11 of 51</span>
+  </header>
+  <h2>A pull waiting for good</h2>
+  <p class="seen">half, kill (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A pull&#x27;s earlier write of a row waited on the lock of a transaction held prepared on the same node, whose outcome that same pull still had to bring.</dd></div>
+    <div><dt>Left behind</dt><dd>The pull never ended, no later one ran, and the node stayed behind.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>An apply waits on a row lock for twice the statement timeout, then fails and is pulled again once the prepared one is finished. <span class="tag">[apply-lock]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>A node&#x27;s copy behind for good, while the cluster runs on and the data is whole on the others.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev27" data-n="27"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f2" data-sev="hw" data-n="2" data-i="11">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#2</span>
+    <span class="rank">12 of 51</span>
+  </header>
+  <h2>A node behind wrote and joined commits</h2>
+  <p class="seen">sequential (2026-10-22)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node back from a restart, or one that joined a term late, wrote and took part in commits on data it lacked.</dd></div>
+    <div><dt>Left behind</dt><dd>A later write without the earlier ones (read skew), and writes made on a stale read.</dd></div>
+    <div><dt>Self-repair</dt><dd>Partly: the pull brings the writes later; a write made on a stale read stays.</dd></div>
+    <div><dt>Fix</dt><dd>Refused until it holds what the members hold. <span class="tag">[behind]</span> <span class="tag">[caught-up]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows written on a stale read stay; other rows were refused, so it stays in the rows written.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev2" data-n="2"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f5" data-sev="hw" data-n="5" data-i="12">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#5</span>
+    <span class="rank">13 of 51</span>
+  </header>
+  <h2>Row locks held for good</h2>
+  <p class="seen">sequential (2026-10-22)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A deadlock across two nodes, and party sessions whose origin&#x27;s rollback never arrived.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; rows locked and their writers waiting.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running; a ytserv restart ends the sessions.</dd></div>
+    <div><dt>Fix</dt><dd>A party session blocking a local writer yields, and one whose origin already decided is ended. <span class="tag">[party-yield]</span> <span class="tag">[orphan]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Row lock: rows locked for good by a cross-node deadlock or an orphaned session.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev5" data-n="5"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f50" data-sev="hw" data-n="50" data-i="13">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#50</span>
+    <span class="rank">14 of 51</span>
+  </header>
+  <h2>A copy&#x27;s restart pulled its first term again</h2>
+  <p class="seen">the nightly's rmc suite (2026-10-25)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node added as a physical copy kept its start position in memory only; restarted, it pulled its first term again over its copied rows.</dd></div>
+    <div><dt>Left behind</dt><dd>A config row back to an older value on the leader; the cluster&#x27;s next writes of it refused (40001).</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>A copy&#x27;s start position is recorded with the proven marks and held at every start. <span class="tag">[seed-kept]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>One row: a config row back to an older value on the leader, and the cluster&#x27;s next writes of it refused.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - rmc passed in the nightly</span>
+    <label class="seen-box"><input type="checkbox" id="rev50" data-n="50"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f49" data-sev="hw" data-n="49" data-i="14">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#49</span>
+    <span class="rank">15 of 51</span>
+  </header>
+  <h2>A leader one write behind: a subterm served short of its second statement</h2>
+  <p class="seen">sequential, rw, partition + kill + pause, 300 s (2026-10-25)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A subterm of two writes was served from a WAL file as its first alone: a version recorded but not read was taken for the end of it, and the node applied that and recorded the subterm committed.</dd></div>
+    <div><dt>Left behind</dt><dd>One row an older value on the leader to the end.</dd></div>
+    <div><dt>Self-repair</dt><dd>No: its next write is refused, the copies compared.</dd></div>
+    <div><dt>Fix</dt><dd>Only a version with no record ends a subterm; one that does not read has it served as its outcome alone, for the puller to ask the others. <span class="tag">[partial-read]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>One row: an older value on the leader than on the four others, its subterm recorded complete.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev49" data-n="49"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f30" data-sev="hw" data-n="30" data-i="15">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#30</span>
+    <span class="rank">16 of 51</span>
+  </header>
+  <h2>A node back from a kill read itself complete without a term&#x27;s last writes</h2>
+  <p class="seen">half, node bouncing; strong, 300 s (2 runs of 37 on the night&#x27;s last build)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>The node lacked the last committed writes of a few rows (one in one run, eight in the other) and stopped asking for them. The cause was found in the code, not yet in a failing run: a party member&#x27;s record insert, cut off at the origin&#x27;s deadline, left an empty placeholder in the WAL cache. The gap check skips empty entries, while the catch-up counted the placeholder as held.</dd></div>
+    <div><dt>Left behind</dt><dd>A node&#x27;s copy short of a term&#x27;s tail, for good.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair takes the majority&#x27;s copy; without it nothing pulled the writes.</dd></div>
+    <div><dt>Fix</dt><dd>An insert that does not finish removes its placeholder, and the catch-up counts a subterm held only by a real record. <span class="tag">[placeholder]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows: a term&#x27;s last writes missing on one node; the next write of such a row is refused under <code>all</code>. Under <code>half</code> it was not blocked.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev30" data-n="30"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f31" data-sev="hw" data-n="31" data-i="16">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#31</span>
+    <span class="rank">17 of 51</span>
+  </header>
+  <h2>A node cut off during a transaction lacked its row, reading itself complete</h2>
+  <p class="seen">sequential, rw, partition + kill + pause (2026-10-23)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A partition cut one node off while a transaction of three writes ran. The transaction committed on the other four; the node, back, read its subterm as held and never pulled it.</dd></div>
+    <div><dt>Left behind</dt><dd>The transaction&#x27;s inserted row missing on that node for good, its data version complete.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair takes the majority&#x27;s copy; otherwise nothing pulled it.</dd></div>
+    <div><dt>Fix</dt><dd>Every party member is one of the transaction&#x27;s 2PC: a member&#x27;s failed statement or unacknowledged PREPARE rolls the transaction back on every node. A checkout leaves a statement that never reached PREPARE to its outcome, and <code>all</code> is every node online now. <span class="tag">[2pc-member]</span> <span class="tag">[checkout-unprepared]</span> <span class="tag">[all-online]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>One row: a committed insert missing on one node that read itself complete, so nothing pulled it.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev31" data-n="31"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f36" data-sev="hw" data-n="36" data-i="17">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#36</span>
+    <span class="rank">18 of 51</span>
+  </header>
+  <h2>A node short of an older term&#x27;s tail, reading itself complete</h2>
+  <p class="seen">sequential, rw, partition + kill + pause (2026-10-23)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>Killed and cut off while the others committed a term&#x27;s last 40 subterms, the node came back two terms on. No node named how far the older term went, so it pulled only the holes below its own last record.</dd></div>
+    <div><dt>Left behind</dt><dd>The last write of three rows missing on that node.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair; otherwise nothing.</dd></div>
+    <div><dt>Fix</dt><dd>Every node names the end of each complete term it holds; a node short of it pulls the tail, and takes no party write under <code>all</code> until it holds it. <span class="tag">[term-end]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows: the last committed write of three rows missing on one node that read itself complete.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev36" data-n="36"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f48" data-sev="hw" data-n="48" data-i="18">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#48</span>
+    <span class="rank">19 of 51</span>
+  </header>
+  <h2>A node short of three rows: a term&#x27;s hole left out at a start</h2>
+  <p class="seen">sequential + recon, every fault and packet, 300 s (2026-10-25)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node knew it missed a stretch of a term; restarted, its data version began at a newer complete term - decided by the order its WAL files were listed - and the hole was never pulled.</dd></div>
+    <div><dt>Left behind</dt><dd>Three rows missing on that node to the end.</dd></div>
+    <div><dt>Self-repair</dt><dd>No: <code>recon</code> checks the rows marked diverged only.</dd></div>
+    <div><dt>Fix</dt><dd>The data version starts at the oldest term not complete, whatever the order. <span class="tag">[dv-start]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows: three committed rows missing on one node to the end, and no repair looked for them.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev48" data-n="48"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f17" data-sev="hw" data-n="17" data-i="19">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#17</span>
+    <span class="rank">20 of 51</span>
+  </header>
+  <h2>A term&#x27;s tail unseen</h2>
+  <p class="seen">half, node bouncing (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>Once the next term opened, the members&#x27; pings left out the term just completed. A node that had missed that term&#x27;s last writes read itself complete and never pulled them.</dd></div>
+    <div><dt>Left behind</dt><dd>The term&#x27;s last writes missing on that node for good.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair. Under <code>half</code> the row was not blocked and took later writes.</dd></div>
+    <div><dt>Fix</dt><dd>The newest complete term goes along with the open ones. <span class="tag">[term-tail]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows: a term&#x27;s last writes missing on one node; blocked under <code>all</code>, not under <code>half</code>.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev17" data-n="17"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f16" data-sev="hw" data-n="16" data-i="20">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#16</span>
+    <span class="rank">21 of 51</span>
+  </header>
+  <h2>A hole forgotten at a restart</h2>
+  <p class="seen">half, node bouncing (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A WAL reload read a subterm with no record as held. A write deferred to the pull, or one that never arrived before the stop, was never asked for again; a term this node opened at a later subterm read its first ones held too.</dd></div>
+    <div><dt>Left behind</dt><dd>An insert and every later write of its row missing on that node.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair; otherwise nothing.</dd></div>
+    <div><dt>Fix</dt><dd>The reload stops the held run at the first hole from the term&#x27;s start. <span class="tag">[replay]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows: an insert and its later writes missing on one node; blocked under <code>all</code>, not under <code>half</code>.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev16" data-n="16"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f19" data-sev="hw" data-n="19" data-i="21">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#19</span>
+    <span class="rank">22 of 51</span>
+  </header>
+  <h2>A transaction served in part</h2>
+  <p class="seen">half, node bouncing (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A subterm of several statements, served from the WAL file, came as its first statement only, or without a statement whose rows the member lacked. The puller recorded it committed.</dd></div>
+    <div><dt>Left behind</dt><dd>The rest of the transaction missing there for good.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair.</dd></div>
+    <div><dt>Fix</dt><dd>A subterm is served whole, or as its outcome alone. <span class="tag">[partial]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>Rows: part of one transaction missing on one node; blocked under <code>all</code>, not under <code>half</code>.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev19" data-n="19"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f14" data-sev="hw" data-n="14" data-i="22">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#14</span>
+    <span class="rank">23 of 51</span>
+  </header>
+  <h2>A catch-up&#x27;s write over a missing predecessor</h2>
+  <p class="seen">half, node bouncing (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node back from a kill applied a later write of a row while the row&#x27;s earlier write was still undecided or still to come. The miss was recorded, and the earlier write then landed over it.</dd></div>
+    <div><dt>Left behind</dt><dd>The copy different for good.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair.</dd></div>
+    <div><dt>Fix</dt><dd>Such a miss is deferred to the pull, which brings the predecessor first. <span class="tag">[dep-defer]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>One row different on one node; blocked under <code>all</code>, not under <code>half</code>.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev14" data-n="14"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f7" data-sev="hw" data-n="7" data-i="23">
+  <header class="card-head">
+    <span class="sev sev-hw">severe</span>
+    <span class="num">#7</span>
+    <span class="rank">24 of 51</span>
+  </header>
+  <h2>A committed write dropped where a node rolled its part back</h2>
+  <p class="seen">sequential (2026-10-22)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node whose own part of a transaction had rolled back saw the cluster commit it without that node. Its gap was closed, but the committed rows never came.</dd></div>
+    <div><dt>Left behind</dt><dd>A node lacks a committed write.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair takes the majority&#x27;s copy; with <code>recon</code> off the row is blocked.</dd></div>
+    <div><dt>Fix</dt><dd>The committed write is applied when that node catches up. <span class="tag">[rolled-back-here]</span></dd></div>
+    <div class="why"><dt>Why severe</dt><dd>One row: a committed write missing on one node; the row is blocked.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev7" data-n="7"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f21" data-sev="w" data-n="21" data-i="24">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#21</span>
+    <span class="rank">25 of 51</span>
+  </header>
+  <h2>Two terms writing one row</h2>
+  <p class="seen">half, node bouncing (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A leader cut off while the next term was elected kept handing out keys of its old term for seconds, and members already in the newer term took them.</dd></div>
+    <div><dt>Left behind</dt><dd>One row written in two terms at once: copies that differ on several nodes.</dd></div>
+    <div><dt>Self-repair</dt><dd><code>recon</code> repair where a strict majority holds one copy; otherwise the row is blocked (55000).</dd></div>
+    <div><dt>Fix</dt><dd>A member refuses a new statement keyed in an older term (40001, retried). <span class="tag">[term-fence]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>One row&#x27;s copies differed on several nodes, but only under <code>half</code>: under <code>all</code> an old leader cannot fill a party. A misconfiguration a guardrail can refuse, and fixed in code before the release.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev21" data-n="21"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f29" data-sev="w" data-n="29" data-i="25">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#29</span>
+    <span class="rank">26 of 51</span>
+  </header>
+  <h2><code>half</code> without recon: a differing row drew further apart</h2>
+  <p class="seen">half, recon off (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node outside the party took every later write of a row it held different, each one a miss. Nothing stopped or repaired it.</dd></div>
+    <div><dt>Left behind</dt><dd>A difference that grows with every write to the row.</dd></div>
+    <div><dt>Self-repair</dt><dd>Only <code>recon</code>, when it is on.</dd></div>
+    <div><dt>Fix</dt><dd>Every CLUSTER DIVERGENCE puts the row under recovery T3 whatever the table&#x27;s <code>recon</code>: blocked cluster-wide (55000), re-checked every minute, repaired from a majority, released once its copies agree. <span class="tag">[divergent-t3]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>A row&#x27;s difference grew with each write, but only under <code>half</code> with <code>recon</code> off. A misconfiguration a guardrail can refuse, and fixed in code before the release.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev29" data-n="29"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f47" data-sev="w" data-n="47" data-i="26">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#47</span>
+    <span class="rank">27 of 51</span>
+  </header>
+  <h2>Every subterm of a term read as diverged: a second WAL file of it</h2>
+  <p class="seen">half, node bouncing (2026-10-25)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A write reached a restarting node before its WAL load and made the term&#x27;s file a second time; the next start kept the small one and pulled the term again over rows that held it and later writes.</dd></div>
+    <div><dt>Left behind</dt><dd>None: the copies equal; 305 false divergences and 25 rows blocked on one node.</dd></div>
+    <div><dt>Self-repair</dt><dd>The blocks are released as the copies agree.</dd></div>
+    <div><dt>Fix</dt><dd>No term&#x27;s WAL is made before the load, and a start takes in one file a term, the other moved aside. <span class="tag">[wal-first]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>No data difference - the copies equal - but 25 rows on one node blocked for audit until they were released.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev47" data-n="47"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f51" data-sev="w" data-n="51" data-i="27">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#51</span>
+    <span class="rank">28 of 51</span>
+  </header>
+  <h2>A member&#x27;s own insert drew values replicated rows held</h2>
+  <p class="seen">the nightly's topology suite, 33_identity (2026-10-25)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A replicated insert moved only the key column&#x27;s sequence; a serial column past the key and a column whose default calls nextval kept theirs.</dd></div>
+    <div><dt>Left behind</dt><dd>Duplicate values in those columns, or a refused insert where one is unique.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>An inserted row&#x27;s every value moves its column&#x27;s sequence. <span class="tag">[seq]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>A guarantee weaker than configured: a column&#x27;s sequence behind the values replicated rows hold; the copies of every row the same.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - topology passed</span>
+    <label class="seen-box"><input type="checkbox" id="rev51" data-n="51"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f3" data-sev="w" data-n="3" data-i="28">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#3</span>
+    <span class="rank">29 of 51</span>
+  </header>
+  <h2>Leaderless for good</h2>
+  <p class="seen">sequential (2026-10-22)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>After restarts the cluster had no leader while every node was running.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; every write refused.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running; a ytserv restart ends it.</dd></div>
+    <div><dt>Fix</dt><dd>A restarted member rejoins, and a node lets go of a leader that answers Spare. <span class="tag">[restart-leaderless]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: no leader, every write refused; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev3" data-n="3"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f44" data-sev="w" data-n="44" data-i="29">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#44</span>
+    <span class="rank">30 of 51</span>
+  </header>
+  <h2>No leader at the end: an older term&#x27;s leader led on</h2>
+  <p class="seen">sequential, rw, partition + kill + pause (2026-10-24)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A newer term&#x27;s leader was killed before it ever answered the old one: the old leader led on with one follower, and two members restarted into the newer term stayed Spare behind it.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; three nodes of five named no leader.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running.</dd></div>
+    <div><dt>Fix</dt><dd>A leader steps down when a member answers a newer term; a leader named at an older term than a member&#x27;s own is none it waits for. <span class="tag">[stale-leader]</span> <span class="tag">[restart-leaderless]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: three nodes of five naming no leader; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev44" data-n="44"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f33" data-sev="w" data-n="33" data-i="30">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#33</span>
+    <span class="rank">31 of 51</span>
+  </header>
+  <h2>A cold start&#x27;s split vote was never asked again</h2>
+  <p class="seen">sequential, rw, partition + kill + pause (2026-10-23)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>Every node was paused right after a restart of all and resumed at once: each detected the cold start and asked for an election in the same round, one vote each, and the next checks did not ask again.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; every node named no leader to the end.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running; a ytserv restart ends it.</dd></div>
+    <div><dt>Fix</dt><dd>A cold start&#x27;s Main counts as up, and the next leaderless checks ask again. <span class="tag">[cold-split]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: no leader to the end, every node running; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev33" data-n="33"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f46" data-sev="w" data-n="46" data-i="31">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#46</span>
+    <span class="rank">32 of 51</span>
+  </header>
+  <h2>No cluster at the start: a leader of two votes in five</h2>
+  <p class="seen">strong + recon, append (2026-10-25, the test's setup)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>The first node up left out the three peers whose names did not resolve yet and won term 1 on two votes of five; the others never took it, its uptime read as 0 in its pings.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; no cluster formed.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>A member whose host does not resolve counts in every majority, and a node&#x27;s ping answer carries its uptime. <span class="tag">[roster]</span> <span class="tag">[health]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: no cluster formed at the start; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev46" data-n="46"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f4" data-sev="w" data-n="4" data-i="32">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#4</span>
+    <span class="rank">33 of 51</span>
+  </header>
+  <h2>A stale leader kept its term</h2>
+  <p class="seen">sequential (2026-10-22)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A leader cut off during the next term&#x27;s election kept leading its old term. Two leaders were named and followers took neither.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; writes refused.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running; a ytserv restart ends it.</dd></div>
+    <div><dt>Fix</dt><dd>It steps down when it hears a newer term&#x27;s leader. <span class="tag">[stale-leader]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: two leaders named, writes refused; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev4" data-n="4"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f32" data-sev="w" data-n="32" data-i="33">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#32</span>
+    <span class="rank">34 of 51</span>
+  </header>
+  <h2>A leader lost right after a restart was never noticed</h2>
+  <p class="seen">sequential, rw, partition + kill + pause (2026-10-23)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>For 30 s after ytserv starts a follower never declares its leader lost. A partition cut the new leader off two seconds after a restart of all, and the other four kept following it.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; every write waited out its timeout with nobody leading.</dd></div>
+    <div><dt>Self-repair</dt><dd>After the 30 s grace, an election.</dd></div>
+    <div><dt>Fix</dt><dd>The grace covers only a leader that has not answered since the node started; one that answered and then stopped is lost, and the election runs. <span class="tag">[lost-after-start]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: no leader for 40 s after a restart, every write waiting; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev32" data-n="32"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f37" data-sev="w" data-n="37" data-i="34">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#37</span>
+    <span class="rank">35 of 51</span>
+  </header>
+  <h2>No write in a whole run under the harshest schedule</h2>
+  <p class="seen">sequential, rw, partition + kill + pause (2026-10-23)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>Two subterms the leader issued as the faults began were saved by no node. The leader waited for every member to answer before rolling such a gap back, one member stayed cut off, and the gap held every write to every synced table.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; nothing committed in the run.</dd></div>
+    <div><dt>Self-repair</dt><dd>Once every member answers.</dd></div>
+    <div><dt>Fix</dt><dd>When every table commits on a majority, the leader rolls back an older term&#x27;s gap once a majority holding that term answered without it. <span class="tag">[gap-mode]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: nothing committed in a run; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev37" data-n="37"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f41" data-sev="w" data-n="41" data-i="35">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#41</span>
+    <span class="rank">36 of 51</span>
+  </header>
+  <h2>No write in a whole run again: one gap in flight held every table</h2>
+  <p class="seen">strong, rw, partition + kill + pause (2026-10-24)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>In a run with about 9 s of a connected majority, one write a member held in flight kept a gap open, and the gate held every synced table while it was open.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; nothing committed.</dd></div>
+    <div><dt>Self-repair</dt><dd>Once the gap closes.</dd></div>
+    <div><dt>Fix</dt><dd>A gap in flight holds its own rows only. <span class="tag">[gap-rows]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: nothing committed in a run; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev41" data-n="41"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f43" data-sev="w" data-n="43" data-i="36">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#43</span>
+    <span class="rank">37 of 51</span>
+  </header>
+  <h2>A node down to the end: a WAL file with no header</h2>
+  <p class="seen">sequential + recon, every fault and packet, 300 s (2026-10-24)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>The node was killed between creating a new term&#x27;s WAL file and writing its header; every start after refused the file and exited.</dd></div>
+    <div><dt>Left behind</dt><dd>One node not running to the end; the others&#x27; data whole.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>A WAL file appears under its name with its header in it, and a start moves aside a file whose header is not whole. <span class="tag">[wal-header]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: one node down to the end; the others&#x27; data whole.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev43" data-n="43"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f45" data-sev="w" data-n="45" data-i="37">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#45</span>
+    <span class="rank">38 of 51</span>
+  </header>
+  <h2>A node down to the end: a WAL page a kill tore</h2>
+  <p class="seen">sequential, rw, partition + kill + pause, 300 s (2026-10-25)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>Every ytserv was killed while one wrote a record&#x27;s address: the page&#x27;s count took in a slot with no item, and every start after panicked loading the page.</dd></div>
+    <div><dt>Left behind</dt><dd>One node not running to the end; the others&#x27; data whole.</dd></div>
+    <div><dt>Self-repair</dt><dd>No.</dd></div>
+    <div><dt>Fix</dt><dd>A page loads without slots its count takes in that hold no item, and an insert writes its item before its count. <span class="tag">[torn-page]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: one node down to the end; the others&#x27; data whole.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev45" data-n="45"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f15" data-sev="w" data-n="15" data-i="38">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#15</span>
+    <span class="rank">39 of 51</span>
+  </header>
+  <h2>A node stalling itself</h2>
+  <p class="seen">half, node bouncing (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A leader behind on a table refused its writes with an answer its own origin pulled on, inside the statement that held the row the pull had to write.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; the client hung and the table stayed behind.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running.</dd></div>
+    <div><dt>Fix</dt><dd>The client&#x27;s transaction ends with 40001 and the pull lands. <span class="tag">[outdated-abort]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: a client hung and a table stayed behind; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev15" data-n="15"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f18" data-sev="w" data-n="18" data-i="39">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#18</span>
+    <span class="rank">40 of 51</span>
+  </header>
+  <h2>A node stalled at a term&#x27;s first write</h2>
+  <p class="seen">half, node bouncing (night matrix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>An apply held the WAL map&#x27;s read lock while it waited on a client&#x27;s row. The new term&#x27;s opening queued behind it, and so did every reader behind that.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; the node stopped taking writes.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running; a restart ends it.</dd></div>
+    <div><dt>Fix</dt><dd>The lock is let go before any wait. <span class="tag">[tm-guard]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: a node stopped taking writes; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev18" data-n="18"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f23" data-sev="w" data-n="23" data-i="40">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#23</span>
+    <span class="rank">41 of 51</span>
+  </header>
+  <h2>A lock cycle in the fix for 19</h2>
+  <p class="seen">half, node bouncing (the night&#x27;s own fix)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>The first form of fix 19 held the WAL pages while a page loaded under the file lock; a writer held the file and waited for the pages.</dd></div>
+    <div><dt>Left behind</dt><dd>No data difference; the node&#x27;s state machine stopped.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running; a restart ends it.</dd></div>
+    <div><dt>Fix</dt><dd>The statements are read one by one, as before. <span class="tag">[partial]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: a node&#x27;s state machine stopped; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev23" data-n="23"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f6" data-sev="w" data-n="6" data-i="41">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#6</span>
+    <span class="rank">42 of 51</span>
+  </header>
+  <h2>A cluster setting applied before its commit</h2>
+  <p class="seen">sequential (2026-10-22)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A config row took effect on a node before its transaction committed, so a vetoed write stayed in effect.</dd></div>
+    <div><dt>Left behind</dt><dd>The leader ran a setting the cluster never committed (<code>min_cluster_size</code> 3 against 5): nodes disagreed on quorum.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not while running; a leader restart re-reads the setting. No data to repair.</dd></div>
+    <div><dt>Fix</dt><dd>The setting is applied at commit. <span class="tag">[cfg-commit]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>A setting the cluster never committed ran on the leader: nodes disagreed on quorum; no data difference found.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev6" data-n="6"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f35" data-sev="w" data-n="35" data-i="42">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#35</span>
+    <span class="rank">43 of 51</span>
+  </header>
+  <h2>A cluster setting committed on a member and never in effect there</h2>
+  <p class="seen">sequential, rw (2026-10-23, the test's setup)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>The pull finished a member&#x27;s prepared transaction that held a setting before the origin&#x27;s COMMIT reached it, and settled nothing: the setting stayed held.</dd></div>
+    <div><dt>Left behind</dt><dd>The row in the member&#x27;s table, its setting not in effect there until a restart.</dd></div>
+    <div><dt>Self-repair</dt><dd>A restart takes it.</dd></div>
+    <div><dt>Fix</dt><dd>A transaction the pull decides settles its held settings: in effect with its commit, dropped with its rollback. <span class="tag">[cfg-pull]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>A setting weaker than committed on one member until a restart; no data difference.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev35" data-n="35"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f10" data-sev="w" data-n="10" data-i="43">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#10</span>
+    <span class="rank">44 of 51</span>
+  </header>
+  <h2>yt_setup&#x27;s table row unseen</h2>
+  <p class="seen">setup (2026-10-23)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A table row written with the config table&#x27;s trigger off (yt_setup&#x27;s local save) reached no running ytserv until a restart.</dd></div>
+    <div><dt>Left behind</dt><dd>The table ran the cluster default (<code>half</code> unless set) instead of its own setting: weaker than configured, silently.</dd></div>
+    <div><dt>Self-repair</dt><dd>A restart takes the table&#x27;s own setting.</dd></div>
+    <div><dt>Fix</dt><dd>Taken by the periodic re-read of the table rows. <span class="tag">[cfgtbl]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>A table silently ran a weaker commit mode than configured; no data difference found.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev10" data-n="10"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f11" data-sev="w" data-n="11" data-i="44">
+  <header class="card-head">
+    <span class="sev sev-w">warning</span>
+    <span class="num">#11</span>
+    <span class="rank">45 of 51</span>
+  </header>
+  <h2>The image set the election size to every node</h2>
+  <p class="seen">docker image, ytctl --batch</p>
+  <dl>
+    <div><dt>What happened</dt><dd><code>min_cluster_size</code> was set to every node, so one node down held off a cold-start election, every pause and every split.</dd></div>
+    <div><dt>Left behind</dt><dd>None; availability only.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not needed.</dd></div>
+    <div><dt>Fix</dt><dd>Both seed a majority. <span class="tag">[min_cluster_size]</span></dd></div>
+    <div class="why"><dt>Why warning</dt><dd>Availability: one node down held off elections, pauses and splits.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev11" data-n="11"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f28" data-sev="l" data-n="28" data-i="45">
+  <header class="card-head">
+    <span class="sev sev-l">low</span>
+    <span class="num">#28</span>
+    <span class="rank">46 of 51</span>
+  </header>
+  <h2>A false CLUSTER DIVERGENCE after a kill</h2>
+  <p class="seen">half, node bouncing (a debug repeat: subterm 3.579 on n2)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node killed between an apply&#x27;s database commit and its WAL record came back holding the rows with no record of them. The pull applied the subterm again over its own rows, missed, and logged a divergence.</dd></div>
+    <div><dt>Left behind</dt><dd>None: the copies are equal; a row marked for audit.</dd></div>
+    <div><dt>Self-repair</dt><dd>None needed: the copies were equal.</dd></div>
+    <div><dt>Fix</dt><dd>An apply runs PREPARE TRANSACTION, writes its record, then COMMIT PREPARED. A kill in between is finished by the pull&#x27;s decision or by the restart. <span class="tag">[apply-2pc]</span></dd></div>
+    <div class="why"><dt>Why low</dt><dd>No data difference: a false alarm on equal copies.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev28" data-n="28"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f34" data-sev="l" data-n="34" data-i="46">
+  <header class="card-head">
+    <span class="sev sev-l">low</span>
+    <span class="num">#34</span>
+    <span class="rank">47 of 51</span>
+  </header>
+  <h2>A false CLUSTER DIVERGENCE: a 2PC step cut off by its deadline</h2>
+  <p class="seen">half, node bouncing (2026-10-23)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A party member&#x27;s PREPARE or COMMIT PREPARED ran in the database while a pause dropped its call before the subterm&#x27;s record moved. The pull applied the subterm again over rows a later write had moved on.</dd></div>
+    <div><dt>Left behind</dt><dd>None: the copies equal; a row blocked for audit.</dd></div>
+    <div><dt>Self-repair</dt><dd>The block is released once the copies agree.</dd></div>
+    <div><dt>Fix</dt><dd>The 2PC step runs in a task of its own, so the record follows the database whatever the caller does. <span class="tag">[complete-whole]</span></dd></div>
+    <div class="why"><dt>Why low</dt><dd>No data difference: a false alarm on equal copies, its row blocked until they were checked.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev34" data-n="34"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f38" data-sev="l" data-n="38" data-i="47">
+  <header class="card-head">
+    <span class="sev sev-l">low</span>
+    <span class="num">#38</span>
+    <span class="rank">48 of 51</span>
+  </header>
+  <h2>A false CLUSTER DIVERGENCE: a later term&#x27;s write over an older term&#x27;s missing tail</h2>
+  <p class="seen">half, node bouncing (2026-10-24)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A node back from a kill was short of an older term&#x27;s tail when a newer term&#x27;s write reached it by apply: the row it lacked was not there, the miss was recorded as a divergence, and the repair made later pulled writes miss again.</dd></div>
+    <div><dt>Left behind</dt><dd>None: the copies equal at the end; rows blocked and repaired.</dd></div>
+    <div><dt>Self-repair</dt><dd>The repair from a majority.</dd></div>
+    <div><dt>Fix</dt><dd>A later term&#x27;s write that misses on a node behind in an earlier term goes to the pull; a repair waits until the row&#x27;s writes are decided on the whole cluster and no transaction is on it; a subterm whose rows later commits wrote is held. <span class="tag">[older-tail]</span> <span class="tag">[repair-gate]</span> <span class="tag">[self-resolved]</span></dd></div>
+    <div class="why"><dt>Why low</dt><dd>No data difference: false alarms on equal copies, the rows repaired.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev38" data-n="38"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f39" data-sev="l" data-n="39" data-i="48">
+  <header class="card-head">
+    <span class="sev sev-l">low</span>
+    <span class="num">#39</span>
+    <span class="rank">49 of 51</span>
+  </header>
+  <h2>A false CLUSTER DIVERGENCE: records held undecided read as held</h2>
+  <p class="seen">half, node bouncing (2026-10-24)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>The leader was killed with a term&#x27;s last subterms in flight; back, it held their records undecided and counted them as held, so a newer term&#x27;s write that missed was recorded as a divergence.</dd></div>
+    <div><dt>Left behind</dt><dd>None: the copies equal; a row blocked and repaired.</dd></div>
+    <div><dt>Self-repair</dt><dd>The repair from a majority.</dd></div>
+    <div><dt>Fix</dt><dd>For that check a node holds a term only as far as it holds decisions of it. <span class="tag">[older-tail]</span></dd></div>
+    <div class="why"><dt>Why low</dt><dd>No data difference: a false alarm on equal copies, the row repaired.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the retests</span>
+    <label class="seen-box"><input type="checkbox" id="rev39" data-n="39"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f12" data-sev="l" data-n="12" data-i="49">
+  <header class="card-head">
+    <span class="sev sev-l">low</span>
+    <span class="num">#12</span>
+    <span class="rank">50 of 51</span>
+  </header>
+  <h2>A false CLUSTER DIVERGENCE on a re-apply</h2>
+  <p class="seen">half, pauses (2026-10-23)</p>
+  <dl>
+    <div><dt>What happened</dt><dd>An apply cut off by the caller&#x27;s deadline after the database committed it, before its record, was applied again over its own rows.</dd></div>
+    <div><dt>Left behind</dt><dd>None: a row marked for audit that matches everywhere.</dd></div>
+    <div><dt>Self-repair</dt><dd>None needed: the copies were equal.</dd></div>
+    <div><dt>Fix</dt><dd>An apply runs to its end, and a miss over a row that already reads as the write is no divergence. <span class="tag">[apply-whole]</span> <span class="tag">[replay]</span></dd></div>
+    <div class="why"><dt>Why low</dt><dd>No data difference: a false alarm on equal copies.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev12" data-n="12"> Reviewed</label>
+  </footer>
+</article>
+<article class="card" id="f9" data-sev="l" data-n="9" data-i="50">
+  <header class="card-head">
+    <span class="sev sev-l">low</span>
+    <span class="num">#9</span>
+    <span class="rank">51 of 51</span>
+  </header>
+  <h2>A refusal read as a lost connection</h2>
+  <p class="seen">every configuration</p>
+  <dl>
+    <div><dt>What happened</dt><dd>A refusal without a code of its own (no leader, not joined, short of nodes, ytserv unreachable) reached the client as 08006.</dd></div>
+    <div><dt>Left behind</dt><dd>None.</dd></div>
+    <div><dt>Self-repair</dt><dd>Not needed.</dd></div>
+    <div><dt>Fix</dt><dd>Now 57P03 (cannot connect now): the client knows the write was not taken. <span class="tag">[57P03]</span></dd></div>
+    <div class="why"><dt>Why low</dt><dd>No data difference: a refusal read as a lost connection.</dd></div>
+  </dl>
+  <footer class="card-foot">
+    <span class="status status-ok">Fixed - passed the matrix</span>
+    <label class="seen-box"><input type="checkbox" id="rev9" data-n="9"> Reviewed</label>
+  </footer>
+</article>
+  </section>
+</main>
+
+<nav class="pager" aria-label="Go one by one">
+  <div class="wrap">
+    <button type="button" id="prev">Prev</button>
+    <span class="where" id="where">Finding <b>1</b> of 51</span>
+    <button type="button" class="next" id="next">Next</button>
+  </div>
+</nav>
+
+<script>
+(function () {
+  var KEY = "yt-jepsen-reviewed";
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+  var reviewed = {};
+  try { reviewed = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { reviewed = {}; }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(reviewed)); } catch (e) {} }
+  function countReviewed() {
+    var n = 0; for (var k in reviewed) if (reviewed[k]) n++;
+    document.getElementById("rev-count").textContent = n;
+  }
+  cards.forEach(function (c) {
+    var box = c.querySelector("input[type=checkbox]");
+    var n = c.getAttribute("data-n");
+    box.checked = !!reviewed[n];
+    c.classList.toggle("reviewed", box.checked);
+    box.addEventListener("change", function () {
+      reviewed[n] = box.checked; c.classList.toggle("reviewed", box.checked); save(); countReviewed();
+    });
+  });
+  countReviewed();
+
+  function visible() { return cards.filter(function (c) { return !c.hidden; }); }
+  var current = 0;
+  function headH() {
+    var h = document.getElementById("top").getBoundingClientRect().height;
+    document.documentElement.style.setProperty("--head-h", Math.round(h) + "px");
+    return h;
+  }
+  function mark() {
+    var v = visible();
+    cards.forEach(function (c) { c.classList.remove("current"); });
+    if (!v.length) { document.getElementById("where").textContent = "No findings in this filter"; return; }
+    if (current > v.length - 1) current = v.length - 1;
+    v[current].classList.add("current");
+    var w = document.getElementById("where");
+    w.innerHTML = "Finding <b>" + (current + 1) + "</b> of " + v.length;
+    document.getElementById("prev").disabled = current === 0;
+    document.getElementById("next").disabled = current === v.length - 1;
+  }
+  function go(i) {
+    var v = visible(); if (!v.length) return;
+    current = Math.max(0, Math.min(v.length - 1, i));
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    v[current].scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    mark();
+  }
+  document.getElementById("prev").addEventListener("click", function () { go(current - 1); });
+  document.getElementById("next").addEventListener("click", function () { go(current + 1); });
+
+  var ticking = false;
+  window.addEventListener("scroll", function () {
+    if (ticking) return; ticking = true;
+    requestAnimationFrame(function () {
+      ticking = false;
+      var line = headH() + 24, v = visible(), pick = 0;
+      for (var i = 0; i < v.length; i++) { if (v[i].getBoundingClientRect().top <= line) pick = i; }
+      if (pick !== current) { current = pick; mark(); }
+    });
+  }, { passive: true });
+
+  var chips = Array.prototype.slice.call(document.querySelectorAll(".chip"));
+  chips.forEach(function (ch) {
+    ch.addEventListener("click", function () {
+      var f = ch.getAttribute("data-f");
+      chips.forEach(function (o) { o.setAttribute("aria-pressed", o === ch ? "true" : "false"); });
+      cards.forEach(function (c) { c.hidden = !(f === "all" || c.getAttribute("data-sev") === f); });
+      current = 0; mark(); headH();
+      window.scrollTo({ top: 0 });
+    });
+  });
+  window.addEventListener("resize", headH);
+  headH(); mark();
+})();
+</script>
+
+</body></html>

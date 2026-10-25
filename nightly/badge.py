@@ -9,9 +9,17 @@ The badge is what dbinvent.com shows next to the release it announces:
 
     https://apt.dbinvent.com/paks/nightly/badge.svg
 
-    nightly 1.1.82 | 2,782 tests · all passed
-    nightly 1.1.82 | 2,782 tests · 1 failed
-    nightly 1.1.82 | 2,782 tests · all passed · ytserv coverage 77%
+    nightly 1.2.0 | 3K e2e tests with 86% coverage
+    nightly 1.2.0 | 3K e2e tests · 1 failed with 86% coverage
+
+The count is the end-to-end suites' checks - every suite but the unit tests -
+rounded to thousands (2,854 is 3K); the coverage is ytserv's (owner, 2026-10-19:
+"3K e2e tests with 86% coverage"). Green says they all passed.
+
+A promoted run that ran only the unit tests (nightly.sh --force --suites unit, to
+publish after a run that passed every suite but could not publish, 2026-10-20)
+states the end-to-end count of the newest run of the same deb whose end-to-end
+suites all passed: it ran none of its own, and "0 e2e tests" would not be the truth.
 
 The badge is the newest promotion: the newest run that published its package
 (`published:` set in results.yaml). A run that failed, or passed and published
@@ -84,6 +92,24 @@ def newest_promoted(path: Path) -> dict:
         n *= 4
 
 
+def e2e_tested(path: Path, deb: str) -> int:
+    """The end-to-end checks of the newest run of this deb whose end-to-end suites
+    all passed - for a promoted run that ran none of its own. 0 when there is none."""
+    n = TAIL
+    while True:
+        lines = tail(path, n)
+        starts = [i for i, line in enumerate(lines) if line.startswith("- run")]
+        runs = yaml.safe_load("\n".join(lines[starts[0]:])) if starts else []
+        for r in reversed(runs):
+            e2e = [s for s in (r.get("suites") or []) if s.get("name") != "unit"]
+            if ((r.get("version") or {}).get("deb") == deb and e2e
+                    and all(s.get("result") == "pass" and int(s.get("failed", 0)) == 0 for s in e2e)):
+                return sum(int(s.get("passed", 0)) for s in e2e)
+        if len(lines) < n:
+            return 0
+        n *= 4
+
+
 def ytserv_coverage() -> float | None:
     """ytserv's percent in coverage.yaml, as nightly.sh last measured it."""
     try:
@@ -93,22 +119,33 @@ def ytserv_coverage() -> float | None:
         return None
 
 
+def thousands(n: int) -> str:
+    """A count as the badge states it: thousands, rounded (2,854 is 3K)."""
+    return f"{n / 1000:.0f}K" if n >= 1000 else f"{n:,}"
+
+
 def badge(run: dict) -> dict:
     version = (run.get("version") or {}).get("ytserv", "?")
     totals = run.get("totals") or {}
     passed, failed = int(totals.get("passed", 0)), int(totals.get("failed", 0))
-    skipped = sum(1 for s in run.get("suites") or [] if s.get("result") == "skipped")
-    parts = [f"{passed + failed:,} tests"]
+    suites = run.get("suites") or []
+    skipped = sum(1 for s in suites if s.get("result") == "skipped")
+    # the end-to-end checks: every suite's but the unit tests'
+    e2e_suites = [s for s in suites if s.get("name") != "unit"]
+    e2e = sum(int(s.get("passed", 0)) + int(s.get("failed", 0)) for s in e2e_suites)
+    if suites and not e2e_suites:
+        # only the unit tests ran: the end-to-end count this deb was tested with
+        e2e = e2e_tested(RESULTS, str((run.get("version") or {}).get("deb", "")))
+    tests = f"{thousands(e2e)} e2e tests" if suites else f"{thousands(passed + failed)} tests"
+    coverage = ytserv_coverage()
+    with_coverage = f" with {coverage:.0f}% coverage" if coverage is not None else ""
     if run.get("result") == "pass":
         color = "brightgreen"
-        parts.append("all passed" + (f", {skipped} suite{'s' if skipped > 1 else ''} skipped" if skipped else ""))
+        message = tests + with_coverage + (f" · {skipped} suite{'s' if skipped > 1 else ''} skipped" if skipped else "")
     else:
         color = "red"
-        parts.append(f"{failed:,} failed" if run.get("suites") else "build failed")
-    coverage = ytserv_coverage()
-    if coverage is not None:
-        parts.append(f"ytserv coverage {coverage:.0f}%")
-    return {"label": f"nightly {version}", "message": " · ".join(parts), "color": color}
+        message = (f"{tests} · {failed:,} failed" if suites else "build failed") + with_coverage
+    return {"label": f"nightly {version}", "message": message, "color": color}
 
 
 def render(b: dict) -> bytes:

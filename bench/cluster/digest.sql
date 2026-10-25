@@ -1,4 +1,4 @@
--- bench/cluster/digest.sql — BENCH.md §5. Run on every node; compare.
+-- bench/cluster/digest.sql - BENCH.md §5. Run on every node; compare.
 -- search_path must include the schema holding pgbench_* (default: public).
 --
 -- Line format (psql -tAF'|'):

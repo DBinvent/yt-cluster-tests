@@ -1,9 +1,9 @@
-# Cluster test 3 — forced leader: node1 as PG main AND yt leader, 2026-09-14
+# Cluster test 3 - forced leader: node1 as PG main AND yt leader, 2026-09-14
 
 ## Thesis
 
 Tests 1 and 2 ran with the yt leader on a *remote* node, so every write statement
-paid a `checkin` round trip — the single largest cost those tests identified
+paid a `checkin` round trip - the single largest cost those tests identified
 (2.21 ms of origin wait for 0.75 ms of leader work, billed per statement).
 
 This round pins the leader onto **node1**, the node that originates the writes,
@@ -12,10 +12,10 @@ via the `yt_info('e:<node>')` operator handover. `checkin_call()` then takes the
 
 Two configurations, both with `sc=0`:
 
-- `nodes=half, wal=half` — synchronous cross-node 2PC
-- `nodes=0, wal=half` — eventual on reads, strong on writes
+- `nodes=half, wal=half` - synchronous cross-node 2PC
+- `nodes=0, wal=half` - eventual on reads, strong on writes
 
-Environment unchanged from tests 1–2: node1 PG16:5434 origin, node2 + node3
+Environment unchanged from tests 1-2: node1 PG16:5434 origin, node2 + node3
 peers, ICMP RTT 0.75 ms. Every run starts from a wiped WAL + synchronized
 restart + resync + verified-converged, then leadership forced to node1.
 
@@ -31,7 +31,7 @@ synchronous_standby_names = FIRST 2 (node2, node3)
 ```
 
 **4.410 ms / 226.8 tps.** Both standbys flush WAL to disk before the primary
-returns — a genuine disk-sync 2-node baseline.
+returns - a genuine disk-sync 2-node baseline.
 
 ## Results
 
@@ -82,47 +82,47 @@ Three ways of paying for checkin, all now measured:
 |---|---|
 | remote leader | 2500 us |
 | remote leader + HPC lease (test 2) | 650 us |
-| **local leader (this test)** | **120–270 us** |
+| **local leader (this test)** | **120-270 us** |
 
 With the leader local, `nodes=half` is down to **4 remote round trips** per
-transaction — 2 × fanout (5.9 ms) + prepare (3.6) + commit (4.1) ≈ 13.6 ms of the
+transaction - 2 × fanout (5.9 ms) + prepare (3.6) + commit (4.1) ≈ 13.6 ms of the
 18.3 measured. `nodes=0` has **none**.
 
 ## Findings and fixes
 
 **1. `wal=half` is inert.** `push_wal_save` fired 0 times in every configuration;
 the `wal` field of `CfgTabl` is still unwired. Both runs are really
-`nodes=0` / `nodes=half` with the WAL setting ignored. *Not fixed — noted.*
+`nodes=0` / `nodes=half` with the WAL setting ignored. *Not fixed - noted.*
 
 **2. Applies could land out of order, and one inversion was unrecoverable.**
 The origin fans applies out from a per-transaction `tokio::spawn`, so two could
 reach a peer reordered. The apply SQL is optimistic
 (`WHERE pk = .. AND col = old`), so the early one matched no row, was accepted as
-success, and the row then never reached the value later applies expected — every
+success, and the row then never reached the value later applies expected - every
 subsequent write to that row failed too. Measured exactly: one inversion
 (subterm 408 before 407) at position 253 of 351 applies → 351−253 = 98 lost, and
 the run lost exactly 98.
 
-*Fixed:* applies are now enforced in **natural subterm order** — a subterm waits
+*Fixed:* applies are now enforced in **natural subterm order** - a subterm waits
 until every subterm before it has landed locally. The signal is `applied_hwm`
 (an `AppliedMark` per term): a contiguous high-water mark of locally materialised
 subterms, with out-of-order arrivals held until the gap fills.
 
 The subtlety worth keeping: it must be marked from **both** paths a subterm can
-reach a node — the async apply *and* the synchronous party `modify`. In `cc=half`
+reach a node - the async apply *and* the synchronous party `modify`. In `cc=half`
 a peer receives each subterm through exactly one of the two, so marking only the
 apply path leaves permanent holes that stall everything after them. A bounded
 timeout remains, logging "applying N out of order" so a genuine hole is loud
 rather than silent.
 
-Per-ROW ordering — only what actually conflicts, allowing more parallelism — is
+Per-ROW ordering - only what actually conflicts, allowing more parallelism - is
 deliberately *not* attempted here; that is `speculative-subterm-exec.md`.
 
 **3. Two false starts on that fix, both from wrong signals rather than wrong
 logic.** Worth recording because the second cost three rounds:
 
 - The barrier first read `least_completed_subterm`, which only `set_subterm_state`
-  advances — and `insert_with_state` calls it only for a subterm that *already
+  advances - and `insert_with_state` calls it only for a subterm that *already
   existed*. A replicated apply is a fresh insert, so 94% bypassed it (1692
   `insert_with_state` vs 103 `set_subterm_state`, zero `data_version` activity)
   and every barrier timed out instead of holding.
@@ -130,7 +130,7 @@ logic.** Worth recording because the second cost three rounds:
   `if !contains_key` guard skips statements 2..n of a transaction.
 
 The second stayed invisible because `cluster_event_applied: N rows` counts rows
-per **apply**, and an apply carries both statements — one where branches landed
+per **apply**, and an apply carries both statements - one where branches landed
 and tellers did not still reported "effective, zero-row=0". A per-**table** digest
 exposed it in a single run: branches identical on all three nodes, tellers
 different on all three. The harness now digests per table.
@@ -139,7 +139,7 @@ different on all three. The harness now digests per table.
 
 1. **Put the yt leader on the node that originates writes.** The cheapest win
    across all three tests: checkin 2500 → ~200 us, `nodes=half` from 18% to 24%
-   of PG sync-replication throughput, with no code change — just
+   of PG sync-replication throughput, with no code change - just
    `yt_info('e:<node>')`.
 
 2. **Synchronous cluster commit is 4.1x PostgreSQL's own sync replication.**
@@ -154,14 +154,14 @@ different on all three. The harness now digests per table.
    What it gives up is read freshness on the peers, not write safety.
 
 4. **An 80/20 transaction mix is not an 80/20 time mix.** At `nodes=half`,
-   80 reads × 0.179 ms = 14 ms against 20 writes × 16.1 ms = 323 ms — writes are
+   80 reads × 0.179 ms = 14 ms against 20 writes × 16.1 ms = 323 ms - writes are
    **96% of elapsed time** (PG sync repl 85%, no-trigger 71%). Degradation vs
    no-trigger improves only from −91.7% (write-only) to −86.9% (80/20). Reads
    themselves are free: 0.179 ms with the cluster vs 0.153 ms without.
 
 5. **Ordering removed a ceiling rather than costing throughput.** `nodes=0` now
-   reaches 497 tps at c=4 and 578 at c=8 — far above the ~200 tps region where it
-   previously diverged intermittently. Unresolved: the 80/20 figures are ~9–15%
+   reaches 497 tps at c=4 and 578 at c=8 - far above the ~200 tps region where it
+   previously diverged intermittently. Unresolved: the 80/20 figures are ~9-15%
    below the pre-fix measurements, which single samples cannot separate from
    run-to-run variance.
 

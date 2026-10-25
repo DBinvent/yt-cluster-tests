@@ -9,7 +9,7 @@
 # entrypoint spends a minute or two on apt, ytsetup and a Postgres restart
 # before anything worth watching happens. That belongs off-camera.
 #
-# Recording needs a real terminal — vhs drives ttyd and encodes with ffmpeg.
+# Recording needs a real terminal - vhs drives ttyd and encodes with ffmpeg.
 set -Eeuo pipefail
 cd "$(dirname "$0")"
 
@@ -43,7 +43,7 @@ EOF
   exit 1
 fi
 
-# Same build arguments docker.sh uses — the yt-cluster package comes from
+# Same build arguments docker.sh uses - the yt-cluster package comes from
 # apt.dbinvent.com unless told otherwise.
 APT_HOST="${APT_HOST:-apt.dbinvent.com}"
 APT_HOST_IP="${APT_HOST_IP:-}"
@@ -73,7 +73,7 @@ for _ in $(seq 90); do
 done
 [ "$ready" = 1 ] || {
   docker logs "$CONTAINER" 2>&1 | tail -30
-  echo "the container never finished bootstrapping — see above" >&2
+  echo "the container never finished bootstrapping - see above" >&2
   exit 1
 }
 echo "ready"
@@ -86,7 +86,7 @@ done
 
 if [ "$KEEP" = 1 ]; then
   echo
-  echo "$CONTAINER left running — docker rm -f $CONTAINER when done"
+  echo "$CONTAINER left running - docker rm -f $CONTAINER when done"
 else
   docker rm -f "$CONTAINER" >/dev/null
 fi

@@ -185,8 +185,13 @@ gates() {
     if wait_for 60 holds_all rmc_down "$id" $(members east) $(members west); then
         ok "I7 down: the top write reached every lower member after $(( $(date +%s) - t0 ))s (the relay)"
     else
-        for n in $(members east) $(members west); do [ "$(q "$n" <<< "select count(*) from rmc_down where id = $id")" = 1 ] && lower=$((lower + 1)); done
-        bad "I7 down: the top write reached $lower of $(( $(members east | wc -w) + $(members west | wc -w) )) lower members within 60s"
+        # the members it missed, named: the nightly of 2026-10-19 said only "9 of 10"
+        local missed=""
+        for n in $(members east) $(members west); do
+            if [ "$(q "$n" <<< "select count(*) from rmc_down where id = $id")" = 1 ]; then lower=$((lower + 1))
+            else missed="$missed $n($(node_state "$n"))"; fi
+        done
+        bad "I7 down: the top write reached $lower of $(( $(members east | wc -w) + $(members west | wc -w) )) lower members within 60s - not:$missed"
     fi
     err=$(cwrite "$ea" "insert into rmc_down values ($((id + 50)), 'east')")
     local here there

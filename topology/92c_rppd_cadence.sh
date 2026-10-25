@@ -524,7 +524,9 @@ check "C2 one watch message with attempt 1 on $Q_W" "1" "$(seen "$w1")"
 check "C2 ...it names the pp's queue and function" "1" \
 	"$(seen "$w1 and body->>'queue'='$Q_A' and body->>'fn_id'='$F_A'")"
 check "C2 ...late_sec >= 0" "1" "$(seen "$w1 and $(num late_sec) >= 0")"
-due="$(seen_val "extract(epoch from $(tsf due_at) - $(tsf last_seen))::int" "$w1")"
+# rounded up, not to the nearest: last_seen has microseconds, and a message in a
+# minute's last half second is just over 60 s before its due, which ::int made 60
+due="$(seen_val "ceil(extract(epoch from $(tsf due_at) - $(tsf last_seen)))::int" "$w1")"
 dsec="$(seen_val "extract(second from $(tsf due_at))::int" "$w1")"
 if in_range "${due:-x}" 61 120 && [ "${dsec:-x}" = "0" ]; then
 	ok "C2 due_at is a cron fire ${due}s after last_seen - the end of the first full period"

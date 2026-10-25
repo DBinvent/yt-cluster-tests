@@ -1,5 +1,5 @@
 #!/bin/bash
-# A ClickHouse node's entrypoint: wait until its yt-cluster node has rendered the
+# A ClickHouse node's entrypoint: wait until its YT Cluster node has rendered the
 # cluster definition (yt_config C clickhouse_cluster, with the inter-server
 # secret filled in from module K), link it into config.d, then start ClickHouse
 # the way the image does. ClickHouse reloads the file by itself when an edit of

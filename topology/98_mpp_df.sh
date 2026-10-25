@@ -100,7 +100,7 @@ e = BallistaExecutor(); e.start()
 sys.stderr.write("executor started\n"); sys.stderr.flush()
 s.wait_for_termination()' | base64 -w0)"
 
-df_up() { # df_up — (re)start the daemon on every node and report how many answer
+df_up() { # df_up - (re)start the daemon on every node and report how many answer
 	local n up=0 down="" live
 	for n in "${NODES[@]}"; do
 		rh "docker exec $n sh -c 'echo $DFD_PY | base64 -d > /tmp/dfd.py; \

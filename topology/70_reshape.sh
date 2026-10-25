@@ -127,7 +127,7 @@ bf="$(logs_all | grep -acE 'A3.*backfill: [1-9][0-9]* row' || true)"
 if [ "${bf:-0}" -gt 0 ]; then
 	ok "Copy backfilled rows ($bf non-zero copy log line(s) across the cluster)"
 else
-	bad "no node logged a non-zero Copy backfill — west filled some other way, or not at all"
+	bad "no node logged a non-zero Copy backfill - west filled some other way, or not at all"
 fi
 
 # WHY the move completed, not just that it did.
@@ -150,9 +150,9 @@ fi
 # the failure message reflects the final state rather than an empty mid-wait one.
 [ -n "$why" ] || why="$(logs_all | { grep -aoE 'reshape COMPLETE.*' || true; } | tail -1)"
 case "$why" in
-	"")                 bad "the move never completed — no reshape COMPLETE in any log" ;;
-	*"table is empty"*) bad "flipped on an empty reference, not a comparison — [$why]" ;;
-	*)                  ok "the flip was justified by a real comparison — [${why#*- }]" ;;
+	"")                 bad "the move never completed - no reshape COMPLETE in any log" ;;
+	*"table is empty"*) bad "flipped on an empty reference, not a comparison - [$why]" ;;
+	*)                  ok "the flip was justified by a real comparison - [${why#*- }]" ;;
 esac
 # The flip consumes `reshape_run` on the node that flipped only - it is a runtime
 # row, local to each node - so every other node would resume this move on each

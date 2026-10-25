@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bench/cluster/lib.sh — sourced by run.sh / init.sh / conditions.sh.
+# bench/cluster/lib.sh - sourced by run.sh / init.sh / conditions.sh.
 # Bounded waits only (wait_common.sh rationale): a hang reports nothing.
 
 set -uo pipefail
@@ -11,10 +11,10 @@ BENCH_DB=${BENCH_DB:-pgbench}
 BENCH_ROLE_CMD=${BENCH_ROLE_CMD:-"sudo -n -u postgres"}
 BENCH_PGPORT=${BENCH_PGPORT:-5432}
 # How a nodes1 transaction gets completed into the cluster:
-#   BENCH_VIA_PGBOUNCER=0 (default) — connect direct; the extension's
+#   BENCH_VIA_PGBOUNCER=0 (default) - connect direct; the extension's
 #       `yt_cluster.auto_complete` GUC (default on) fires yt_complete at
 #       PRE_COMMIT, so a plain COMMIT is a cluster commit. No PgBouncer.
-#   BENCH_VIA_PGBOUNCER=1 — legacy path: drive the load through a patched
+#   BENCH_VIA_PGBOUNCER=1 - legacy path: drive the load through a patched
 #       PgBouncer so a bare COMMIT is turned into `yt_complete(true); COMMIT`
 #       by the XA patch. Only needed if auto_complete is disabled.
 BENCH_VIA_PGBOUNCER=${BENCH_VIA_PGBOUNCER:-0}

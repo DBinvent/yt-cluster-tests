@@ -135,8 +135,8 @@ echo "[IT] Create DB and USER [$USER] if not exists ..."
 psql -p $port -h $wd -c "create user $USER with superuser" postgres || echo "User $USER already exists..."
 psql -p $port -h $wd -c "create database $USER owner $USER;" postgres || echo "DB $USER already exists..."
 
-# Fatal, and said out loud. Without this the failure is discarded — there is
-# no `set -e` here — and the run continues to wait for an extension that was
+# Fatal, and said out loud. Without this the failure is discarded - there is
+# no `set -e` here - and the run continues to wait for an extension that was
 # never created, forever. That is how `CREATE EXTENSION ytpgxt` survived the
 # rename to `yt-cluster`: the suite never reported it, it just stopped.
 # error.msg is the channel close_wait.sh reads to decide the exit code.
@@ -150,7 +150,7 @@ fi
 #
 # There used to be a `./psql_wait.sh` on this line, which could not work:
 # it polls `yt_info('R')`, `yt_info()` asks ytserv over HTTP, and ytserv is
-# what the next line starts — so the wait could only finish once the thing
+# what the next line starts - so the wait could only finish once the thing
 # it was waiting for had started, and that could not happen until the wait
 # finished. The readiness gate is not missing, it is in the right place
 # already: the parallel `test_and_close` task runs `yt_wait.sh`, whose first

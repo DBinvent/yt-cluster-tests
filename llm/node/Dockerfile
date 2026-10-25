@@ -1,4 +1,4 @@
-# One yt-cluster node of the llm test cluster: PostgreSQL 18, the yt-cluster package
+# One YT Cluster node of the llm test cluster: PostgreSQL 18, the yt-cluster package
 # (extension + ytserv + ytctl) and DataFusion for yt_llm's df target.
 #
 # build.sh stages this directory with the package as yt-cluster.deb. Nothing is

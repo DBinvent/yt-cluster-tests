@@ -1,6 +1,6 @@
 # rmc test plan: resilience and membership under change
 
-This test checks that a hierarchy of yt-cluster clusters keeps every acknowledged
+This test checks that a hierarchy of YT Clusters keeps every acknowledged
 transaction, and keeps its boundaries, while its membership changes underneath a
 running write load: nodes are added at runtime on every level, leadership is
 moved, nodes are restarted, and old nodes are replaced one by one by new ones.

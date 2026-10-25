@@ -1,5 +1,5 @@
 # A three-node YT Cluster starting, electing a leader, replicating a
-# transaction, and shutting down — recorded from a real run.
+# transaction, and shutting down - recorded from a real run.
 #
 #   ../record.sh          builds the image, boots a container, records this
 #   vhs tapes/cluster.tape  if you already have a bootstrapped `yt-cluster-demo`
@@ -33,7 +33,7 @@ Sleep 2s
 Type "docker exec -it yt-cluster-demo bash -lc 'cd /home/rust && cargo make --env PG_VER=14 --env CNT=3'"
 Enter
 
-# Guessed, not measured — nobody has recorded this yet. Watch the result and
+# Guessed, not measured - nobody has recorded this yet. Watch the result and
 # trim: too short truncates the shutdown, too long ends on a dead prompt.
 # The run is done when close_wait.sh prints "YT cluster closed!".
 Sleep 150s

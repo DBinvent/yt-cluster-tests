@@ -112,7 +112,7 @@ done
 if [ "$mn" -gt 0 ] && [ "$((mx - mn))" -le 1 ]; then
 	ok "the split is by row count, not key width (min $mn, max $mx per partition)"
 else
-	bad "partitions are lopsided — min $mn, max $mx (equal-width slicing of gappy ids?)"
+	bad "partitions are lopsided - min $mn, max $mx (equal-width slicing of gappy ids?)"
 fi
 
 # ── the honest-refusal cases ──────────────────────────────────────────────────
@@ -124,7 +124,7 @@ esac
 # and it must still say what CAN be done, or the refusal is a dead end
 case "$nokey" in
 	*hashtext*) ok "the refusal names the fallback a planner can use instead" ;;
-	*) bad "the refusal gives no alternative — [$nokey]" ;;
+	*) bad "the refusal gives no alternative - [$nokey]" ;;
 esac
 
 unknown="$(pfield n1 "public.not_a_table" "error")"

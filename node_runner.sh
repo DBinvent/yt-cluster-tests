@@ -6,7 +6,7 @@ set -Eeu
 #   ./node_runner.sh <node-id> <command> [args...]
 #
 # The command is taken as the whole of "$@" rather than a fixed $1 $2, so
-# arguments can be added to ytserv without editing this file — which is how
+# arguments can be added to ytserv without editing this file - which is how
 # `public.yt_config` came to be missing when ytserv started requiring it.
 . ./wait_common.sh
 
@@ -21,7 +21,7 @@ shift
 # A restart is a test case; a crash loop is a broken build. The difference
 # is how long the process stayed up: a server killed by case3 has been
 # serving for a while, one that panics on its own config never gets going.
-# Without this the run does not fail, it spins — ytserv panicking on a node
+# Without this the run does not fail, it spins - ytserv panicking on a node
 # id it will not accept restarts here forever while yt_wait.sh waits for a
 # leader that is never coming.
 max_crashes=${IT_MAX_RESTARTS:-5}
@@ -45,7 +45,7 @@ do
     crashes=$(( crashes + 1 ))
     if [ "$crashes" -ge "$max_crashes" ]
     then
-      it_fail "node$nid: $1 exited $rc within ${min_uptime}s, $crashes times running — not restarting again"
+      it_fail "node$nid: $1 exited $rc within ${min_uptime}s, $crashes times running - not restarting again"
     fi
     echo "Node$nid crashed ($crashes/$max_crashes) ..."
   else

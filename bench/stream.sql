@@ -1,4 +1,4 @@
--- bench/stream.sql — one data stream per node (BENCH.md §2)
+-- bench/stream.sql - one data stream per node (BENCH.md §2)
 --
 -- Each node owns a disjoint key range, so the only cross-node work is
 -- replication. pgbench's built-in tpcb-like cannot be used here: every

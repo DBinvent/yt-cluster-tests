@@ -21,7 +21,7 @@ if [ -f "$TESTS_ROOT/.env" ]; then
 fi
 # The yt-pgxt checkout the suite builds from and encodes table configs with:
 # YT_PGXT, or a sibling of this repository.
-REPO_ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-pgxt}"
+REPO_ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster}"
 
 YX_HOST="${YX_HOST:-local}"          # where the containers run: an ssh target, or local
 # [peering] The cluster's own uuid, written to every node as module-C `cluster`.
@@ -31,6 +31,10 @@ YX_HOST="${YX_HOST:-local}"          # where the containers run: an ssh target, 
 YX_CLUSTER_UUID="${YX_CLUSTER_UUID:-7a1c0000-0000-5000-8000-000000000001}"
 YX_NET="${YX_NET:-yxtopo}"
 YX_IMAGE="${YX_IMAGE:-yxtopo-node}"
+# [ytserv-py] the build fixture A's nodes run (10_up.sh): ytserv-py, which has the
+# Python functions the server-function scripts call, unless run_a.sh's YX_GROUP
+# says regular - the regular ytserv, for everything else
+YX_SERVER_BIN="${YX_SERVER_BIN:-ytserv-py}"
 YX_DB="${YX_DB:-yxtopo}"
 YX_CFG="${YX_CFG:-public.yt_config}"
 YX_PORT="${YX_PORT:-7421}"
@@ -94,6 +98,31 @@ fi
 rh() {
 	if [ "$YX_HOST" = "local" ]; then bash -c "$*"; else
 		"${YX_SSH[@]}" "$YX_HOST" "$*"; fi
+}
+
+# [build-host] Where the images are built (00_build, 05_gitsrv): YX_BUILD_HOST, an
+# ssh target or local - YX_HOST itself unless set. Built on another host, an image
+# reaches YX_HOST by ship_image: docker save there, docker load here, through this
+# host, so nothing is built where the containers run (the nightly's LANE_HOST).
+YX_BUILD_HOST="${YX_BUILD_HOST:-$YX_HOST}"
+bh() {
+	if [ "$YX_BUILD_HOST" = "local" ]; then bash -c "$*"; else
+		"${YX_SSH[@]}" "$YX_BUILD_HOST" "$*"; fi
+}
+# ship_image <image>: the build host's image onto YX_HOST, same name and id - a
+# public one the build host lacks is pulled there first. Sent only when YX_HOST
+# does not hold that id already.
+ship_image() {
+	[ "$YX_BUILD_HOST" = "$YX_HOST" ] && return 0
+	local id
+	id="$(bh "docker image inspect -f '{{.Id}}' $1 2>/dev/null \
+		|| { docker pull -q $1 >/dev/null && docker image inspect -f '{{.Id}}' $1; }")" || id=""
+	[ -n "$id" ] || { echo "ship_image: no $1 on $YX_BUILD_HOST" >&2; return 1; }
+	[ "$(rh "docker image inspect -f '{{.Id}}' $1 2>/dev/null")" = "$id" ] && return 0
+	# set -e: not here - the id it arrives with is the check
+	bh "docker save $1" | rh "docker load -q" >/dev/null || true
+	[ "$(rh "docker image inspect -f '{{.Id}}' $1 2>/dev/null")" = "$id" ] \
+		|| { echo "ship_image: $1 not carried from $YX_BUILD_HOST to $YX_HOST" >&2; return 1; }
 }
 
 # psql on one node, -tA so the output is the value and nothing else.
@@ -213,7 +242,7 @@ cfg_write() {
 	        insert into $YX_CFG (name,module,value) values ('$name','$mod','$val');"
 }
 
-# cfg_delete <node> <name> <module> — the removal half of cfg_write, and it needs
+# cfg_delete <node> <name> <module> - the removal half of cfg_write, and it needs
 # the trigger off for exactly the same reason.
 cfg_delete() {
 	local n="$1" name="$2" mod="$3"
@@ -323,7 +352,7 @@ clear_prepared() {
 		# being SOURCED, so `10_up.sh` reaches it before it has created any
 		# container. A command substitution's status IS the assignment's
 		# status, so under `set -e` a node that does not exist yet aborted the
-		# sourcing — silently, with no output at all, because nothing had been
+		# sourcing - silently, with no output at all, because nothing had been
 		# echoed yet. Latent since the fixture was written; a seventh node made
 		# it fire every time.
 		gids="$(q "$n" "select gid from pg_prepared_xacts" || true)"
@@ -524,7 +553,7 @@ check_same() {
 	ca="$(q "$a" "select count(*) from $rel")"
 	cb="$(q "$b" "select count(*) from $rel")"
 	if [ "${ca:-0}" -lt "$minrows" ] || [ "${cb:-0}" -lt "$minrows" ]; then
-		bad "$desc — refusing to compare: $a has ${ca:-0} row(s), $b has ${cb:-0}, need >= $minrows"
+		bad "$desc - refusing to compare: $a has ${ca:-0} row(s), $b has ${cb:-0}, need >= $minrows"
 		return
 	fi
 	da="$(q "$a" "$digest")"
@@ -537,7 +566,7 @@ ok()   { echo "  OK   $1"; pass=$((pass+1)); }
 bad()  { echo "  FAIL $1"; fail=$((fail+1)); }
 # check <description> <expected> <actual>
 check() {
-	if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 — expected [$2] got [$3]"; fi
+	if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 - expected [$2] got [$3]"; fi
 }
 summary() {
 	echo "  ---- $pass passed, $fail failed ----"

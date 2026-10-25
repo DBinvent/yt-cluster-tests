@@ -19,7 +19,7 @@ IT_ERROR_FILE=${IT_ERROR_FILE:-error.msg}
 #
 # Both halves matter: several callers have no `set -e` and drop our exit
 # code on the floor, so error.msg is what still makes the run fail. That is
-# also why it is append-only — Makefile.toml's `preclean` truncates it once
+# also why it is append-only - Makefile.toml's `preclean` truncates it once
 # per run, and every node writes into the same file.
 it_fail() {
   echo "[IT] $*" >&2
@@ -42,7 +42,7 @@ it_wait_for() {
   do
     if [ "$waited" -ge "$IT_WAIT_TIMEOUT" ]
     then
-      echo "[IT] giving up on: $what — last attempt was:" >&2
+      echo "[IT] giving up on: $what - last attempt was:" >&2
       "$@" >&2 || true
       it_fail "gave up after ${IT_WAIT_TIMEOUT}s waiting for $what"
     fi

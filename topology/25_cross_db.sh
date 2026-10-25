@@ -500,7 +500,8 @@ for n in "${NODES[@]}"; do
 	u="$(node_uuid "$n")"
 	rh "docker rm -f $n >/dev/null 2>&1; true" || true
 	if ! rh "docker run -d --name $n --hostname $n --network $YX_NET \
-		-e NODE_UUID=$u -e DB=postgres -e CFG_TABLE=$YX_CFG ${YX_COV_MOUNT:-} $YX_IMAGE >/dev/null"; then
+		-e NODE_UUID=$u -e DB=postgres -e CFG_TABLE=$YX_CFG ${YX_COV_MOUNT:-} \
+		-e YT_SERVER_BIN=$YX_SERVER_BIN $YX_IMAGE >/dev/null"; then
 		bad "docker run $n from $YX_IMAGE failed"
 		summary
 	fi
@@ -536,7 +537,8 @@ for n in "${NODES[@]}"; do
 	sql+="insert into $YX_CFG (name,module,value) values ('serve_etcd','C','true');"
 	sql+="insert into $YX_CFG (name,module,value) values ('serve_rppd','C','true');"
 	sql+="insert into $YX_CFG (name,module,value) values ('cluster','C','$YX_CLUSTER_UUID');"
-	sql+="insert into $YX_CFG (name,module,value) values ('log_level','C','warning');"
+	# YX_LOG_LEVEL: another for a diagnosis (debug); the fixture's is warning
+	sql+="insert into $YX_CFG (name,module,value) values ('log_level','C','${YX_LOG_LEVEL:-warning}');"
 	sql+="insert into $YX_CFG (name,module,value) values ('tcp_timeout_ms','C','2000');"
 	for p in "${NODES[@]}"; do
 		sql+="insert into $YX_CFG (name,module,value) values ('$(node_uuid "$p")','Z','${NODE_AZ[$p]}');"
@@ -987,6 +989,17 @@ else
 		sleep 2
 	done
 	[ -n "$st" ] && ok "13b: $L started the rppd of $APP4" || bad "13b: no rppd started for $APP4 on $L"
+	# ...and every node's: the write below comes from W, whose instance hands its event
+	# to the leader only once it is up and names the master - before, W ran it itself
+	# and nothing ran on the leader (13c, the nightlies of 2026-10-19)
+	up=0
+	for n in "${NODES[@]}"; do
+		for _ in $(seq 1 45); do
+			rh "docker logs $n 2>&1 | grep -aq 'rppd started for database $APP4'" 2>/dev/null && { up=$((up + 1)); break; }
+			sleep 2
+		done
+	done
+	check "13b: every node started the rppd of $APP4" "${#NODES[@]}" "$up"
 	sink_b="$(q "$L" "select count(*) from cx_sink" "$APP4")"
 	app_b="$(sum_app "select count(*) from cx_sink")"
 	out="$(qe "$W" "begin; insert into cx_py4 values (1, 'd11'); select yt_complete(true); commit;" "$APP4")"

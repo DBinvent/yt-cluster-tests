@@ -2,7 +2,7 @@
 # [P5] Build and start the git server, and put its deploy key on every node.
 #
 # Run after 10_up.sh: the nodes must exist before the key can be installed into
-# them. Idempotent — re-running reuses the key pair if it is already there, so a
+# them. Idempotent - re-running reuses the key pair if it is already there, so a
 # node added later gets the same one.
 #
 # The PRIVATE key is generated on the docker host and copied into the nodes with
@@ -25,9 +25,11 @@ rh "cd - >/dev/null 2>&1; true"
 # The build context is this directory, shipped to the docker host the same way
 # 00_build.sh ships the node context.
 tar -C "$(dirname "${BASH_SOURCE[0]}")" -cf - Dockerfile.gitsrv gitsrv-entrypoint.sh \
-	| rh "mkdir -p /tmp/yxgitsrv && tar -C /tmp/yxgitsrv -xf - && \
+	| bh "mkdir -p /tmp/yxgitsrv && tar -C /tmp/yxgitsrv -xf - && \
 	      docker build -q -f /tmp/yxgitsrv/Dockerfile.gitsrv -t $IMG /tmp/yxgitsrv" \
 	| tail -1
+# [build-host] built on YX_BUILD_HOST: onto the host gitsrv runs on
+ship_image "$IMG" || { bad "$IMG did not reach $YX_HOST"; summary; }
 
 rh "docker network inspect $YX_NET >/dev/null 2>&1 || docker network create $YX_NET >/dev/null"
 rh "docker rm -f gitsrv >/dev/null 2>&1; true"
@@ -48,7 +50,7 @@ check "the fixture repositories exist" "fn.git sql.git" \
 
 # ── the deploy key, and a known_hosts entry, on every node ──────────────────
 #
-# `rppd_git_ssh_key` and rdbm's `source_git_ssh_key` name a PATH, node-local by
+# `rppd_git_ssh_key` and sge's `source_git_ssh_key` name a PATH, node-local by
 # design (a key path replicated cluster-wide names a different file on every
 # node), so each node needs its own copy.
 for n in "${NODES[@]}"; do
@@ -68,7 +70,7 @@ out="$(rh "docker exec -u postgres $probe env \
 	git ls-remote ssh://git@gitsrv/srv/git/fn.git" 2>&1 | head -3)"
 case "$out" in
 	*refs/heads/*) ok "$probe can clone over ssh from gitsrv" ;;
-	*) bad "$probe cannot reach gitsrv over ssh — [$out]" ;;
+	*) bad "$probe cannot reach gitsrv over ssh - [$out]" ;;
 esac
 
 echo

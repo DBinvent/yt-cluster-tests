@@ -1,30 +1,31 @@
-# yt-cluster code coverage: the lines of yt-pgxt's Rust workspace the nightly's tests ran -
+# YT Cluster code coverage: the lines of yt-cluster's Rust workspace the nightly's tests ran -
 # the unit tests and every end-to-end suite, against an instrumented ytserv and ytctl
 # (nightly/coverage.sh says what counts). Written by a nightly run that measured it,
 # and a run measures it when this file is MISSING, or lists fewer suites than a whole
 # run: rename or delete it and the next nightly measures again, even with no code
 # change (nightly/nightly.sh --coverage: now). ytserv's percent is the badge's.
-run: "20261013-050008"
-measured: "2026-10-13T07:58:08Z"
-version: {deb: "1.18.86", ytserv: "1.1.85"}
-source: "fc97e58+dirty"
-result: pass
-suites: ["unit", "topology", "hier", "lxc", "llm", "topo", "topo-faults", "topo-membership", "rmc"]
-lines: {total: 42130, covered: 28920, percent: 68.6}
+run: "20261025-105906"
+measured: "2026-10-25T14:24:54Z"
+version: {deb: "1.20.2", ytserv: "1.20.2"}
+source: "39e1494+dirty"
+result: fail
+suites: ["unit", "topology", "topology-py", "hier", "lxc", "migrate", "llm", "topo", "topo-faults", "topo-membership", "rmc"]
+lines: {total: 71050, covered: 50180, percent: 70.6}
 # percent of those lines each part ran: the unit tests, the suites together, each suite
 by:
-  "unit": 37.1
-  "e2e": 48.5
-  "hier": 22.7
-  "llm": 16.3
-  "lxc": 15.8
-  "rmc": 25.6
-  "topo-faults": 31.7
-  "topo-membership": 26.2
-  "topo": 31.9
-  "topology": 33.2
+  "unit": 46.9
+  "e2e": 42.4
+  "hier": 23.4
+  "llm": 11.5
+  "lxc": 10.8
+  "rmc": 23.9
+  "topo-faults": 27.6
+  "topo-membership": 24.2
+  "topo": 27.7
+  "topology-py": 20.1
+  "topology": 27.2
 crates:
-  - {name: "ytcluster-common", lines: 145, percent: 81.4, unit: 43.4, e2e: 52.4}
-  - {name: "ytcluster-types", lines: 1317, percent: 74.8, unit: 63.0, e2e: 34.2}
-  - {name: "ytserv", lines: 30574, percent: 81.4, unit: 43.5, e2e: 59.3}
-  - {name: "ytctl", lines: 10094, percent: 29.0, unit: 14.3, e2e: 17.5}
+  - {name: "ytcluster-common", lines: 167, percent: 83.8, unit: 52.7, e2e: 47.3}
+  - {name: "ytcluster-types", lines: 1813, percent: 74.0, unit: 68.7, e2e: 26.5}
+  - {name: "ytctl", lines: 17293, percent: 38.4, unit: 27.0, e2e: 14.0}
+  - {name: "ytserv", lines: 51777, percent: 81.2, unit: 52.8, e2e: 52.4}

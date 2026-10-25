@@ -12,7 +12,7 @@ errormsg=${IT_ERROR_FILE:-error.msg}
 [ -f "$errormsg" ] || : > "$errormsg"
 
 # Two budgets: ask politely, then insist. Was a single unbounded loop that
-# sent SIGTERM once a second forever — so a process that ignored it, or one
+# sent SIGTERM once a second forever - so a process that ignored it, or one
 # owned by somebody else, hung the run at the very end, after all the work
 # was done and with the result already known.
 term_budget=${IT_STOP_TIMEOUT:-30}
@@ -20,7 +20,7 @@ kill_budget=${IT_KILL_TIMEOUT:-10}
 
 # Unchanged, and still the wrong way to find processes: it greps the whole
 # process table for "node", with exclusions bolted on as it has misfired.
-# Replacing it means a container per node — REVIEW.md, "What to use instead".
+# Replacing it means a container per node - REVIEW.md, "What to use instead".
 node_pids() {
   ps ugx | grep -v nodev | grep -v grep | grep -v "externals/node" | grep node | awk '{print $2}'
 }

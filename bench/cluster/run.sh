@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bench/cluster/run.sh — pgbench, cluster manner (BENCH.md §2, clusterTODO.md)
+# bench/cluster/run.sh - pgbench, cluster manner (BENCH.md §2, clusterTODO.md)
 #
 #   ./run.sh <nodes-file> <nosync|nodes1>
 #

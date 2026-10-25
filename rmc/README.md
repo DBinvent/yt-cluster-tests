@@ -1,6 +1,6 @@
 # rmc test: resilience and membership under change
 
-Three linked yt-cluster clusters on docker, one above two, take a steady write load
+Three linked YT Clusters on docker, one above two, take a steady write load
 while their membership changes underneath it. Nodes are added at runtime on
 every level, leadership is moved, nodes and leaders are restarted or lost, and
 one cluster has all of its original nodes replaced, one by one. After every

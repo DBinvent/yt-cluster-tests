@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 TOPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../topology" && pwd)"
 
 DEB="${YT_CLUSTER_DEB:-$(ls -t "$REPO_ROOT"/target/debian/yt-cluster_*_amd64.deb 2>/dev/null | head -1)}"
-[ -n "$DEB" ] || { echo "no deb in target/debian — run: cargo deb -p ytctl --variant pg18 --no-build" >&2; exit 1; }
+[ -n "$DEB" ] || { echo "no deb in target/debian - run: cargo deb -p ytctl --variant pg18 --no-build" >&2; exit 1; }
 echo "Using $(basename "$DEB")"
 
 STAGE=/tmp/yxhier-build

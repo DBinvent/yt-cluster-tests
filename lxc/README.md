@@ -35,7 +35,7 @@ lxc/90_destroy.sh
 ```
 
 Configuration via env vars (see `lxc/env.sh`): `YX_CONTAINER` (name),
-`YX_IMAGE` (default `ubuntu:24.04`), `YX_DEB` (path to a built .deb — when unset,
+`YX_IMAGE` (default `ubuntu:24.04`), `YX_DEB` (path to a built .deb - when unset,
 binaries are pushed from `target/release`).
 
 ## Host prerequisites
@@ -43,8 +43,8 @@ binaries are pushed from `target/release`).
 - LXD initialized once: `lxd init --auto` (creates the default storage pool and
   the `lxdbr0` bridge).
 - **Docker on the same host**: Docker sets the iptables `FORWARD` policy to DROP,
-  which cuts the container off from the internet (DNS still works — dnsmasq is
-  host-local — but apt downloads time out). Allow the LXD bridge through:
+  which cuts the container off from the internet (DNS still works - dnsmasq is
+  host-local - but apt downloads time out). Allow the LXD bridge through:
 
   ```sh
   sudo iptables -I DOCKER-USER -i lxdbr0 -j ACCEPT
@@ -63,7 +63,7 @@ binaries are pushed from `target/release`).
 
 - **batch** (`20_batch.sh`): fully scripted, asserted here.
 - **purge + re-install** (`30_purge.sh`): fully scripted, asserted here.
-- **setup TUI wizard** (`--setup`) and **control TUI**: interactive — verified manually
+- **setup TUI wizard** (`--setup`) and **control TUI**: interactive - verified manually
   inside the container (`lxc exec $YX_CONTAINER -- sudo ytctl --setup`). The wizard's
   non-interactive pre-checks (connect diagnostics, role/db bootstrap under sudo) are
   exercised by the batch scripts and unit tests.

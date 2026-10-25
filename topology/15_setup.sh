@@ -75,7 +75,7 @@ for n in "${NODES[@]}"; do
 	if [ "${t:-}" = "1/1" ] && [ "${r:-0}" = "1" ]; then
 		ok "$n has both triggers (row, truncate) and the config row"
 	else
-		bad "$n is half-registered — row/truncate triggers=${t:-0} cfg_row=${r:-0}"
+		bad "$n is half-registered - row/truncate triggers=${t:-0} cfg_row=${r:-0}"
 	fi
 done
 

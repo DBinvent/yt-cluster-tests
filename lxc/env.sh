@@ -8,7 +8,7 @@ if [ -f "$TESTS_ROOT/.env" ]; then
 	_yx_keep="$(export -p)"; set -a; . "$TESTS_ROOT/.env"; set +a; eval "$_yx_keep"; unset _yx_keep
 fi
 # The yt-pgxt checkout: YT_PGXT, or a sibling of this repository.
-REPO_ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-pgxt}"
+REPO_ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster}"
 
 YX_CONTAINER="${YX_CONTAINER:-ytctl-test}"
 YX_IMAGE="${YX_IMAGE:-ubuntu:24.04}"

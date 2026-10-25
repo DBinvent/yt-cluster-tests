@@ -63,13 +63,13 @@ RUN sed s/peer/trust/  -i /etc/postgresql/$POSTGRESQL_VERSION_MAJOR/main/pg_hba.
 #
 #   - the cluster under test is created from scratch on every run. `initdb`
 #     writes each node into ./cluster/nodeN in the bind-mounted working
-#     directory, and it_init.sql builds the schema — see "The database is
+#     directory, and it_init.sql builds the schema - see "The database is
 #     rebuilt every run" in README.md.
 #   - the package's own instance, which ytsetup needs during bootstrap,
 #     lives where the Debian package puts it: /var/lib/postgresql/14/main.
 #
 # /var/lib/postgresql/data was neither. It held nothing, and `VOLUME` on it
-# left an anonymous volume behind after every `docker run` — a pile of empty
+# left an anonymous volume behind after every `docker run` - a pile of empty
 # directories nobody prunes. The `COPY pg_hba.conf` that followed it did
 # nothing either: Docker discards writes to a declared volume path made in
 # later build steps, so that file never reached an image. What actually

@@ -165,7 +165,7 @@ after="$(info "$DRIFT" W "public.sb_t")"
 [ -z "$after" ] && after="$(info "$DRIFT" W "$YX_DB.public.sb_t")"
 [ -z "$after" ] \
 	&& ok "the gate cleared once the schemas converged" \
-	|| bad "sb_t is still blocked after the column was dropped: $after — the \
+	|| bad "sb_t is still blocked after the column was dropped: $after - the \
 verdict is cached and nothing invalidated it"
 
 summary

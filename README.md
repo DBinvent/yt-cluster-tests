@@ -1,8 +1,12 @@
 # YT Cluster Integration Tests
 
-We run our tests on Debian-based Linux distributions and can’t give any promises about the compatibility with many other versions and distros, except for those we use ourselves in development now. The suites below run in docker on Ubuntu 24.04 and 26.04 with PostgreSQL 18, and the package suite (lxc/) on Ubuntu 24.04; the cargo-make test further down runs in an Ubuntu 22.04 container with PostgreSQL 14 (`./docker.sh`).
+We run our tests on Debian-based Linux distributions and can’t give any promises about the compatibility with many other versions and distros, except for those we use ourselves in development now. The suites below run in docker on Ubuntu 24.04 and 26.04 with PostgreSQL 18, and the package suites (lxc/, migrate/) on Ubuntu 24.04; the cargo-make test further down runs in an Ubuntu 22.04 container with PostgreSQL 14 (`./docker.sh`).
 
 YT Cluster is written in Rust and out of habit we use cargo-make in the integration tests.
+
+## News
+
+**2026-10-25 - YT Cluster under Jepsen: 51 findings, every one fixed and retested, none critical from the first run on.** Jepsen is the industry standard for testing data consistency in a cluster, designed to compromise data integrity on purpose: very picky and very aggressive, it forces the very rare cases a production cluster is very unlikely to meet. Its faults on five nodes - partitions, ytserv killed and paused, damaged packets - with Elle checking every transaction, found 49 defects, and the nightly two more. None of the first 30 was a crash or left the cluster going on from a divergent state; the retests found rarer ones, two of which stopped a node from starting after a kill at the wrong moment. Every one is fixed - in YT Cluster 1.20, published on 2026-10-25 (build 1.20.2) - and most of the fixes improve usability: they remove the need for workaround solutions, to meet the expectation of a high level of user-friendly experience. We continue improving and monitoring YT Cluster as new features come, and the Jepsen test project is updated with them. The findings by severity: [jepsen/findings.html](jepsen/findings.html) (to view: [dbinvent.com](https://www.dbinvent.com/cluster/articles/jepsen-findings)), a copy of [the page shared on 2026-10-23](https://claude.ai/artifact/Dtu2vx8WUyNm19J8NBjRFH) brought up to date; every finding and retest: [jepsen/findings.md](jepsen/findings.md); the news: [dbinvent.com](https://www.dbinvent.com/news/yt-cluster-under-jepsen).
 
 ## Other tests and reports
 
@@ -11,7 +15,7 @@ tests, each with its write-up:
 
 | | |
 |---|---|
-| [llm/](llm/README.md) | `yt_llm`: questions in plain language, answered by PostgreSQL, DataFusion or ClickHouse, on a docker cluster of three yt-cluster and three ClickHouse nodes. The article: [llm/report.md](llm/report.md); the run: [llm/results.md](llm/results.md) |
+| [llm/](llm/README.md) | `yt_llm`: questions in plain language, answered by PostgreSQL, DataFusion or ClickHouse, on a docker cluster of three YT Cluster and three ClickHouse nodes. The article: [llm/report.md](llm/report.md); the run: [llm/results.md](llm/results.md) |
 | [rmc/](rmc/README.md) | resilience and membership under change: three linked clusters (one above two) keep every acknowledged write and their boundaries while nodes are added at runtime on every level, leadership moves, nodes restart, and a whole cluster is replaced one node at a time. The plan: [rmc/plan.md](rmc/plan.md); the run: [rmc/results.md](rmc/results.md) |
 | [cluster-test1.md](cluster-test1.md) | where the time goes in a 3-node cluster, against PostgreSQL's own synchronous replication; harness [cluster-test1-matrix.sh](cluster-test1-matrix.sh) |
 | [cluster-test2.md](cluster-test2.md) | HPC: subterm leases against the per-statement checkin round trip |
@@ -22,9 +26,11 @@ tests, each with its write-up:
 | [topology/](topology/README.md) | one cluster of seven nodes in docker (fixture A, `run_all.sh`): az, tier, shard, write zones, reshape, recon, alerts, blocking, recovery, partitions, rppd server functions, the etcd API, the ClickHouse sink, MPP and DataFusion, jsonb merge, SKV join, the commit path, concurrency, network splits, peer streaming. The plan: [topology/PLAN.md](topology/PLAN.md) |
 | [hier/](hier/run_all.sh) | three linked clusters on one network: relations, quorum, dialling, tables across the boundary, neighbours, failover |
 | [lxc/](lxc/README.md) | the package in a disposable LXC container: install, `ytctl --batch`, purge and reinstall, the failure cases of each |
+| [migrate/](migrate/README.md) | a running database migrated into a four-node cluster in LXC containers: the package on the application's server and its one PostgreSQL restart, then each node joined from a dump of the one before it while every node writes; the databases compared at the end |
 | [topo/](topo/README.md) | the runtime topology jobs on the rmc layout: the job layer, az create/delete, moves with purge, approval from above and locks, split/combine, faults, refusals, membership |
 | [llm/lab/](llm/lab/test-yt-llm.sh) | `yt_llm` and the models against a live cluster (`YT_LLM_NODES`), not docker - run by hand |
-| [nightly/](nightly/nightly.sh) | every suite above but llm/lab, each night a watched repository changed; publishes the deb and the EL9 rpm when all pass. Results: [nightly/results.yaml](nightly/results.yaml); code coverage: [nightly/coverage.yaml](nightly/coverage.yaml) |
+| [jepsen/](jepsen/README.md) | Jepsen: jepsen-io/sql's list-append and rw workloads written on every node at once under partitions, packet faults, ytserv killed and paused, the histories judged by Elle - correctness, no performance graphs; a docker host of five nodes and a control node - run by hand (`jepsen/run.sh`), and four of its cases in the nightly (`jepsen/nightly_cases.sh`). The findings, every one fixed, none critical: [jepsen/findings.md](jepsen/findings.md), one list by severity; one by one in [jepsen/findings.html](jepsen/findings.html); the latest run: [jepsen/results.yaml](jepsen/results.yaml) |
+| [nightly/](nightly/nightly.sh) | every suite above but llm/lab, and four of jepsen's cases, each night a watched repository changed; publishes the deb and the EL9 rpm when all pass. Results: [nightly/results.yaml](nightly/results.yaml); code coverage: [nightly/coverage.yaml](nightly/coverage.yaml) |
 
 All of them build from a yt-pgxt checkout next to this one (`YT_PGXT` to point
 elsewhere) and read their settings from `.env` (see [env.example](env.example));
@@ -35,23 +41,31 @@ rmc/ and llm/ keep their own `.env`.
 `nightly/nightly.sh`, from cron at 05:00 UTC on the build host:
 
 1. fingerprints the `.rs` files of every watched repository (yt-pgxt and the
-   local repositories its build uses - rppd, rdbm, diff-doc-rs - plus etcd,
+   local repositories its build uses - rppd, sge, diff-doc-rs - plus etcd,
    ytcluster_dist, infra_apt; never this one), committed or not, and stops when no
    `.rs` file changed since the last tested run - then nothing is built, nothing
-   appended to results.yaml, no package made;
-2. bumps the deb's patch version when it is already published (and ytserv's, when
-   ytserv changed since its version was published);
+   appended to results.yaml, no package made, no message sent, however it was
+   started;
+2. bumps the deb's patch version when it is already published, and sets ytserv's
+   version to it: one number for the package and the daemon;
 3. builds the extension for every PostgreSQL major and the PostgreSQL 18 package,
-   and runs unit, topology, hier, lxc, llm, topo (t0-t4, t6), topo faults (t5),
-   topo membership (t7) and rmc;
+   and runs unit, topology (on the regular ytserv), topology-py (fixture A's
+   server-function scripts, on ytserv-py, the build with Python functions), hier,
+   lxc, migrate (a running database into a cluster), llm, topo (t0-t4, t6), topo
+   faults (t5), topo membership (t7) and rmc;
 4. when every suite passed - a test of a known gap fails until the gap is fixed,
-   so it blocks too - builds the release (every glibc target, EL9) and publishes
-   the deb to the apt repository and the rpm to its `yum/el9`;
+   so it blocks too - builds the release (every glibc target, EL9, musl) and
+   publishes it: the deb to the apt repository, the rpm to its `yum/el9`, the
+   tarball of the static binaries to its `dist/`, and the image
+   [`dbinvent/yt`](https://hub.docker.com/r/dbinvent/yt) to Docker Hub, built from
+   the deb as the repository serves it and started once before it is pushed. Schema
+   Guard too, when its version is new to the repository: its deb, its tarball and
+   [`dbinvent/sge`](https://hub.docker.com/r/dbinvent/sge);
 5. appends the run to `nightly/results.yaml`, oldest first, for a page to read in
    reverse.
 
-`nightly.sh --dry-run` says what a run would do; `--force` runs with nothing
-changed; `--no-publish` tests only.
+`nightly.sh --dry-run` says what a run would do; `--no-publish` tests only. There
+is no run without a code change, whatever was asked.
 
 ### Coverage
 
@@ -74,6 +88,13 @@ run started by hand. [nightly/coverage.sh](nightly/coverage.sh) does the work:
   https://apt.dbinvent.com/paks/nightly/badge.svg), which dbinvent.com shows.
 
 Needs `cargo-llvm-cov` and `rustup component add llvm-tools-preview` on the build host.
+
+A run that published also renews the regular ytserv's own badge
+(`nightly/safety_badge.py`, https://apt.dbinvent.com/paks/nightly/ytserv-safety.svg):
+`cargo audit` over the crates in ytserv's tree, and `cargo check -p ytserv` with
+unsafe code forbidden (`-F unsafe_code`; cargo caps the lints of registry crates, so
+it fails only on unsafe code in ytserv's own crates). Needs `cargo-audit` on the
+build host.
 
 ## Preparations
 
@@ -146,10 +167,10 @@ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/yt-cluster.gpg] https://apt.
 
 The repository is served over HTTPS, so `ca-certificates` must be installed; it is on a stock Ubuntu 20.04+ / Debian 10+.
 
-Install the YT Cluster package:
+Install the YT Cluster package - the same command updates it: every build of a release carries the release's version (1.20), so `apt upgrade` can miss a new one - `--reinstall` always fetches the newest build:
 
 ```shell
-sudo apt update && sudo apt install yt-cluster
+sudo apt update && sudo apt install --reinstall yt-cluster
 ```
 
 The package is dual-licensed: see [License](#license).
@@ -162,6 +183,38 @@ sudo ytctl
 
 And now we are ready to perform the YT Cluster integration tests.
 
+### Without the deb: Docker images and static binaries
+
+Each build the nightly publishes is also an image and a tarball - and Schema
+Guard's, when its version is new:
+
+| | |
+|---|---|
+| [`dbinvent/yt`](https://hub.docker.com/r/dbinvent/yt) | one node: PostgreSQL 18 (the official `postgres:18` image) with the package, and ytserv beside it. Tags: the build, the release (`1.20`), `latest` |
+| [`dbinvent/sge`](https://hub.docker.com/r/dbinvent/sge) | Schema Guard: a static `sge` and `psql`, on Alpine |
+| [yt-cluster-latest.tar.gz](https://apt.dbinvent.com/paks/yt-cluster-latest.tar.gz) | `ytctl` and `ytserv` static (musl, no glibc), the extension for PostgreSQL 14 to 18, laid out for `/usr/local` |
+| [sge-latest.tar.gz](https://apt.dbinvent.com/paks/sge-latest.tar.gz) | `sge`, static |
+
+```shell
+docker run -d --name yt1 --hostname yt1 -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=app \
+    -p 5441:5432 -v yt1:/var/lib/postgresql dbinvent/yt:1.20
+docker exec yt1 psql -U postgres -c "select * from yt_info('o')"    # Term: 1, ..., Leader
+
+docker run --rm -v "$PWD:/work" dbinvent/sge \
+    --db_url=postgres://app:secret@db.example.com/app --source_dir=. migrate
+```
+
+The image sets a node up by itself, from its environment (`YT_PEERS`,
+`YT_CLUSTER`, ...); `ytctl` is in it, not needed for that. A cluster of three with
+Docker Compose, adding a node while every node writes, and the settings:
+[Running in Docker](https://www.dbinvent.com/cluster/guide/docker). The tarballs:
+
+```shell
+curl -fsSLO https://apt.dbinvent.com/paks/yt-cluster-latest.tar.gz
+curl -fsSL https://apt.dbinvent.com/paks/yt-cluster-latest.tar.gz.sha256 | sha256sum -c
+sudo tar -xzf yt-cluster-latest.tar.gz -C /usr/local
+```
+
 ## Running the tests
 
 Clone the repository:
@@ -170,7 +223,7 @@ Clone the repository:
 git clone https://github.com/DBinvent/yt-cluster-tests.git
 ```
 
-Then cd into the yt-cluster directory.
+Then cd into the yt-cluster-tests directory.
 
 ```shell
 cd yt-cluster-tests
@@ -198,7 +251,7 @@ cargo make --makefile node.toml --env NID=1 --env psql=1 --env CNT=1 --env INIT=
 
 ### The database is rebuilt every run
 
-Nothing here keeps a database between runs, on purpose — a test that starts
+Nothing here keeps a database between runs, on purpose - a test that starts
 from whatever the last run left behind is a test whose result depends on the
 last run. There is no volume to mount and nothing to clean up: every node is
 created from nothing each time, and the schema is created by SQL that runs
@@ -206,8 +259,8 @@ as part of starting the node.
 
 Each node gets its own PostgreSQL data directory under `cluster/nodeN`,
 created by `initdb` on first use and reused as-is afterwards. `cluster/` is
-git-ignored. To start completely fresh — a different `PG_VER`, or a data
-directory left in a bad state — delete it:
+git-ignored. To start completely fresh - a different `PG_VER`, or a data
+directory left in a bad state - delete it:
 
 ```shell
 rm -rf cluster/
@@ -219,7 +272,7 @@ scripts, run in this order:
 | script | what it creates |
 |---|---|
 | `it_init.sql` | the `public.yt_config` table, the cluster roster and settings rows in it, the `yt` schema, and `CREATE EXTENSION yt_cluster` |
-| `it_prepare_test.sql` | the `yt_config_test_trigger` on `yt_config`, which calls `yt_synchronize()` on every insert, update and delete — this is what puts a row on the wire |
+| `it_prepare_test.sql` | the `yt_config_test_trigger` on `yt_config`, which calls `yt_synchronize()` on every insert, update and delete - this is what puts a row on the wire |
 | `it_test.sql` | a sample transaction, for running by hand. The automated cases in `testcases/` do their own inserts instead |
 
 `it_init.sql` is run for you by `node.toml`'s `yt` task before the YT server
@@ -230,7 +283,7 @@ roster, for `--env CNT=1`.
 Two rows in `it_init.sql` are worth knowing about before you change
 anything:
 
-- the `'N'` rows are the **roster** — one per node, naming every node the
+- the `'N'` rows are the **roster** - one per node, naming every node the
   cluster should expect. They are the same on every node, and a node missing
   from them is a node nobody talks to.
 - the `'C'` rows are settings: `log_level`, `verbose`, `ping_tick_sleep_ms`
@@ -338,7 +391,7 @@ cargo make killall
 
 ### Docker
 
-If you have Docker installed, you can play around with tests in a container without messing up the system. In order to deploy the container with these tests, run:
+If you have Docker installed, you can play around with tests in a container without messing up the system - the tests' own container, not the node image `dbinvent/yt` above. In order to deploy the container with these tests, run:
 ```shell
 ./docker.sh
 ```
@@ -349,7 +402,7 @@ machine and the SQL and scripts you edit are the ones that run.
 
 The container declares **no volume for PostgreSQL**, which is deliberate:
 see "The database is rebuilt every run" above. The container is disposable,
-and so is everything in it — `docker rm` leaves nothing behind but the
+and so is everything in it - `docker rm` leaves nothing behind but the
 `cluster/` directory on your side of the mount.
 
 The image installs the `yt-cluster` package from the apt repository at build

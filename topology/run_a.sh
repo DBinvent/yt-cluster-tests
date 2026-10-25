@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # [topology] Fixture A: bring the cluster up, then run everything that exists.
 #
-# Split from run_all.sh because the two fixtures have different lifecycles —
+# Split from run_all.sh because the two fixtures have different lifecycles -
 # A is long-lived and B is torn down between SKV phases (PLAN.md §5).
 #
 # Failure policy is PLAN.md §4a: **record and carry on**. A red script does not
@@ -12,7 +12,7 @@ LOG="${YX_LOG:-/tmp/yxtopo-run-a.log}"
 
 # The 7-node fixture: the original six plus n7, whose PostgreSQL is reached
 # over TCP so it can never be Main (membership.md, Forever-Spare) while staying
-# a full etcd, rppd and queue member. It is in the ROSTER but not the quorum —
+# a full etcd, rppd and queue member. It is in the ROSTER but not the quorum -
 # `min_cluster_size` is 6, and a 7-node roster still forming a 6-node cluster
 # is itself the assertion 24_db_local.sh makes.
 #
@@ -24,9 +24,32 @@ export YX_AZ="${YX_AZ:-n1=top,n2=top,n3=east,n4=east,n5=west,n6=west,n7=west}"
 export YX_TIER="${YX_TIER:-top=0,east=1,west=1}"
 export YX_SPARE_NODES="${YX_SPARE_NODES:-n7}"
 
+# [ytserv-py] The server-function scripts call Python functions, which only
+# ytserv-py - the build with rppd - has; everything else runs on the regular
+# ytserv. YX_GROUP is what this run covers, and so the build its nodes run:
+#   all      every script, on ytserv-py - the default, by hand
+#   py       the server-function scripts, on ytserv-py (the nightly's topology-py)
+#   regular  the rest, on the regular ytserv (the nightly's topology)
+# Each half needs only what it sets up itself: they run as two fixtures, on two
+# docker hosts at once if asked (nightly.sh LANE_SUITES).
+PY_SCRIPTS="05_gitsrv.sh 92_rppd.sh 92c_rppd_cadence.sh 92b_rppd_breaker.sh 92d_rppd_shaper.sh 91_otel.sh 94_clickhouse.sh 98_mpp_df.sh 25_cross_db.sh"
+export YX_GROUP="${YX_GROUP:-all}"
+case "$YX_GROUP" in
+	all|py) export YX_SERVER_BIN=ytserv-py ;;
+	regular) export YX_SERVER_BIN=ytserv ;;
+	*) echo "YX_GROUP=$YX_GROUP: all, py or regular" >&2; exit 2 ;;
+esac
+in_group() { # <script>: this run covers it
+	case "$YX_GROUP" in all) return 0 ;; esac
+	case " $PY_SCRIPTS " in
+		*" $1 "*) [ "$YX_GROUP" = py ] ;;
+		*) [ "$YX_GROUP" = regular ] ;;
+	esac
+}
+
 exec > >(tee -a "$LOG") 2>&1
 echo "================================================================"
-echo "fixture A  started $(date -Is)"
+echo "fixture A  started $(date -Is)  group: $YX_GROUP, nodes on $YX_SERVER_BIN"
 echo "================================================================"
 
 rc=0
@@ -58,28 +81,28 @@ step() {
 # Resumable because this is a long run on a shared box and it has twice been
 # killed by unrelated memory pressure. The fixture is long-lived, so re-running
 # `10_up.sh` after an interruption would throw away a healthy elected cluster to
-# rebuild an identical one — and the destructive step is exactly the one not to
+# rebuild an identical one - and the destructive step is exactly the one not to
 # repeat by reflex.
 if [ $# -gt 0 ]; then
 	echo "resuming: $*"
 	for t in "$@"; do step "$t"; done
 else
-	# P7c — the destructive half. Recreates n1..n7 from the new image; a rebuilt
+	# P7c - the destructive half. Recreates n1..n7 from the new image; a rebuilt
 	# image does NOT reach a running container, which is why this and
 	# 00_build.sh always go together.
 	step 10_up.sh
-	step 05_gitsrv.sh
+	in_group 05_gitsrv.sh && step 05_gitsrv.sh
 
-	# Group 1 — the regression baseline. First, because a red here is a
+	# Group 1 - the regression baseline. First, because a red here is a
 	# regression from this session's work and finding that out before anything
 	# else is the only way to attribute the rest.
 	for t in 15_setup.sh 20_flat.sh 30_az.sh 40_tier.sh 50_shard.sh 60_write_az.sh \
 	         70_reshape.sh 80_recon.sh 85_alert.sh 88_quiescent.sh 95_partition.sh \
 	         96_jsonb_merge.sh 96b_merge_more.sh 31_commit.sh; do
-		step "$t"
+		in_group "$t" && step "$t"
 	done
 
-	# Group 2 — the capability coverage added this session, measured against
+	# Group 2 - the capability coverage added this session, measured against
 	# dbinvent.com's Platform Capabilities list rather than against whatever
 	# tests happened to exist. Second, so a red here is read against a known-good
 	# Group 1 rather than confused with a regression.
@@ -92,15 +115,15 @@ else
 	# spare stops missing rows committed during a roll (its S7/S8 on n7); run it by
 	# hand meanwhile, on a running fixture: ../nightly/locked.sh ./run_a.sh 32_schema_change.sh
 	for t in 86_schema_block.sh 87_node_block.sh 89_recover.sh 89b_recovery.sh 23_split.sh \
-	         92_rppd.sh 93_etcd.sh 92c_rppd_cadence.sh 92b_rppd_breaker.sh 92d_rppd_shaper.sh 91_otel.sh 94_clickhouse.sh \
+	         92_rppd.sh 93_etcd.sh 93b_etcd_upsert.sh 92c_rppd_cadence.sh 92b_rppd_breaker.sh 92d_rppd_shaper.sh 91_otel.sh 94_clickhouse.sh \
 	         97_mpp.sh 98_mpp_df.sh 98_skv_join.sh 29_concurrent.sh 29b_flags_ab.sh 29c_parallel_apply.sh \
-	         29d_shard_lease.sh 99_peer_stream.sh 25_cross_db.sh 26_stage.sh; do
-		step "$t"
+	         29d_shard_lease.sh 99_peer_stream.sh 25_cross_db.sh 26_stage.sh 33_identity.sh 37_delta_retry.sh; do
+		in_group "$t" && step "$t"
 	done
 
 	# [db-local] The regression guard for the defect run 1 found: a TCP-attached
 	# node that does not start. Last, because it restarts the cluster.
-	step 24_db_local.sh
+	in_group 24_db_local.sh && step 24_db_local.sh
 fi
 
 echo

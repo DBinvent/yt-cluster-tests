@@ -72,6 +72,8 @@ service:
       receivers: [otlp]
       exporters: [debug]
 YAML
+# [build-host] from the build host, as every image the fixture runs
+ship_image "$OT_IMAGE" || { bad "$OT_IMAGE did not reach $YX_HOST"; summary; }
 rh "docker rm -f otelcol >/dev/null 2>&1; docker run -d --name otelcol --network $YX_NET \
 	-v /tmp/otelcol.yaml:/etc/otelcol/config.yaml $OT_IMAGE >/dev/null" \
 	|| { bad "the collector did not start ($OT_IMAGE)"; summary; }

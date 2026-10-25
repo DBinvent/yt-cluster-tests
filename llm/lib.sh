@@ -44,12 +44,12 @@ node_uuid() { python3 -c 'import sys, uuid; print(uuid.uuid5(uuid.UUID(sys.argv[
 # The six containers, in plain docker - no compose needed. Everything is found
 # by name, never by address:
 # - network ytllm: every container, under its short name (yt1..yt3, ch1..ch3):
-#   the yt-cluster roster (ytN:7421) and the ClickHouse cluster (chN:9000);
+#   the YT Cluster roster (ytN:7421) and the ClickHouse cluster (chN:9000);
 # - networks ytllm-pairN (internal): ytN and chN only, where chN is also `ch`.
 #   So the one cluster-wide module K row clickhouse (http://ch:8123) makes every
-#   yt-cluster node read its own ClickHouse node;
+#   YT Cluster node read its own ClickHouse node;
 # - the model host: by its name (LLM_HOST); where that does not resolve, .env's
-#   LLM_HOST_IP is mapped to it in the yt-cluster containers (--add-host).
+#   LLM_HOST_IP is mapped to it in the YT Cluster containers (--add-host).
 CH_IMAGE=clickhouse/clickhouse-server:26.9
 cname() { echo "ytllm-$1"; }
 
@@ -95,7 +95,7 @@ cluster_rm() {
     true
 }
 
-# psql on a yt-cluster node as postgres, SQL on stdin
+# psql on a YT Cluster node as postgres, SQL on stdin
 q() { # q <node> [psql args...]
     local n="$1"; shift
     docker exec -i -u postgres "$(cname "$n")" psql -X -q -At -v ON_ERROR_STOP=1 -d "$DB" "$@"

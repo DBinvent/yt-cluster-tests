@@ -1,5 +1,5 @@
 #!/bin/bash
-# A yt-cluster node: PostgreSQL first, then ytserv once the config says so.
+# A YT Cluster node: PostgreSQL first, then ytserv once the config says so.
 #
 # On the first start up.sh (or test.sh, for a node added later) writes the
 # config; ytserv waits for the C row cfg_ready. On a restart the row is already

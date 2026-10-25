@@ -6,7 +6,8 @@ sudo chmod a+rw /var/log/yt-cluster
 
 sudo apt-get update
 echo "refresh yt-cluster..."
-sudo apt-get install --only-upgrade yt-cluster
+# a build of the same release keeps its version (1.20): --only-upgrade alone can miss it
+sudo apt-get install --only-upgrade --reinstall yt-cluster
 sudo localedef -i en_US -f UTF-8 en_US.UTF-8
 
 sudo service postgresql start # required for ytsetup

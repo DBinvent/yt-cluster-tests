@@ -1,8 +1,8 @@
-# Cluster test 2 — HPC (hheuristic pre-checkin), 2026-09-14
+# Cluster test 2 - HPC (hheuristic pre-checkin), 2026-09-14
 
 Same goal as `cluster-test1.md`: where the performance goes, measured against
 PostgreSQL's own synchronous replication on the same hardware. This round tests
-**HPC** — the subterm-lease feature from `pre-checkin.md` — which attacks the
+**HPC** - the subterm-lease feature from `pre-checkin.md` - which attacks the
 single largest cost test 1 identified: `checkin()` is a synchronous RTT to the
 leader on **every write statement**, 2.21 ms of origin wait for 0.75 ms of
 leader work.
@@ -39,7 +39,7 @@ replication throughput**, on a network where the wire alone is 0.75 ms.
 | 2 | cc=half | off | 22.847 | 43.8 | yes | 0 |
 | 2 | cc=half | **on** | **21.589** | **46.3** | yes | 395 |
 | 2 | cc=NODES0 | off | 9.666 | 103.5 | yes | 0 |
-| 2 | cc=NODES0 | **on** | **5.008** | **199.7** | **NO** — see below | 395 |
+| 2 | cc=NODES0 | **on** | **5.008** | **199.7** | **NO** - see below | 395 |
 
 Means: `cc=half` **23.07 → 20.77 ms (−10%), 43.3 → 48.2 tps (+11%)**;
 `cc=NODES0` **9.98 → 5.67 ms (−43%), 100.3 → 178.9 tps (+78%)**.
@@ -57,7 +57,7 @@ hpc off   cluster_save 5.44 ms = checkin 2.50 + fanout 2.64
 hpc on    cluster_save 4.35 ms = checkin 0.65 + fanout 3.44
 ```
 
-**checkin −74% (2.50 → 0.65 ms)** — that is the RTT being replaced by a local
+**checkin −74% (2.50 → 0.65 ms)** - that is the RTT being replaced by a local
 mint. `cluster_save` per statement is −20%. (The fanout difference between those
 two particular runs is leader placement, not HPC: they elected different
 leaders. The alternated A/B above controls for it.)
@@ -75,9 +75,9 @@ protocol and config. Default **off** (`hpc_feature=0`).
 - **Config**: `hpc_feature`, `hpc_row` 10, `hpc_time_sec` 2, `hpc_tables` 4,
   `hpc_lease_sec` 20, `hpcu_uid_max` 100.
 - **Protocol**: `LeaseScope` / `LeaseRequest` / `LeaseReply` / `LeaseAckRequest`
-  / `LeaseStopRequest` / `LeaseStopReply` and 5 RPCs — `lease`, `lease_extend`,
+  / `LeaseStopRequest` / `LeaseStopReply` and 5 RPCs - `lease`, `lease_extend`,
   `lease_amend`, `lease_ack`, `lease_stop`.
-- **Leader**: `LeaseRegistry` — grant / extend / ack / stop / conflict check /
+- **Leader**: `LeaseRegistry` - grant / extend / ack / stop / conflict check /
   `covering_write` redirect. A lease is a plain `subterm.fetch_add(n)`, so the
   leased run is excluded from regular issuing for free, with no bookkeeping on
   the normal path.
@@ -96,13 +96,13 @@ protocol and config. Default **off** (`hpc_feature=0`).
 ### Two design decisions worth recording
 
 **A lease is only for a remote checkin.** On the leader `checkin_call()` takes
-the `HostOption::This` branch — a direct in-process call with no round trip — so
+the `HostOption::This` branch - a direct in-process call with no round trip - so
 there is nothing to remove. The leader refuses to lease to itself, and the
 leasee path is wired solely into the `SomeHost` arm. Leasing to self would only
 pull subterms out of regular issuing to save a cost that does not exist.
 
 **The party is pinned at grant time.** The leasee is by definition a follower,
-so it must not re-derive the party per statement from its own peer view — two
+so it must not re-derive the party per statement from its own peer view - two
 nodes deriving independently can disagree, and the party decides who must
 commit. The leader picks it once during `lease()` using the same `select_party()`
 the normal checkin path uses (extracted verbatim for that purpose), stores it in
@@ -118,7 +118,7 @@ configuration isolates it:
 | `-R 100` | 94.3 | **CONVERGED** |
 | `-R 200` | 140.9 | **DIVERGED** |
 
-and HPC **off** — which cannot exceed ~100 tps because of the RTT — always
+and HPC **off** - which cannot exceed ~100 tps because of the RTT - always
 converged. So this is **rate-dependent, not HPC-semantic**: HPC removes the
 round trip, the origin pushes roughly twice as fast, and somewhere above
 ~140 tps the apply path stops holding. HPC did not introduce the defect; it
@@ -130,8 +130,8 @@ What was ruled out on the diverging peer:
 - **Not out-of-order arrival.** Applies executed in strict subterm order
   (266, 267, … 305).
 - **Not the catch-up path.** Zero wal-api pull activity during the run.
-- The failure is the same signature as the zero-row apply fixed in test 1 —
-  286 of 300 applies matched no row — but the ordering cause fixed there is not
+- The failure is the same signature as the zero-row apply fixed in test 1 -
+  286 of 300 applies matched no row - but the ordering cause fixed there is not
   the cause here.
 
 The exact mechanism is **not yet pinned**, and it is the next thing to chase.
@@ -148,22 +148,22 @@ measurements match that prediction closely (−10% on `cc=half`, −43% on
 
 The remaining levers, in order of measured value:
 
-1. **The apply-path ceiling above** — it now caps eventual mode at ~140 tps,
+1. **The apply-path ceiling above** - it now caps eventual mode at ~140 tps,
    which is the binding constraint for `cc=NODES0`, not the round trips.
-2. **The 4 remaining round trips in `cc=half`** — the 2PC fan-out and
+2. **The 4 remaining round trips in `cc=half`** - the 2PC fan-out and
    PREPARE/COMMIT pair. Matching PostgreSQL's single ack round trip is a
    protocol change, not tuning.
 3. The local trigger path, still ~415 us per call with 96% inside
-   `curl_easy_perform` (test 1) — gRPC-over-HTTP2 is heavy for a unix socket.
+   `curl_easy_perform` (test 1) - gRPC-over-HTTP2 is heavy for a unix socket.
 
 ## State
 
 `hpc_feature` left at **0** on all three nodes and in the shipped default; the
 build is deployed and the cluster is on `cc=half`, converged, `stmt_cache_size=10`
 (98.4% hit, see test 1). Enable with the module-`C` row `hpc_feature=1` plus an
-`ytserver` restart — the C-module knobs are not hot-reloadable.
+`ytserver` restart - the C-module knobs are not hot-reloadable.
 
-## Appendix — HPC gated behind sequential consistency, and operator-driven leader move (2026-09-14)
+## Appendix - HPC gated behind sequential consistency, and operator-driven leader move (2026-09-14)
 
 ### `sequential_consistency` is now tri-state
 
@@ -178,7 +178,7 @@ meaning 0/1.
 | 2 `SC_HPC` | SC **plus** HPC leasing for this table |
 
 The ordering is not arbitrary. A lease lets the leasee mint subterms locally, so
-the leader's conflict scan never sees those writes — that is only sound where a
+the leader's conflict scan never sees those writes - that is only sound where a
 conflicting concurrent write is **rejected outright** rather than merged, which
 is exactly what level 1 guarantees. HPC therefore sits above SC, never beside it.
 
@@ -186,29 +186,29 @@ The separate `hpc_feature` SmCfg knob is **removed**: HPC is now armed per table
 by this level, checked on the leasee (observe + mint) and on the leader (a lease
 whose scope contains a table below SC_HPC is refused).
 
-### `yt_info('e:<node>')` — move leadership on demand
+### `yt_info('e:<node>')` - move leadership on demand
 
 Same dispatch style as `yt_info('a:<table>')`, so no `.so` change. Accepts a node
 uuid prefix, host or ip. Run on the target it forces an election locally; run
 anywhere else it sends the new `promote` RPC to the target. `ElectionEventRequest`
 gained a `force` flag which bypasses the receiver's anti-bouncing guard and the
-candidate's own eligibility gate — the automatic path never sets it.
+candidate's own eligibility gate - the automatic path never sets it.
 
 **A split-brain bug had to be fixed to make this usable.** `do_handle_confirm`
 repointed `writer.boss` to the new leader but never touched `writer.state`, so an
 incumbent leader stayed `PeerState::Leader` and reported
-`"Leader, discrepancy: other leader!"` **indefinitely** — two nodes each believing
+`"Leader, discrepancy: other leader!"` **indefinitely** - two nodes each believing
 they led the same term. It is pre-existing, but automatic elections rarely hit it
 (the old leader is usually down); an operator handover hits it every time. An
 incumbent now steps down to `Main` when the cluster confirms someone else.
 
 Verified: issued from node3 (a non-target node), leadership moved to node1, all
-three nodes agreed within 12 s and stayed stable — no discrepancy.
+three nodes agreed within 12 s and stayed stable - no discrepancy.
 
 ### Co-locating the leader with the write origin beats HPC
 
 node1 is where pgbench runs. With node1 as leader its checkin takes the
-`HostOption::This` branch — a direct in-process call — so the round trip is gone
+`HostOption::This` branch - a direct in-process call - so the round trip is gone
 entirely rather than merely leased away:
 
 | leader | ms | tps | origin checkin |
@@ -217,11 +217,11 @@ entirely rather than merely leased away:
 | remote, HPC | 20.77 | 48.2 | 650 us |
 | **node1 (= the write origin)** | **16.14** | **62.0** | **212 us** |
 
-**+43% over the no-HPC baseline and +29% over HPC**, converged, 0 failed — and it
+**+43% over the no-HPC baseline and +29% over HPC**, converged, 0 failed - and it
 needs no lease at all. That is 26% of PG sync replication's throughput, up from
 18%.
 
 The practical rule: **put the leader on the node that originates writes.** HPC is
-what you use for the nodes that are *not* the leader — in a genuinely
+what you use for the nodes that are *not* the leader - in a genuinely
 multi-master workload every node originates, so at most one of them can have a
 local checkin and the rest still need leases.

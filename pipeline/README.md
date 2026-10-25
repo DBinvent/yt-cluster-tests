@@ -16,12 +16,12 @@ ClickHouse public.bench_analytics
 ```
 
 `CH` is the ClickHouse client bound alongside `DB`/`ETCD` when the node has
-`serve_clickhouse` on — the piece this test is really here to prove.
+`serve_clickhouse` on - the piece this test is really here to prove.
 
 ## Direct route: etcd queue straight into ClickHouse
 
 A queue named **`/q/ch:<table>/`** or **`/queue/clickhouse:<table>/`** is
-consumed by the etcd server itself — each message's JSON value is written into
+consumed by the etcd server itself - each message's JSON value is written into
 that ClickHouse table as JSONEachRow, batched, with **no Python function, no
 watcher and no PostgreSQL** anywhere in the path. `etcd_ch_queue_test.py` needs
 nothing but an etcd client:
@@ -45,7 +45,7 @@ messages, and a failed insert leaves the rows queued for the next attempt.
 work, and ordinary watcher-driven queues are unaffected.
 
 One bug this surfaced, in `etcds`: `get_or_create_queue` held a `queues.read()`
-guard as the match scrutinee and took `queues.write()` inside the create arm —
+guard as the match scrutinee and took `queues.write()` inside the create arm -
 a self-deadlock that wedged the whole node. It had never fired because every
 queue used to be created by `create_watcher` (which takes the write lock
 directly); a queue nothing watches is created by its first *put*, and hit it
@@ -64,7 +64,7 @@ immediately.
 
 ## Running it
 
-On the **origin** node (the one pgbench writes to — `on_commit` fires there).
+On the **origin** node (the one pgbench writes to - `on_commit` fires there).
 Note `rppd_config` is no longer set up here: ytserv fills it from the cluster
 roster and puts `master` on the elected leader.
 
@@ -82,7 +82,7 @@ system-wide, not a venv):
 sudo python3 -m pip install psycopg2-binary etcd3 clickhouse_connect
 ```
 
-and ClickHouse reachable from that node — it binds `127.0.0.1` out of the box,
+and ClickHouse reachable from that node - it binds `127.0.0.1` out of the box,
 so a remote origin needs a `<listen_host>` drop-in.
 
 ## Results (2026-09-15, ytserv 0.14.0, ClickHouse 26.8.4.11)
@@ -95,8 +95,8 @@ so a remote origin needs a `<listen_host>` drop-in.
 | pgbench → cluster commit | 20/20 and 30/30 transactions, 0 failed |
 | `on_commit_python` → fn1 | **fires for every row**: 30 runs / 0 errors, 26 runs / 0 errors, 20 runs / 0 errors across runs |
 | fn1 → `ETCD.put` | keys land; the queue drains to 0 afterwards |
-| etcd queue → fn2 | **fixed and lossless** — every queued message is delivered, executed and acknowledged |
-| fn2 → ClickHouse | works every time it is reached — table created, 1 row per cluster node |
+| etcd queue → fn2 | **fixed and lossless** - every queued message is delivered, executed and acknowledged |
+| fn2 → ClickHouse | works every time it is reached - table created, 1 row per cluster node |
 
 What lands in ClickHouse per source row, one row per cluster node:
 
@@ -126,7 +126,7 @@ and drops a consumer that will not accept, so one dead watcher cannot wedge a
 queue others are reading.
 
 **2. An acknowledge deleted every message below it.**
-`delete` did `retain(|v| v.idx > idx)` — a cumulative ack. But a consumer
+`delete` did `retain(|v| v.idx > idx)` - a cumulative ack. But a consumer
 acknowledges one specific key, and acks come back badly out of order (a burst
 acked 2, 3, 1, 8, 9, 7, ...). Acking a high idx therefore silently discarded
 every lower message still waiting to be dispatched. Now `retain(|v| v.idx != idx)`.
@@ -141,7 +141,7 @@ Two faults, both in `rd_config.rs`:
   `respawn_drive()` now guarantees one comes back (single outstanding retry).
 - *Blocking Python on the async runtime.* `invoke()` runs the function
   synchronously and was called straight from an async task. The origin node has
-  **one core**, so that blocked the only runtime worker for the whole call —
+  **one core**, so that blocked the only runtime worker for the whole call -
   starving the completions that return contexts and send tokens, the gRPC server
   (`curl error: Timeout was reached` on every INSERT) and the cluster ping/apply
   loops (`peer stream ack timeout`). Now wrapped in `block_in_place`.
@@ -169,7 +169,7 @@ the dispatcher, the acknowledge path and the executor are lossless.
 
 The remaining shortfall is upstream of the queue: only 13 of 20 committed rows
 fired `on_commit_python` at all. That is the `notify_data` / on-commit path in
-ytserv (`cluster.rs`), not the etcd queue and not the rppd executor — both of
+ytserv (`cluster.rs`), not the etcd queue and not the rppd executor - both of
 which are clean. Serial inserts do not show it; it appears with concurrent
 clients.
 
@@ -178,8 +178,8 @@ clients.
 1. **`rppd_config` is now maintained by ytserv, not by hand.** It used to need a
    hand-written row with `master = true`, or rppd answered every event with
    `[py] Internal error "not a master"`. `sync_rppd_config` now mirrors the
-   cluster roster into the table on every heartbeat — one row per node, keyed by
-   `host`, named by node UUID — and puts `master` on whichever node the cluster
+   cluster roster into the table on every heartbeat - one row per node, keyed by
+   `host`, named by node UUID - and puts `master` on whichever node the cluster
    elected leader, calling `rppd.set_master()` so the running instance follows
    without a restart. Verified: forcing leadership with `yt_info('e:<node>')`
    moved `rppd_config.master` to the new leader **within 15 s**.
@@ -189,14 +189,14 @@ clients.
    returns no row, `started` is never set, and every later event is refused with
    that same misleading "not a master".
 
-2. **`rppd_function_log` broke rppd startup** — fixed in rppd: `SELECT_LOG`
+2. **`rppd_function_log` broke rppd startup** - fixed in rppd: `SELECT_LOG`
    omitted `output` while `RpFnLog` has the field, so a restart with any row in
    the log table failed with `no column found for name: output`, left `started`
    false, and then reported the *misleading* `"not a master"` for every event.
 
 3. **A read-only Python function must still end its transaction.** psycopg2
    opens one on the first `execute`, and rppd reuses the connection, so without
-   a `DB.commit()` the backend sits `idle in transaction` holding ACCESS SHARE —
+   a `DB.commit()` the backend sits `idle in transaction` holding ACCESS SHARE -
    enough to block `TRUNCATE`/DDL on the table indefinitely. Both functions here
    commit after reading; the note is in the code.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# yt-cluster config matrix with per-stage breakdown.
+# YT Cluster config matrix with per-stage breakdown.
 # Each run starts from a KNOWN-GOOD cluster: WAL wiped (so checkin cost isn't
 # skewed by WAL file size), synchronized restart, leader elected, tables resynced
 # and verified converged.

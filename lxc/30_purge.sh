@@ -79,7 +79,7 @@ check "after the DB cleanup: extension yt_cluster dropped" no_extension
 check "after the DB cleanup: config table $YX_TARGET dropped" no_config_table
 
 echo "Re-installing after purge with -U ytsvc (service role auto-creation)..."
-# the -U scenario: OS user exists, DB role does not — ytctl must create the role
+# the -U scenario: OS user exists, DB role does not - ytctl must create the role
 # (as postgres, no password), run the service as ytsvc, and connect via peer auth
 xc bash -c "id -u ytsvc >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin ytsvc"
 assert "re-install --batch -U ytsvc exits 0" \
@@ -94,12 +94,16 @@ assert "database ytsvc created" \
 assert "plain psql works for ytsvc" \
 	xc sudo -u ytsvc psql -tc "select current_database()"
 assert "ytserver active after re-install" xc systemctl is-active ytserver
+# no --python this time: the regular ytserv (no Python) or its per-libc variant,
+# never ytserv-py, which shares its name's start
+assert "ytserver runs the regular ytserv (no --python)" \
+	xc grep -qE '^\s*ExecStart=\S*/ytserv(-glibc[0-9_]+|-musl)?(\s|$)' /lib/systemd/system/ytserver.service
 # by MainPID, not `ps -C ytserv`: the comm name of a variant binary is truncated
 # (ytserv-glibc2_35 → ytserv-glibc2_3) and would not match by name
 assert "ytserver runs as ytsvc" \
 	bash -c "lxc exec $YX_CONTAINER -- bash -c 'ps -o user= -p \$(systemctl show -n0 -p MainPID --value ytserver)' | grep -q ytsvc"
 # end-to-end as the service user: the extension's yt_info('e') curls the running
-# ytserver — proves the service is up AND accessible for that user (retry the
+# ytserver - proves the service is up AND accessible for that user (retry the
 # startup window: the service may still be settling after the PG restart)
 assert "yt_info('e') works for ytsvc (install db)" bash -c "
 	for i in 1 2 3 4 5; do

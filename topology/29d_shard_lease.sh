@@ -21,7 +21,9 @@
 #       the shard fail while they are sent to W, and commit again once the lease
 #       lapsed - nothing waits for W for good (added 2026-10-16, unrun)
 #       ...and meanwhile a write of another synced table commits at once: the
-#       lease's gap holds only its own rows (lease-end, 2026-10-17)
+#       lease's gap holds only its own rows (lease-end, 2026-10-17) - written once
+#       O and the leader, which picks its party, both see W off; the leader
+#       answers within 3 s all the while (2026-10-19)
 #   L6  W back on the network holds what O holds
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== shard lease: a shard's subterms issued by the node that writes it =="
@@ -90,6 +92,23 @@ register_table public.sl_o ""
 restart_all
 await_cluster
 L="$(leader_now)"
+# A third node leads, never a top one: with the leader as O, O's view of W and the
+# party chooser's are one, and L5 tests nothing of the two disagreeing - the
+# nightlies' failures all had a west node lead (2026-10-19). Moved by the operator's
+# force-election, yt_info('e:<ip>:<port>'), as 34_skv_store does.
+case " ${TOPS[*]} " in *" $L "*)
+	for n in "${NODES[@]}"; do
+		case " ${TOPS[*]} " in *" $n "*) continue ;; esac
+		is_spare_node "$n" && continue
+		NIP="$(rh "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $n")"
+		echo "  force-election to $n ($NIP): $(q "$L" "select yt_info('e:$NIP:$YX_PORT')" 2>&1 | cut -c1-120)"
+		for _ in $(seq 1 30); do [ "$(leader_now)" = "$n" ] && break; sleep 2; done
+		await_cluster
+		L="$(leader_now)"
+		break
+	done ;;
+esac
+check "a third node leads, neither top node (leader $L)" "" "$(case " ${TOPS[*]} " in *" $L "*) echo "$L" ;; esac)"
 # W: a top node that is not the leader - the leader leases to nobody, itself included
 W=""; O=""
 for n in "${TOPS[@]}"; do [ "$n" != "$L" ] && [ -z "$W" ] && W="$n"; done
@@ -166,16 +185,31 @@ case "$(yinfo "$W" E hpc_lease)" in
 	*"holds shard top of public.sl_t"*) ok "L5 $W holds the lease of shard top again" ;;
 	*) bad "L5 $W did not take the lease again: [$(yinfo "$W" E hpc_lease)]" ;;
 esac
+# the leader now, while W still answers (W is never it): it picks the party below
+L="$(leader_now)"; [ -n "$L" ] || L="$O"
 node_down "$W"
 # Writes only once O has NOTICED the holder gone (as 23_split's E2): a write racing
 # the detection takes the holder into its 2PC party and fails on its PREPARE
 # ("Fail to modify peer ... of party: Timeout expired", the nightly of 2026-10-18) -
-# a different question from whether it waits on the lease's gap
-seen=""
+# a different question from whether it waits on the lease's gap.
+# ...and the leader too: it picks the party. O saw W off and wrote while the leader
+# still counted W up, a second later than O - its party held W, and the PREPARE
+# came 2 of 3 short ("no response from any nodes on PREPARE": six runs at debug
+# 2026-10-19, every failure that order, every pass the other).
+# The leader's answers are timed meanwhile: they read W's state under the lock its
+# party choice reads, and a leader that stalls while W goes is a fault of its own -
+# the nightlies of 2026-10-19 timed out checking in with it ("Timeout expired").
+seen=""; uw="$(node_uuid "$W")"; slow=0
 for i in $(seq 1 20); do
-	case "$(info "$O" E "$(node_uuid "$W")")" in ""|*Good*|*Leader*) sleep 1 ;; *) seen=$i; break ;; esac
+	a="$(info "$O" E "$uw")"
+	t1=$(date +%s%N); b="$(info "$L" E "$uw")"; t1=$(( ($(date +%s%N) - t1) / 1000000 ))
+	[ "$t1" -gt "$slow" ] && slow=$t1
+	case "$a" in ""|*Good*|*Leader*) sleep 1; continue ;; esac
+	case "$b" in ""|*Good*|*Leader*) sleep 1; continue ;; esac
+	seen=$i; break
 done
-echo "  $O sees $W off${seen:+ after ${seen}s}${seen:- - not within 20s}"
+echo "  $O and the leader $L see $W off$([ -n "$seen" ] && echo " after ${seen}s" || echo " - not within 20s")"
+check "L5 the leader answered within 3 s while $W went away (slowest: ${slow} ms)" "1" "$([ "$slow" -lt 3000 ] && echo 1 || echo 0)"
 # [lease-end] another table's write does not wait on the lease's gap: it commits
 # well inside the statement timeout (before, every synced table waited on it)
 t1=$(date +%s)

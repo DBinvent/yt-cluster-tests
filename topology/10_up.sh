@@ -14,7 +14,7 @@ for n in "${NODES[@]}"; do
 	rh "docker rm -f $n >/dev/null 2>&1; true"
 	# [P6c/db-local] A spare node reaches its PostgreSQL over TCP, so it can
 	# never be Main (membership.md, Forever-Spare) while staying a full etcd
-	# and rppd member. `?host=` is omitted, which is what makes the URL TCP —
+	# and rppd member. `?host=` is omitted, which is what makes the URL TCP -
 	# see rmc.rs::db_is_unix_socket, and note the `?host=` test comes FIRST
 	# there because sqlx_host_fix inserts `localhost` into socket URLs.
 	dbu=""
@@ -26,6 +26,7 @@ for n in "${NODES[@]}"; do
 	# (nightly/coverage.sh); unset otherwise.
 	rh "docker run -d --name $n --hostname $n --network $YX_NET \
 		-e NODE_UUID=$u -e DB=$YX_DB -e CFG_TABLE=$YX_CFG -e SECRET=$YX_SECRET $dbu ${YX_COV_MOUNT:-} \
+		-e YT_SERVER_BIN=$YX_SERVER_BIN \
 		$YX_IMAGE >/dev/null"
 done
 
@@ -66,7 +67,8 @@ for n in "${NODES[@]}"; do
 	# per peer per attempt.
 	sql+="insert into $YX_CFG (name,module,value) values ('cluster','C','$YX_CLUSTER_UUID');"
 	# log_level: the default is debug and costs ~11% - "warning", not "warn".
-	sql+="insert into $YX_CFG (name,module,value) values ('log_level','C','warning');"
+	# YX_LOG_LEVEL: another for a diagnosis (debug); the fixture's is warning
+	sql+="insert into $YX_CFG (name,module,value) values ('log_level','C','${YX_LOG_LEVEL:-warning}');"
 	# Six PostgreSQL+ytserv pairs share one host here, so the compiled 100ms ping
 	# deadline is far too tight: under a multi-statement transaction the node is
 	# busy applying, pings miss it, peers flap to "switched off", and select_party

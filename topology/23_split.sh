@@ -299,7 +299,7 @@ reach "${VOTERS[1]}" "${VOTERS[0]}" \
 
 DIG="select md5(string_agg(id::text||':'||v, ',' order by id)) from sp_t where id > 0"
 
-# ═════ E1 — 4/3 ══════════════════════════════════════════════════════════════
+# ═════ E1 - 4/3 ══════════════════════════════════════════════════════════════
 echo "  -- E1: 4/3"
 one_leader 60 "${NODES[@]}" || { bad "E1 no agreed leader before the split: $LAST_VIEWS"; summary; }
 L="$ONE_LEADER"
@@ -412,7 +412,7 @@ for n in "${NODES[@]}"; do
 	check_same "E1 $n holds the identical table to $LH" "$LH" "$n" "$DIG" "$((1 + ${#SPLIT_ACK[@]}))" sp_t
 done
 
-# ═════ E2 — 3/3 ══════════════════════════════════════════════════════════════
+# ═════ E2 - 3/3 ══════════════════════════════════════════════════════════════
 echo "  -- E2: 3/3 voters"
 one_leader 60 "${NODES[@]}" || { bad "E2 no agreed leader before the split: $LAST_VIEWS"; summary; }
 L2="$ONE_LEADER"

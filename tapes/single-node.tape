@@ -25,7 +25,7 @@ Sleep 2s
 Type "docker exec -it yt-cluster-demo bash -lc 'cd /home/rust && cargo make --makefile node.toml --env NID=1 --env psql=1 --env CNT=1 --env INIT=it_init_single.sql'"
 Enter
 # initdb, Postgres start, extension create, ytserv start, then the prompt.
-# Guessed — measure it on the first recording and trim.
+# Guessed - measure it on the first recording and trim.
 Sleep 45s
 
 Type "select * from json_to_recordset(yt_info('E')) as x(name text, module text, value text);"

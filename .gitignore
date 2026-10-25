@@ -25,3 +25,9 @@ __pycache__/
 /nightly/badge.svg
 /rmc/.env
 */results/*.log
+
+# jepsen/: the store of each run (results.yaml is kept), and Leiningen's output
+/jepsen/store/
+/jepsen/target/
+/jepsen/.lein-*
+/jepsen/.nrepl-port

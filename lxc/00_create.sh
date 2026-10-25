@@ -3,7 +3,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 if lxc info "$YX_CONTAINER" >/dev/null 2>&1; then
-	echo "Container $YX_CONTAINER already exists — reusing (90_destroy.sh to reset)."
+	echo "Container $YX_CONTAINER already exists - reusing (90_destroy.sh to reset)."
 else
 	lxc init "$YX_IMAGE" "$YX_CONTAINER"
 	if [ "$YX_NIC" = "macvlan" ]; then

@@ -8,7 +8,7 @@
 # ../../yt-pgxt/target/debian, when that checkout is next to this one.
 . "$(dirname "$0")/lib.sh"
 
-deb="${YT_CLUSTER_DEB:-$(ls -t "$HERE"/../../yt-pgxt/target/debian/yt-cluster_*_amd64.deb 2>/dev/null | head -1)}"
+deb="${YT_CLUSTER_DEB:-$(ls -t "$HERE"/../../yt-cluster/target/debian/yt-cluster_*_amd64.deb 2>/dev/null | head -1)}"
 [ -n "$deb" ] && [ -f "$deb" ] || die "no yt-cluster package: set YT_CLUSTER_DEB to a yt-cluster_<version>_amd64.deb"
 say "== package $(basename "$deb") ($(md5sum < "$deb" | cut -c1-12))"
 

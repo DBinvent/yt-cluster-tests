@@ -1,0 +1,22 @@
+# [jepsen] A DB node: a YT Cluster node as dbinvent/yt runs one - PostgreSQL 18 and
+# ytserv, set up by its own entrypoint on its first start - with what Jepsen needs on
+# a node: sshd for the control node, sudo, iptables and tc (iproute2) for partitions
+# and packet faults, procps for kills and pauses. A deb in deb/ (run.sh --deb, by
+# default the newest one the yt-pgxt checkout built) replaces the image's package:
+# the build under test.
+ARG BASE=dbinvent/yt:1.20
+FROM ${BASE}
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssh-server sudo iptables iproute2 procps psmisc \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /run/sshd /root/.ssh && chmod 700 /root/.ssh && ssh-keygen -A
+COPY deb/ /tmp/deb/
+RUN if ls /tmp/deb/*.deb >/dev/null 2>&1; then \
+      apt-get update \
+      && apt-get install -y --no-install-recommends --allow-downgrades /tmp/deb/*.deb \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi \
+ && rm -rf /tmp/deb
+COPY node-entrypoint.sh /usr/local/bin/jepsen-node.sh
+ENTRYPOINT ["tini", "--", "jepsen-node.sh"]
+CMD ["postgres"]

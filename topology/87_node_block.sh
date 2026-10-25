@@ -8,7 +8,7 @@
 #
 # | | driven by | config | default |
 # |---|---|---|---|
-# | operator | `node_run` config row | `<uuid8>:pause` / `follow` | — |
+# | operator | `node_run` config row | `<uuid8>:pause` / `follow` | - |
 # | automatic | the leader's ping tick | `auto_demote` | **off** |
 #
 # ## Why the operator path is asserted and the automatic one is observed
@@ -85,7 +85,7 @@ esac
 # "the write never arrived" about the feature under test rather than about
 # itself. Here it produced "the cluster writes before the pause - expected [1]
 # got [0]" two seconds after a cold start.
-seed() { # seed <id> <witness-node> — one committed write, confirmed to land
+seed() { # seed <id> <witness-node> - one committed write, confirmed to land
 	local id="$1" who="$2" i
 	for i in 1 2 3; do
 		q "$L" "begin; insert into nb_t values ($id,'v$id') on conflict do nothing;
@@ -149,7 +149,7 @@ fi
 # the row never left it, the subject never saw the command, and the test's first
 # run reported "n1 is not paused" with no `[grow]` line on n1 at all - because
 # nothing had asked it to pause.
-cfg_push() { # cfg_push <name> <module> <value> — through the sync path
+cfg_push() { # cfg_push <name> <module> <value> - through the sync path
 	q "$L" "begin;
 	        delete from $YX_CFG where module='$2' and name='$1';
 	        insert into $YX_CFG (name,module,value) values ('$1','$2','$3');

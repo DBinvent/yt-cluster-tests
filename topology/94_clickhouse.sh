@@ -32,7 +32,7 @@ echo "== clickhouse: a committed row reaches ClickHouse =="
 CH_HOST="${YX_CH_HOST:-chsrv}"
 CH_IMAGE="${YX_CH_IMAGE:-clickhouse/clickhouse-server:24.8-alpine}"
 
-chq() { # chq <sql> — run SQL in the ClickHouse container
+chq() { # chq <sql> - run SQL in the ClickHouse container
 	rh "docker exec $CH_HOST clickhouse-client --query \"$1\"" 2>/dev/null || true
 }
 
@@ -42,6 +42,8 @@ chq() { # chq <sql> — run SQL in the ClickHouse container
 # over the docker network, so "up on the host" proves nothing by itself.
 if [ -z "$(rh "docker ps --format '{{.Names}}' | grep -x $CH_HOST" 2>/dev/null)" ]; then
 	echo "  starting $CH_HOST..."
+	# [build-host] from the build host, as every image the fixture runs
+	ship_image "$CH_IMAGE" || echo "  WARN  $CH_IMAGE did not reach $YX_HOST"
 	rh "docker run -d --name $CH_HOST --network $YX_NET --ulimit nofile=262144:262144 \
 	    -e CLICKHOUSE_SKIP_USER_SETUP=1 $CH_IMAGE >/dev/null" 2>/dev/null || true
 	for _ in $(seq 1 12); do

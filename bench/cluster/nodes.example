@@ -1,4 +1,4 @@
-# bench/cluster node list — one node per line, copy to `nodes` and edit.
+# bench/cluster node list - one node per line, copy to `nodes` and edit.
 #
 #   <ssh-target>            [pgport]
 #

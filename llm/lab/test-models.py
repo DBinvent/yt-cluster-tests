@@ -48,7 +48,7 @@ import urllib.parse
 # sibling checkout of this repository
 _TESTS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERE = os.environ.get("LLM_DIR") or os.path.join(
-    os.environ.get("YT_PGXT") or os.path.join(os.path.dirname(_TESTS), "yt-pgxt"), "llm")
+    os.environ.get("YT_PGXT") or os.path.join(os.path.dirname(_TESTS), "yt-cluster"), "llm")
 RESULTS = {"PASS": 0, "FAIL": 0}
 
 

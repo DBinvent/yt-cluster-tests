@@ -169,7 +169,12 @@ fi
 #
 # In the background with `wait`: a trap runs only between foreground commands,
 # so a ytserv (or `sleep`) in the foreground kept SIGTERM from stop_node.
-su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yt-cluster/ytserv '${DB_URL}' ${CFG_TABLE}" &
+# YT_SERVER_BIN: the regular ytserv, or ytserv-py - the build with rppd (Python
+# functions), as `ytctl --python` installs it - for the scripts that call server
+# functions (topology/run_a.sh YX_GROUP); nothing else is accepted.
+case "${YT_SERVER_BIN:=ytserv}" in ytserv|ytserv-py) ;;
+    *) echo "[node] YT_SERVER_BIN=$YT_SERVER_BIN: ytserv or ytserv-py"; exit 2 ;; esac
+su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yt-cluster/${YT_SERVER_BIN} '${DB_URL}' ${CFG_TABLE}" &
 YT_PID=$!
 wait "$YT_PID" || echo "[node] ytserv exited $? - container held open for inspection"
 YT_PID=""

@@ -2,7 +2,7 @@
 # Bring up the yt_llm test cluster on docker - a new one each run: the previous
 # cluster, its volumes and its secrets go first.
 #
-#   1. the three yt-cluster nodes, PostgreSQL only: ytserv waits for C cfg_ready
+#   1. the three YT Cluster nodes, PostgreSQL only: ytserv waits for C cfg_ready
 #   2. the sample data (data/pg.sql) on each node
 #   3. the cluster config, the same rows on every node - the roster (N), the
 #      cluster and llm settings (C), the model service's client keys and the
@@ -24,7 +24,7 @@ say "== a new cluster, docker ${DOCKER_HOST:-(default)}"
 cluster_rm
 new_state
 
-say "== 1. yt-cluster nodes ${NODES[*]}"
+say "== 1. YT Cluster nodes ${NODES[*]}"
 net_up
 for i in 1 2 3; do node_run "$i" || die "docker run yt$i"; done
 ext_ready() { [ "$(q "$1" <<< "select count(*) from pg_extension where extname = 'yt_cluster'" 2>/dev/null)" = 1 ]; }
@@ -43,7 +43,7 @@ for n in "${NODES[@]}"; do
 done
 
 say "== 3. cluster config (the same rows on every node)"
-# the two kinds of yt-cluster shard (data/pg.sql): pinned by an owner column, and ring hash
+# the two kinds of YT Cluster shard (data/pg.sql): pinned by an owner column, and ring hash
 pin=$(docker exec "$(cname yt1)" ytctl --encode-table-cfg 'shard=owner; outer=pin' | tail -1 | tr -d '\r')
 ring=$(docker exec "$(cname yt1)" ytctl --encode-table-cfg 'shard=id; outer=reject' | tail -1 | tr -d '\r')
 [ -n "$pin" ] && [ -n "$ring" ] || die "ytctl --encode-table-cfg gave nothing"
