@@ -73,13 +73,13 @@ RUN apt-get update -q \
 # whole reason for the dependency. Fail the build instead.
 RUN test -f /usr/lib/python3.12/encodings/__init__.py
 # Fail the BUILD, not the first test run, if anything is still unresolved.
-# Both builds: the regular ytserv, and ytserv-py (rppd, Python functions) that the
+# Both builds: the regular ytserv, and ytserv-all (rppd, Python functions) that the
 # nodes run - node-entrypoint.sh.
 RUN ldconfig \
     && test -f /usr/local/bin/yt-cluster/ytserv \
     && ! ldd /usr/local/bin/yt-cluster/ytserv | grep -q "not found" \
-    && test -f /usr/local/bin/yt-cluster/ytserv-py \
-    && ! ldd /usr/local/bin/yt-cluster/ytserv-py | grep -q "not found"
+    && test -f /usr/local/bin/yt-cluster/ytserv-all \
+    && ! ldd /usr/local/bin/yt-cluster/ytserv-all | grep -q "not found"
 
 # The extension has to sit in PostgreSQL's own directories; on a real node
 # `ytctl --batch` does this copy. Here it is baked into the image so N

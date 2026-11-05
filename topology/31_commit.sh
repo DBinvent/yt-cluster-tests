@@ -21,6 +21,9 @@
 #        another session - on every node; X2 ROLLBACK PREPARED - nowhere; X3 a
 #        prepared transaction with no cluster side commits as before (written
 #        2026-10-16, first run the next nightly)
+#   P1-P9 [savepoint] a member cannot undo one write of a transaction: one that rolled a savepoint
+#        back over a write it sent is refused at COMMIT and is on no node, rather than leaving the
+#        row on every member and not on the origin; one that rolled back no write commits as before
 #   C9   one transaction of 500 rows
 #
 # ## C9 and C13 - known gaps until ytserv 0.20.61
@@ -425,6 +428,57 @@ check "X1-X3 nothing is left prepared under a test gid" "0" \
 	"$(q "$O" "select count(*) from pg_prepared_xacts where gid like 'yt_test_xa%'")"
 q "$O" "drop table if exists cm_local;" >/dev/null 2>&1
 xa_cleanup
+
+# ── P1-P8: a savepoint rolled back ───────────────────────────
+same_rows() { # same_rows <where>: the nodes that do not hold what the first does
+	local first n got out=""
+	for n in "${NODES[@]}"; do
+		got="$(q "$n" "select coalesce(string_agg(id::text, ',' order by id), '') from cm_t where $1")"
+		[ -n "${first+x}" ] || first="$got"
+		[ "$got" = "$first" ] || out="$out $n[$got]"
+	done
+	echo "${out# }"
+}
+out="$(qe "$O" "begin; savepoint a; insert into cm_t values (92001, 'p1'); rollback to a; insert into cm_t values (92002, 'p1'); commit;")"
+case "$out" in *"savepoint was rolled back"*) ok "P1 rolled back over a write: refused at COMMIT" ;; *) bad "P1 COMMIT: [$out]" ;; esac
+sleep 4
+check "P1a the rolled-back row is on no node" "" "$(lacking cm_t "id = 92001" 0)"
+check "P1b nor the other one" "" "$(lacking cm_t "id = 92002" 0)"
+out="$(qe "$O" "insert into cm_t values (92003, 'p2');")"
+check "P2 the same session's next write" "" "$(err_of "$out")"
+wait_all 30 cm_t "id = 92003" 1 && ok "P2a it is on every node" || bad "P2a missing: $(lacking cm_t "id = 92003" 1)"
+out="$(qe "$O" "begin; savepoint a; insert into cm_t values (92004, 'p3'); release a; commit;")"
+check "P3 a savepoint released commits" "" "$(err_of "$out")"
+wait_all 30 cm_t "id = 92004" 1 && ok "P3a on every node" || bad "P3a missing: $(lacking cm_t "id = 92004" 1)"
+out="$(qe "$O" "begin; insert into cm_t values (92005, 'p4'); savepoint a; select 1; rollback to a; commit;")"
+check "P4 a savepoint rolled back over no write commits" "" "$(err_of "$out")"
+wait_all 30 cm_t "id = 92005" 1 && ok "P4a the earlier write is on every node" || bad "P4a missing: $(lacking cm_t "id = 92005" 1)"
+out="$(qe "$O" "begin; savepoint a; savepoint b; insert into cm_t values (92006, 'p5'); release b; rollback to a; commit;")"
+case "$out" in *"savepoint was rolled back"*) ok "P5 an outer one over a released inner one's write: refused" ;; *) bad "P5 COMMIT: [$out]" ;; esac
+sleep 4
+check "P5a on no node" "" "$(lacking cm_t "id = 92006" 0)"
+out="$(qe "$O" "begin; insert into cm_t values (92007, 'p6'); do \$\$ begin insert into cm_t values (92007, 'dup'); exception when unique_violation then null; end \$\$; commit;")"
+check "P6 an EXCEPTION block over a duplicate, which sent nothing, commits" "" "$(err_of "$out")"
+wait_all 30 cm_t "id = 92007" 1 && ok "P6a on every node" || bad "P6a missing: $(lacking cm_t "id = 92007" 1)"
+out="$(qe "$O" "begin; do \$\$ begin insert into cm_t values (92008, 'p7'); raise exception 'undo'; exception when others then null; end \$\$; commit;")"
+case "$out" in *"savepoint was rolled back"*) ok "P7 an EXCEPTION block undoing its write: refused" ;; *) bad "P7 COMMIT: [$out]" ;; esac
+sleep 4
+check "P7a on no node" "" "$(lacking cm_t "id = 92008" 0)"
+out="$(qe "$O" "begin; savepoint a; insert into cm_t values (92009, 'p8'); rollback to a; select yt_complete(true); commit;")"
+case "$out" in *"savepoint was rolled back"*) ok "P8 an explicit yt_complete(true) is refused the same" ;; *) bad "P8 yt_complete: [$out]" ;; esac
+out="$(qe "$O" "begin; savepoint a; insert into cm_t values (92010, 'p8'); rollback to a; prepare transaction 'yt_test_xa4';")"
+case "$out" in *"savepoint was rolled back"*) ok "P8a and PREPARE TRANSACTION" ;; *) bad "P8a PREPARE: [$out]" ;; esac
+check "P8b nothing left prepared" "0" "$(q "$O" "select count(*) from pg_prepared_xacts where gid = 'yt_test_xa4'")"
+sleep 4
+check "P8c on no node" "" "$(lacking cm_t "id in (92009, 92010)" 0)"
+check "P8d every node holds the same rows of this case" "" "$(same_rows "id between 92001 and 92010")"
+qt "$W" "alter table cm_t add constraint cm_t_veto_p9 check (v <> 'p9-forbidden');" >/dev/null
+out="$(qe "$O" "begin; insert into cm_t values (92011, 'p9'); savepoint a; insert into cm_t values (92012, 'p9-forbidden'); rollback to a; commit;")"
+case "$out" in *"savepoint was rolled back"*) ok "P9 a write the cluster refused, caught by a savepoint: refused at COMMIT" ;; *) bad "P9 COMMIT: [$out]" ;; esac
+qt "$W" "alter table cm_t drop constraint cm_t_veto_p9;" >/dev/null
+sleep 5
+check "P9a the earlier write is on no node, the origin included" "" "$(lacking cm_t "id = 92011" 0)"
+settle "P9"
 
 # ── C9: 500 rows in one transaction ──────────────────────────────
 #

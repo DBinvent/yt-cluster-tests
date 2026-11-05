@@ -17,6 +17,8 @@
 #   L3  n1 and n2 hold the same sl_t, exactly the acknowledged rows
 #   L4  nobody writes for longer than the lease: it lapses, and O's next write is
 #       admitted by the leader again
+#   L4b no lease while O's write of the shard is in flight: the leader refuses, and
+#       says why; W's writes go by ordinary checkins, every one committed
 #   L5  W takes the lease again and drops off the network with it: O's writes of
 #       the shard fail while they are sent to W, and commit again once the lease
 #       lapsed - nothing waits for W for good (added 2026-10-16, unrun)
@@ -61,6 +63,13 @@ leader_now() {
 }
 lease_next() { # the holder's next subterm, from "... next N, ..."
 	yinfo "$1" E hpc_lease | sed -nE 's/.* next ([0-9]+),.*/\1/p'
+}
+lease_live() { # a lease in use, not the lapsed one that still names the shard
+	case "$(yinfo "$1" E hpc_lease)" in
+		*"spent or past its time"*) return 1 ;;
+		*"holds shard top of public.sl_t"*) return 0 ;;
+		*) return 1 ;;
+	esac
 }
 
 cleanup() {
@@ -176,9 +185,39 @@ case "$(yinfo "$W" E hpc_lease)" in
 esac
 check "L4 $O's write after the lapse committed" "" "$(cwc "$O" "insert into sl_t values ('top', 2001, 1)")"
 
+# ── L4b: no lease while another node's write of the shard is in flight ──────
+# The holder's conflict scan does not see a write still on its way to it, so the
+# leader refuses (shard_lease_refusal) and the burst goes by ordinary checkins. L4's
+# write met L5's burst so by chance in the nightlies of 2026-10-30 and 2026-11-04.
+sleep 6   # a node says a refusal once in 30 s: L1's turn, had it one, is over
+t1=$(date +%s)
+inflight="$(mktemp)"
+qx "$O" "begin; insert into sl_t values ('top', 2002, 1); select pg_sleep(10); commit;" 30s > "$inflight" 2>&1 &
+inflight_pid=$!
+sleep 2
+batch "$W" 2101 40
+check "L4b $W's 40 writes committed with $O's in flight" "40" "${BATCH_N:-0}${BATCH_ERR:+ - $BATCH_ERR}"
+lease_live "$W" && bad "L4b a lease with $O's write in flight: [$(yinfo "$W" E hpc_lease)]" \
+	|| ok "L4b no lease while $O's write is in flight"
+said="$(rh "docker logs --since $t1 $W 2>&1 | grep -c 'of shard top of .* refused: a write of shard top by another node is in flight'" 2>/dev/null || true)"
+check "L4b $W says why" "1" "$([ "${said:-0}" -ge 1 ] && echo 1 || echo "${said:-0}")"
+wait "$inflight_pid"
+check "L4b $O's write committed" "" "$(err_of "$(cat "$inflight")")"
+rm -f "$inflight"
+
 # ── L5: the holder goes away under its lease ────────────────────────────────
 batch "$W" 3001 40
 check "L5 $W's 40 writes of shard top committed" "40" "${BATCH_N:-0}${BATCH_ERR:+ - $BATCH_ERR}"
+# The leader may refuse this whole burst too, for a write of O's it has not yet seen
+# done (L4b): the next burst asks again.
+bursts=1
+while ! lease_live "$W" && [ "$bursts" -lt 6 ]; do
+	sleep 1
+	batch "$W" $((3001 + 40 * bursts)) 40
+	check "L5 $W's next 40 writes of shard top committed" "40" "${BATCH_N:-0}${BATCH_ERR:+ - $BATCH_ERR}"
+	bursts=$((bursts + 1))
+done
+echo "  L5 $W asked through $bursts burst(s) of 40"
 # a live lease, not the lapsed one of L4 - that one still names the shard
 case "$(yinfo "$W" E hpc_lease)" in
 	*"spent or past its time"*) bad "L5 $W did not take the lease again - it shows the lapsed one: [$(yinfo "$W" E hpc_lease)]" ;;

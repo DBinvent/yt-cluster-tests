@@ -51,6 +51,11 @@ stop_node() {
 }
 trap stop_node TERM INT
 
+# A container killed leaves its socket's lock, naming the postmaster's pid. In the new container
+# that pid may be some other process - pids start over - and PostgreSQL then takes it for a
+# running server and will not start ("lock file already exists"). pg_ctlcluster removes a stale
+# postmaster.pid, not this. Nothing runs here yet: what is there is the old container's.
+rm -f /var/run/postgresql/.s.PGSQL.*.lock
 pg_ctlcluster 18 main start || true
 # No fixed cap ending in a half-started node: a recovery replays the WAL and
 # takes what it takes. Ten minutes, then say so and stay up for inspection.
@@ -169,11 +174,11 @@ fi
 #
 # In the background with `wait`: a trap runs only between foreground commands,
 # so a ytserv (or `sleep`) in the foreground kept SIGTERM from stop_node.
-# YT_SERVER_BIN: the regular ytserv, or ytserv-py - the build with rppd (Python
-# functions), as `ytctl --python` installs it - for the scripts that call server
+# YT_SERVER_BIN: the regular ytserv, or ytserv-all - the build with rppd (Python
+# functions), as `ytctl --all` installs it - for the scripts that call server
 # functions (topology/run_a.sh YX_GROUP); nothing else is accepted.
-case "${YT_SERVER_BIN:=ytserv}" in ytserv|ytserv-py) ;;
-    *) echo "[node] YT_SERVER_BIN=$YT_SERVER_BIN: ytserv or ytserv-py"; exit 2 ;; esac
+case "${YT_SERVER_BIN:=ytserv}" in ytserv|ytserv-all) ;;
+    *) echo "[node] YT_SERVER_BIN=$YT_SERVER_BIN: ytserv or ytserv-all"; exit 2 ;; esac
 su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yt-cluster/${YT_SERVER_BIN} '${DB_URL}' ${CFG_TABLE}" &
 YT_PID=$!
 wait "$YT_PID" || echo "[node] ytserv exited $? - container held open for inspection"

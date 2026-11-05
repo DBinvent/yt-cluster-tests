@@ -107,7 +107,8 @@ q n1 "begin; insert into al_t values (77,'due'); select yt_complete(true); commi
 found=""
 for _ in $(seq 1 30); do
 	for n in "${NODES[@]}"; do
-		c="$(q "$n" "select count(*) from public.yt_alert where source='recon'")"
+		# [floor-alert] not a recon sweep's below-floor Warning: the row block's own alert
+		c="$(q "$n" "select count(*) from public.yt_alert where source='recon' and coalesce(pk, '') <> 'below-floor'")"
 		if [ "${c:-0}" != "0" ]; then found="$n"; break 2; fi
 	done
 	sleep 5
@@ -124,7 +125,7 @@ if [ -n "$found" ]; then
 	# busy test cluster. An unscoped `where resolved is null` therefore counted
 	# 2 and failed with `expected [1] got [2]` - reporting the health alert as a
 	# defect in the recon one. Only the row this test caused may be asserted on.
-	AL="from public.yt_alert where source='recon' and subject like '%al_t%'"
+	AL="from public.yt_alert where source='recon' and subject like '%al_t%' and coalesce(pk, '') <> 'below-floor'"
 	check "it is CRITICAL (class 3)" "3" "$(q "$found" "select class $AL limit 1")"
 	check "it names the table"       "1" "$(q "$found" "select count(*) $AL")"
 	check "it is unresolved"         "1" "$(q "$found" "select count(*) $AL and resolved is null")"

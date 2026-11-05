@@ -13,8 +13,8 @@
 # `ytserv-glibc2_35` for the packaged install, so the tests were running a
 # different binary from the deployment even when they ran at all.
 #
-# The regular build by default; YTSERV_NAME=ytserv-py picks the build with Python
-# functions (`ytctl --python` installs it), for a test that calls them.
+# The regular build by default; YTSERV_NAME=ytserv-all picks the build with Python
+# functions (`ytctl --all` installs it), for a test that calls them.
 set -Eeu
 
 dir=${YTSERV_DIR:-/usr/local/bin/yt-cluster}
@@ -29,7 +29,7 @@ runnable() {
 # Reverse name order puts a suffixed glibc build ahead of the bare name, and
 # a newer -glibc2_NN ahead of an older one; the static musl build goes last,
 # as the fallback that cannot fail on a missing library.
-# By name, not ytserv*: that matches ytserv-py's builds as well as ytserv's.
+# By name, not ytserv*: that matches ytserv-all's builds as well as ytserv's.
 for candidate in $(ls -1 "$dir/$name" "$dir/$name"-glibc* 2>/dev/null | sort -r) \
                  $(ls -1 "$dir/$name"-musl 2>/dev/null)
 do

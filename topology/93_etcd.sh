@@ -28,6 +28,7 @@
 # 3. a key written on one node is readable on another (it is a CLUSTER kv, not
 #    a per-node one)
 # 4. watch streams a change as it happens, rather than on a poll
+# 5. a node late for one put gets the next ones
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== etcd: the v3 key-value surface, from an ordinary etcd client =="
 
@@ -169,7 +170,45 @@ rm -f "$wf"
 	|| bad "the watch saw nothing in 25s - change streaming is the half of the \
 etcd claim that needs no second system, and it did not fire"
 
-# ── 5. and it is OFF where it is not configured ────────────────────────────
+# ── 5. a node late for one put is not left out of the next ───────────────────
+#
+# etcd stops sending to a peer that was late for one write, and leaves bringing it back
+# to its embedder. Frozen for one put, that node got no later put of this writer until
+# one of the two restarted: nothing failed, and each kept its own keys.
+echo "  $B frozen while $A writes one key..."
+rh "docker pause $B" >/dev/null
+yxe "$A" "$A" put "$K/late/during" "x" >/dev/null
+rh "docker unpause $B" >/dev/null
+got=""
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+	yxe "$A" "$A" put "$K/late/after$i" "y" >/dev/null
+	sleep 3
+	[ "$(yxe "$B" "$B" get "$K/late/after$i")" = "y" ] && { got="$i"; break; }
+done
+[ -n "$got" ] && ok "a node late for one put gets the next: put $got after it, on $B" \
+	|| bad "$B never got a put of $A after it was late for one, in 36s"
+back="$(info "$A" E etcd_peers)"
+case "$back" in
+	*"; 0 brought back"|"") bad "$A does not say it brought a peer back: [$back]" ;;
+	*) ok "$A says so: $back" ;;
+esac
+# a peer no node holds off: one stuck there gets no queue message of that node, either
+off=""
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+	off=""
+	for n in "${NODES[@]}"; do
+		m="$(rh "docker exec $n /usr/local/bin/yxetcd $n:7421 members" 2>/dev/null)" || { off="$off $n:no-answer"; continue; }
+		c="$(printf '%s\n' "$m" | grep -c learner || true)"
+		t="$(printf '%s\n' "$m" | grep -c . || true)"
+		[ "${c:-0}" = 0 ] || off="$off $n:$c"
+		[ "${t:-0}" -ge "$((${#NODES[@]} - 1))" ] || off="$off $n:lists-$t"
+	done
+	[ -z "$off" ] && break
+	sleep 2
+done
+[ -z "$off" ] && ok "every node holds every peer online" || bad "peers not online, node:how many:$off"
+
+# ── 6. and it is OFF where it is not configured ────────────────────────────
 #
 # `serve_etcd` defaults to false. A surface that answered regardless would mean
 # every node exposes a writable kv whether its operator asked for one or not.

@@ -51,6 +51,19 @@ finish() { say "---- $(basename "$0"): $pass passed, $fail failed"; exit $(( fai
 
 cname() { echo "$MIG_PREFIX-$1"; }
 xn() { local n="$1"; shift; lxc exec "$(cname "$n")" -- "$@"; }
+# push_peers <n> <file>: node n's roster file in place, tried three times - an lxc exec
+# LXD itself cut ("error receiving version packet ... connection reset by peer") left
+# node 1 with none, and its ytctl, and so every node after it, failed (nightly of
+# 2026-10-31)
+push_peers() {
+	local n="$1" f="$2" i
+	for i in 1 2 3; do
+		xn "$n" mkdir -p /etc/yt-cluster && lxc file push "$f" "$(cname "$n")/etc/yt-cluster/peers" >/dev/null \
+			&& xn "$n" test -s /etc/yt-cluster/peers && return 0
+		sleep 2
+	done
+	return 1
+}
 ip_of() { lxc list "^$1\$" -c4 --format csv | grep -oE '^[0-9.]+' | head -1; }
 nip() { ip_of "$(cname "$1")"; }
 node_uuid() { python3 -c 'import sys, uuid; print(uuid.uuid5(uuid.UUID(sys.argv[1]), sys.argv[2]))' "$YT_CLUSTER_NS" "$1"; }

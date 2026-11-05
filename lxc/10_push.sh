@@ -18,15 +18,14 @@ else
 	xc mkdir -p /usr/local/bin/yt-cluster /usr/local/include/yt-cluster
 	lxc file push "$YX_BIN_DIR/ytctl" "$YX_CONTAINER/usr/local/bin/ytctl"
 	lxc file push "$YX_BIN_DIR/ytserv" "$YX_CONTAINER/usr/local/bin/yt-cluster/ytserv"
-	# ytserv-py, the build with Python functions: 20_batch.sh installs it (--python)
-	if [ -x "$YX_BIN_DIR/ytserv-py" ]; then
-		lxc file push "$YX_BIN_DIR/ytserv-py" "$YX_CONTAINER/usr/local/bin/yt-cluster/ytserv-py"
-		xc chmod 755 /usr/local/bin/yt-cluster/ytserv-py
+	# ytserv-all, the build with Python functions: 20_batch.sh installs it (--python)
+	if [ -x "$YX_BIN_DIR/ytserv-all" ]; then
+		lxc file push "$YX_BIN_DIR/ytserv-all" "$YX_CONTAINER/usr/local/bin/yt-cluster/ytserv-all"
+		xc chmod 755 /usr/local/bin/yt-cluster/ytserv-all
 	fi
 	# per-libc variants (deb layout) when built - exercises find_bin's best-match
-	# selection among ytserv, ytserv-glibc2_35, ytserv-musl (and ytserv-py's own)
-	for v in "$REPO_ROOT"/target/glibc*/ytserv-glibc* "$REPO_ROOT"/target/musl/ytserv-musl \
-		"$REPO_ROOT"/target/glibc*/ytserv-py-glibc* "$REPO_ROOT"/target/musl/ytserv-py-musl; do
+	# selection among ytserv, ytserv-glibc2_35, ytserv-musl (ytserv-all: the host's glibc only)
+	for v in "$REPO_ROOT"/target/glibc*/ytserv-glibc* "$REPO_ROOT"/target/musl/ytserv-musl; do
 		if [ -f "$v" ]; then
 			lxc file push "$v" "$YX_CONTAINER/usr/local/bin/yt-cluster/$(basename "$v")"
 			xc chmod 755 "/usr/local/bin/yt-cluster/$(basename "$v")"

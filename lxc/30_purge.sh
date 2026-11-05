@@ -95,7 +95,7 @@ assert "plain psql works for ytsvc" \
 	xc sudo -u ytsvc psql -tc "select current_database()"
 assert "ytserver active after re-install" xc systemctl is-active ytserver
 # no --python this time: the regular ytserv (no Python) or its per-libc variant,
-# never ytserv-py, which shares its name's start
+# never ytserv-all, which shares its name's start
 assert "ytserver runs the regular ytserv (no --python)" \
 	xc grep -qE '^\s*ExecStart=\S*/ytserv(-glibc[0-9_]+|-musl)?(\s|$)' /lib/systemd/system/ytserver.service
 # by MainPID, not `ps -C ytserv`: the comm name of a variant binary is truncated

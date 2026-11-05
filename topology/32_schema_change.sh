@@ -2,12 +2,12 @@
 # [schema] A schema change rolled across the running cluster, and the schema checked
 # for consistency on every node before, during and after.
 #
-# DDL does not travel on the replication path (rumba.md §1): a schema change is
+# DDL does not travel on the replication path (sge_worker.md §1): a schema change is
 # applied to each node in turn - followers first, the leader last (the order
 # Schema Guard Enterprise's (sge) `yt_migrate()` planner queues them) - while the application keeps
 # writing. For as long as the roll takes, some nodes have the new shape and some
 # the old, so a rolled change has to be an EXPAND step first (a nullable column,
-# a column with a default, an index - rumba.md §6), the writes leave the new
+# a column with a default, an index - sge_worker.md §6), the writes leave the new
 # column alone until every node has it, and the CONTRACT step (dropping what the
 # application no longer reads) comes last.
 #
@@ -16,7 +16,7 @@
 # default - so while a party member lacks it, that write FAILS: the commit needs
 # the party, and the member refuses the statement. Writes to the table during a
 # roll are expected to fail on migrated nodes and are paused, or retried, by the
-# application (rumba.md §6). What must hold is that a failed write leaves nothing
+# application (sge_worker.md §6). What must hold is that a failed write leaves nothing
 # behind anywhere, and that nothing fails once every node has the column.
 #
 # "The same schema" here is what an application and `to_jsonb(t.*)` see: every

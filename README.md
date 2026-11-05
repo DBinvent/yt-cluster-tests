@@ -1,5 +1,21 @@
 # YT Cluster Integration Tests
 
+**YT Cluster** [![trivy](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml/badge.svg)](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml)
+[![docker scout](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/scout.yml/badge.svg)](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/scout.yml)
+[![docker](https://img.shields.io/docker/v/dbinvent/yt?sort=semver&label=docker)](https://hub.docker.com/r/dbinvent/yt)
+· [Trivy's result and the SBOMs](security/trivy-yt-cluster.md)
+\
+**Schema Guard** [![trivy](https://github.com/DBinvent/sge/actions/workflows/trivy.yml/badge.svg)](https://github.com/DBinvent/sge/actions/workflows/trivy.yml)
+[![docker scout](https://github.com/DBinvent/sge/actions/workflows/scout.yml/badge.svg)](https://github.com/DBinvent/sge/actions/workflows/scout.yml)
+[![docker](https://img.shields.io/docker/v/dbinvent/sge?sort=semver&label=docker)](https://hub.docker.com/r/dbinvent/sge)
+· [Trivy's result and the SBOMs](https://github.com/DBinvent/sge/blob/main/security/trivy-sge.md)
+
+Each image as Docker Hub serves it, scanned by Trivy and Docker Scout: YT Cluster's every day
+after the nightly ([.github/workflows](.github/workflows)), Schema Guard's after each publish and
+weekly (its own). After each green nightly run each product's SBOMs - CycloneDX, its crates and
+its image - and Trivy's result go into its public repository (nightly/security.sh): YT
+Cluster's in [security/](security/).
+
 We run our tests on Debian-based Linux distributions and can’t give any promises about the compatibility with many other versions and distros, except for those we use ourselves in development now. The suites below run in docker on Ubuntu 24.04 and 26.04 with PostgreSQL 18, and the package suites (lxc/, migrate/) on Ubuntu 24.04; the cargo-make test further down runs in an Ubuntu 22.04 container with PostgreSQL 14 (`./docker.sh`).
 
 YT Cluster is written in Rust and out of habit we use cargo-make in the integration tests.
@@ -29,8 +45,9 @@ tests, each with its write-up:
 | [migrate/](migrate/README.md) | a running database migrated into a four-node cluster in LXC containers: the package on the application's server and its one PostgreSQL restart, then each node joined from a dump of the one before it while every node writes; the databases compared at the end |
 | [topo/](topo/README.md) | the runtime topology jobs on the rmc layout: the job layer, az create/delete, moves with purge, approval from above and locks, split/combine, faults, refusals, membership |
 | [llm/lab/](llm/lab/test-yt-llm.sh) | `yt_llm` and the models against a live cluster (`YT_LLM_NODES`), not docker - run by hand |
+| [mongodb/](mongodb/README.md) | YCSB on two clusters of four CPU-limited nodes over two docker hosts, one after the other: MongoDB (a replica set, every write through its primary) and YT Cluster with DocumentDB and its gateway (every node written, each document merged path by path) - one document, each node's client writing its own path of it; throughput, latency and failed writes per client, and every node the same document at the end; by hand under the nightly's lock (`mongodb/run.sh`), results in [mongodb/results.yaml](mongodb/results.yaml) |
 | [jepsen/](jepsen/README.md) | Jepsen: jepsen-io/sql's list-append and rw workloads written on every node at once under partitions, packet faults, ytserv killed and paused, the histories judged by Elle - correctness, no performance graphs; a docker host of five nodes and a control node - run by hand (`jepsen/run.sh`), and four of its cases in the nightly (`jepsen/nightly_cases.sh`). The findings, every one fixed, none critical: [jepsen/findings.md](jepsen/findings.md), one list by severity; one by one in [jepsen/findings.html](jepsen/findings.html); the latest run: [jepsen/results.yaml](jepsen/results.yaml) |
-| [nightly/](nightly/nightly.sh) | every suite above but llm/lab, and four of jepsen's cases, each night a watched repository changed; publishes the deb and the EL9 rpm when all pass. Results: [nightly/results.yaml](nightly/results.yaml); code coverage: [nightly/coverage.yaml](nightly/coverage.yaml) |
+| [nightly/](nightly/nightly.sh) | every suite above but llm/lab, and four of jepsen's cases, each night a watched repository changed; publishes the deb and the EL9 rpm when all pass. Results: [nightly/results.yaml](nightly/results.yaml); code coverage: [nightly/coverage.md](nightly/coverage.md), from [nightly/coverage.yaml](nightly/coverage.yaml) |
 
 All of them build from a yt-pgxt checkout next to this one (`YT_PGXT` to point
 elsewhere) and read their settings from `.env` (see [env.example](env.example));
@@ -50,7 +67,7 @@ rmc/ and llm/ keep their own `.env`.
    version to it: one number for the package and the daemon;
 3. builds the extension for every PostgreSQL major and the PostgreSQL 18 package,
    and runs unit, topology (on the regular ytserv), topology-py (fixture A's
-   server-function scripts, on ytserv-py, the build with Python functions), hier,
+   server-function scripts, on ytserv-all, the build with Python functions), hier,
    lxc, migrate (a running database into a cluster), llm, topo (t0-t4, t6), topo
    faults (t5), topo membership (t7) and rmc;
 4. when every suite passed - a test of a known gap fails until the gap is fixed,
@@ -84,8 +101,10 @@ run started by hand. [nightly/coverage.sh](nightly/coverage.sh) does the work:
 - the unit tests under `cargo llvm-cov`;
 - the report: `nightly/coverage.yaml` (total, per crate, per suite) and a
   `coverage:` percent in the run's results.yaml entry; per-file tables and HTML in
-  the run's logs. ytserv's figure goes on the badge (`nightly/badge.py`, served as
-  https://apt.dbinvent.com/paks/nightly/badge.svg), which dbinvent.com shows.
+  the run's logs. ytserv's figure goes on the coverage badge (`nightly/badge.py`, served
+  as https://apt.dbinvent.com/paks/nightly/coverage.svg, beside `badge.svg` with the
+  version and the tests), which dbinvent.com shows and links to the table
+  [nightly/coverage.md](nightly/coverage.md).
 
 Needs `cargo-llvm-cov` and `rustup component add llvm-tools-preview` on the build host.
 
@@ -94,7 +113,10 @@ A run that published also renews the regular ytserv's own badge
 `cargo audit` over the crates in ytserv's tree, and `cargo check -p ytserv` with
 unsafe code forbidden (`-F unsafe_code`; cargo caps the lints of registry crates, so
 it fails only on unsafe code in ytserv's own crates). Needs `cargo-audit` on the
-build host.
+build host. Each advisory is graded by its CVSS score and named on the badge ("1 medium
+advisory"): red only for a high or critical one or unsafe code, yellow for a medium, low
+or unrated one. The badge is the regular ytserv's only: ytserv-all, the build with Python
+functions, holds unsafe code - pyo3, libpython and one call of its own.
 
 ## Preparations
 

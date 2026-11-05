@@ -1,0 +1,41 @@
+name: docker scout
+
+# Docker Scout on YT Cluster's published image, dbinvent/yt:latest on Docker Hub - what
+# users pull (trivy.yml scans it too, with another database). Fails on a CRITICAL or
+# HIGH CVE that has a fix - as trivy.yml's gate: the official postgres:18 image's Debian
+# carries some with none released yet, which no rebuild here can take (owner, 2026-10-29);
+# they are listed in security/trivy-yt-cluster.md. The README's badge, and the one on
+# dbinvent.com, is this workflow's result.
+# Daily after the nightly publishes, and by hand: an advisory can come out with nothing
+# changed here. Scout needs a Docker Hub login: the repository secret DOCKER_TOKEN, a
+# read-only access token of the account dbinvent (as Schema Guard's scout.yml).
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/scout.yml"]
+  schedule:
+    - cron: "40 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout
+  cancel-in-progress: true
+
+jobs:
+  cves:
+    runs-on: ubuntu-latest
+    steps:
+      # pinned to a commit, like trivy-action in trivy.yml. Dependabot bumps the pin.
+      - uses: docker/scout-action@e7e2a72bf1485d10a58f30696b6c513b261ce4fa # v1.29.0
+        with:
+          command: cves
+          image: registry://dbinvent/yt:latest
+          only-severities: critical,high
+          only-fixed: true
+          exit-code: true
+          summary: true
+          dockerhub-user: dbinvent
+          dockerhub-password: ${{ secrets.DOCKER_TOKEN }}

@@ -89,7 +89,7 @@ diag() {
 		qt "$n" "select '     $n state fn '||fn_id||' '||state||' attempt='||attempt||' held='||held||' '||coalesce(left(last_error,80),'')
 		         from rppd_function_state where fn_id between $F_P and $F_D"
 		qt "$n" "select '     $n seen '||q||' '||coalesce(body::text, k) from bk_seen where q <> 'pp' and q <> 'px' order by at"
-		rh "docker logs --since 15m $n 2>&1 | { grep -E 'breaker' || true; } | tail -4 | sed 's/^/     $n log: /'" 2>/dev/null || true
+		rh "docker logs --since 15m $n 2>&1 | { grep -iE 'breaker' || true; } | tail -4 | sed 's/^/     $n log: /'" 2>/dev/null || true
 	done
 	return 0
 }

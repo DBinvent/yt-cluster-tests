@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# topo T4: split and combine of members (yt-pgxt topo-jobs.md, phase 4), on the
+# topo T4: split and combine of members (YT Cluster's topo-jobs.md, phase 4), on the
 # west cluster of the rmc layout - itself below top, beside east - under rmc's
 # load. Destructive: run it last, after a fresh ../rmc/up.sh.
 #
@@ -11,7 +11,8 @@
 # crossing the relay both ways, westx electing its own leader and its group jobs
 # approved by west - its direct upper - never by top. Then westx combines back
 # into west: its nodes members of west again, in zone westx, with the rows
-# written while apart.
+# written while apart. Then again beside west (NEIGHBOR) and back, and above it
+# refused - west has an upper; and a zone of top, which has none, split above it.
 # J9 (split and combine keep every acknowledged row, the relay carries, the new
 # cluster elects), J10. Writes results/t4-<time>.log; exits 0 when no check failed.
 C=west
@@ -87,7 +88,7 @@ check "J9 westx records west above it" UPPER "$(cfgval "$X1" Z westc.level)"
 wait_for 90 leader_among "$X1" "$X2" && XL=$(leader_among "$X1" "$X2") || XL=""
 [ -n "$XL" ] && ok "J9 westx elects its own leader: $XL" || bad "J9 westx elects a leader within 90s: $X1=$(node_state "$X1") $X2=$(node_state "$X2")"
 XF=$X1; [ "$XL" = "$X1" ] && XF=$X2
-# [skv] westx's own store (yt-pgxt skv-secrets.md H9): its genesis on the leaving
+# [skv] westx's own store (YT Cluster's skv-secrets.md H9): its genesis on the leaving
 # nodes' keys makes a master key and a CA of its own, wrapped for both, and its
 # leader pins that CA for westx's joiners (H12) - a genesis that refused the store
 # left westx with neither, so no TLS and no link to west (the nightly of 2026-10-18)
@@ -139,6 +140,95 @@ cwrite "$X1" "insert into topo_s1 values (23, 'in west again')" >/dev/null || ba
 wait_for 30 all_have topo_s1 23 "$X1" "$X2" && ok "J9 its table is written in west's consensus now" || bad "topo_s1 23"
 S2=$(sum "$L" topo_s2)
 for n in $X1 $X2 $KEEP; do check "J9 topo_s2 the same on $n" "$S2" "$(sum "$n" topo_s2)"; done
+
+# ── beside west, under TLS ──────────────────────────────────────────────────
+# (YT Cluster's skv-secrets.md H13, 2026-10-27) west requires TLS, so it signs in to a
+# neighbour only over it: westx holds west's CA approved and trusted from its
+# start, west approves westx's CA by its leader's word (H9) - then TLS both ways,
+# and westx requires it too. A table both hold cannot cross sideways: topo_s2 stays
+say "-- $(now) J9n split westx off again, beside west (NEIGHBOR)"
+cfg_tx $C "update $CFG set value = '$(enc 'az=westc')' where module = 'A' and name = 'public.topo_s2'" || bad "route topo_s2 to westc"
+sleep 5
+nj=$(job_new "$f" split "" "az=westx;level=NEIGHBOR")
+job_wait 240 "$f" "$nj" done "J9n westx split off beside west"
+check "J9n west records westx beside it" NEIGHBOR "$(cfgval "$L" Z westx.level)"
+check "J9n westx records west beside it" NEIGHBOR "$(cfgval "$X1" Z westc.level)"
+wait_for 90 leader_among "$X1" "$X2" && XL=$(leader_among "$X1" "$X2") || XL=""
+[ -n "$XL" ] && ok "J9n westx elects its own leader: $XL" || bad "J9n westx elects a leader within 90s: $X1=$(node_state "$X1") $X2=$(node_state "$X2")"
+XF=$X1; [ "$XL" = "$X1" ] && XF=$X2
+west_ca() { [ -n "$2" ] && [ "$(QT=20 q "$1" -c "select count(*) from json_to_recordset(yt_info('X')) as x(name text, value text, module text) where name like '@ca/%' and value = '$2'" 2>/dev/null)" = 1 ]; }
+WCA=$(cfgval "$X1" K ca:westc)
+west_ca "$L" "$WCA" && ok "J9n westx holds west's CA approved from its start: $WCA" \
+    || bad "J9n westx's K ca:westc [$WCA] is a CA of west's"
+nbca() { [ "$(QT=20 q "$1" -c "select count(*) from $CFG where module = 'X' and name like '@nbca/$2/%'" 2>/dev/null)" -ge 1 ] 2>/dev/null; }
+nbca "$X1" westc && ok "J9n ...and trusts it (@nbca/westc)" || bad "J9n westx holds an @nbca/westc anchor"
+wait_for 120 nbca "$L" westx && ok "J9n west approved westx's CA and trusts it: $(cfgval "$L" K ca:westx)" \
+    || bad "J9n west holds westx's CA: K [$(cfgval "$L" K ca:westx)], peer_tls [$(info "$L" X peer_tls)]"
+xs_tls() { case "$(info "$1" X peer_tls)" in "TLS between members required:"*) return 0;; esac; return 1; }
+wait_for 240 xs_tls "${XL:-$X1}" && ok "J9n westx requires TLS, west included: $(info "${XL:-$X1}" X peer_tls)" \
+    || bad "J9n westx requires TLS: $(info "${XL:-$X1}" X peer_tls)"
+cwrite "$XF" "insert into topo_s1 values (24, 'beside west')" >/dev/null || bad "write topo_s1 in westx beside west"
+wait_for 30 all_have topo_s1 24 "$X1" "$X2" && ok "J9n westx writes its own table" || bad "topo_s1 24 in westx"
+say "-- $(now) J9n westx combines back into west"
+k2=$(job_new "$XF" combine "" "into=westc")
+wait_for 240 named "$X1" "$WUUID" && wait_for 30 named "$X2" "$WUUID" \
+    && ok "J9n $X1 and $X2 name west's cluster again" || bad "J9n both name west: $X1=$(cfgval "$X1" C cluster) $X2=$(cfgval "$X2" C cluster)"
+wait_for 180 counted "$X1" && wait_for 60 counted "$X2" && ok "J9n $L (west) counts both Good" \
+    || bad "J9n $L (west) counts both Good: $X1=[$(info "$L" E "$(node_uuid "$X1")")] $X2=[$(info "$L" E "$(node_uuid "$X2")")]"
+check "J9n $X1 holds what was written beside west" 23 "$(rows "$X1" topo_s1)"
+
+# ── above west: refused below top ───────────────────────────────────────────
+# a cluster holds one upper's countersignature and roots; west is below top
+say "-- $(now) J9u split westx off above west: refused, west has an upper"
+u=$(job_new "$f" split "" "az=westx;level=UPPER")
+job_wait 60 "$f" "$u" refused "J9u a split above a cluster that has an upper is refused under TLS"
+# the reason ytserv gives (split.rs second_upper_refusal) - not a topo_* table's name
+case "$(job_get "$f" "$u" reason)" in *"upper already (top)"*) ok "J9u ...for its upper, top";;
+    *) bad "J9u the refusal names its upper top: [$(job_get "$f" "$u" reason)]";; esac
+
+# ── above top: a cluster with no upper, split UPPER ─────────────────────────
+# (YT Cluster's skv-secrets.md H13) top has no upper: a zone of it splits off above
+# it. The cluster made holds top's CA approved from its start (K ca:top); top pins
+# the new cluster's root - made only at its genesis - from its leader's word, takes
+# its roots, and drops the split's record with them. Two nodes join top first.
+say "-- $(now) J9t u4 and u5 join top; zone topx of them splits off above top (UPPER)"
+add_node upper u4
+add_node upper u5
+TU=$(leader_of upper)
+case "$TU" in ""|u4|u5) bad "J9t top's leader is one of its nodes that stay: [$TU]";; esac
+tf=$(for n in $(members upper); do case "$n" in "$TU"|u4|u5) ;; *) echo "$n"; break;; esac; done)
+zt=$(job_new "$tf" az_create "" "name=topx;tier=0;nodes=$(node_uuid u4),$(node_uuid u5)")
+job_wait 60 "$tf" "$zt" done "J9t zone topx made of u4, u5"
+cfg_tx upper "update $CFG set value = '$(enc 'az=top; no_up; no_down')' where module = 'A' and name in ('public.rmc_ledger', 'public.rmc_probe')" \
+    || bad "J9t the ledger of top stays with top"
+TKEEP=$(for n in $(members upper); do case "$n" in u4|u5) ;; *) printf '%s ' "$n";; esac; done)
+load_members upper $TKEEP
+sleep 5
+st=$(job_new "$tf" split "" "az=topx;level=UPPER")
+job_wait 240 "$tf" "$st" done "J9t topx split off above top"
+# the split's record, written at the cut: there until top holds topx's roots
+t_split_held() { [ "$(QT=20 q "$1" -c "select count(*) from $CFG where module = 'X' and name = '@split/topx'" 2>/dev/null)" = 1 ]; }
+t_upca() { [ "$(QT=20 q "$1" -c "select count(*) from $CFG where module = 'X' and name like '@upca/%'" 2>/dev/null)" -ge 1 ] 2>/dev/null; }
+{ t_split_held "$TU" || t_upca "$TU"; } && ok "J9t the split's record written at the cut (or gone with the roots already)" \
+    || bad "J9t no @split/topx on $TU and no root of topx held"
+set_members upper $TKEEP
+# top changed here: the closing step check starts from now for it
+SNAP_L[upper]=$(leader_of upper); SNAP_T[upper]=$( [ -n "${SNAP_L[upper]}" ] && node_term "${SNAP_L[upper]}")
+check "J9t top records topx above it" UPPER "$(cfgval "$TU" Z topx.level)"
+check "J9t topx records top below it" LOWER "$(cfgval u4 Z top.level)"
+TCA=$(cfgval u4 K ca:top)
+west_ca "$TU" "$TCA" && ok "J9t topx holds top's CA approved from its start: $TCA" \
+    || bad "J9t topx's K ca:top [$TCA] is a CA of top's"
+t_pinned() { [ -n "$(cfgval "$1" Z topx.root)" ]; }
+wait_for 180 t_pinned "$TU" && ok "J9t top pinned topx's root from its leader's word: $(cfgval "$TU" Z topx.root)" \
+    || bad "J9t top pins topx's root: peer_tls [$(info "$TU" X peer_tls)]"
+wait_for 90 leader_among u4 u5 && TXL=$(leader_among u4 u5) || TXL=""
+TROOT=$(cfgval "$TU" Z topx.root)
+[ -n "$TXL" ] && [ -n "$TROOT" ] && check "J9t ...topx's own CA" "$(info "$TXL" X @ca/1)" "$TROOT" \
+    || bad "J9t topx elects a leader and top pins a root: u4=$(node_state u4) u5=$(node_state u5) root [$TROOT]"
+wait_for 120 t_upca "$TU" && ok "J9t top holds topx's root as its upper's" || bad "J9t top holds an @upca row"
+t_split_gone() { [ "$(QT=20 q "$1" -c "select count(*) from $CFG where module = 'X' and name = '@split/topx'" 2>/dev/null)" = 0 ]; }
+wait_for 60 t_split_gone "$TU" && ok "J9t the split's record went with the roots" || bad "J9t @split/topx still on $TU"
 
 after_step $C
 say ""

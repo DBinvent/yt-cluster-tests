@@ -36,11 +36,33 @@ rm -f /var/run/postgresql/.s.YT.*.pid
 # the data directory (conf.d above), so the clone keeps its own identity.
 PGDATA=/var/lib/postgresql/18/main
 CLONED=""
+# COPY_REQUEST=1: as `ytctl --copy` makes a copy (its steps 3, 5 and 6): the copy request
+# committed on the member first - one transaction writing the local row copy.<this node's
+# uuid>, with the sync trigger off, from the member's copy_position as its ytserv says it
+# in that transaction - then the backup, then the row deleted on the member. The copy is
+# seeded from the row it carries, its holes and all, not from `least`.
+COPY_ROW="copy.${NODE_UUID}"
+copy_sql() { su postgres -c "psql -h ${CLONE_FROM} -d ${DB} -X -q -At -v ON_ERROR_STOP=1" ; }
 if [ -n "${CLONE_FROM:-}" ] && [ ! -e "$PGDATA/.rmc-cloned" ]; then
     echo "[node] cloning ${CLONE_FROM}"
+    if [ -n "${COPY_REQUEST:-}" ]; then
+        copy_sql <<SQL || { echo "[node] FATAL: the copy request on ${CLONE_FROM} failed"; sleep infinity; }
+begin; set local session_replication_role = replica;
+delete from ${CFG_TABLE} where module = 'C' and name = '${COPY_ROW}';
+insert into ${CFG_TABLE} (id, name, module, value)
+select -(100 + (abs(hashtext('${COPY_ROW}')::bigint) % 1000000))::integer, '${COPY_ROW}', 'C', value
+from json_to_recordset(yt_info('copy_position')) as x(name text, value text) where name = 'copy_position';
+commit;
+SQL
+        echo "[node] the copy request on ${CLONE_FROM}: $(copy_sql <<< "select value from ${CFG_TABLE} where module = 'C' and name = '${COPY_ROW}'")"
+    fi
     rm -rf "${PGDATA:?}"/*
     su postgres -c "pg_basebackup -h ${CLONE_FROM} -U postgres -D $PGDATA -X stream -c fast" \
         || { echo "[node] FATAL: pg_basebackup from ${CLONE_FROM} failed"; sleep infinity; }
+    if [ -n "${COPY_REQUEST:-}" ]; then
+        copy_sql <<< "begin; set local session_replication_role = replica; delete from ${CFG_TABLE} where module = 'C' and name = '${COPY_ROW}'; commit;" \
+            || echo "[node] the copy request on ${CLONE_FROM} not undone"
+    fi
     touch "$PGDATA/.rmc-cloned" && chown postgres:postgres "$PGDATA/.rmc-cloned"
     CLONED=1
 fi

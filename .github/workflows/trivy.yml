@@ -1,0 +1,74 @@
+name: trivy
+
+# Trivy on YT Cluster's published image, dbinvent/yt:latest on Docker Hub - what users
+# pull: the official postgres:18 image's Debian with PostgreSQL, the yt-cluster package
+# from apt.dbinvent.com, ytserv. YT Cluster's source is private; its own repository
+# scans its crates. Gives the findings to Code scanning (the Security tab), then fails
+# the run on a HIGH or CRITICAL one that has a fix - the README's badge, and the one on
+# dbinvent.com. A finding to accept goes in .trivyignore. Keeps a CycloneDX SBOM of the
+# image as the run's artifact (sbom-image).
+# Daily after the nightly publishes (the nightly runs at 05:00 UTC, some four hours), on
+# a push and by hand: an advisory can come out with nothing changed here.
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/trivy.yml", ".trivyignore"]
+  schedule:
+    - cron: "30 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trivy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # the SARIF upload
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker pull dbinvent/yt:latest
+      # pinned to a commit, not a tag: trivy-action's tags were force-pushed to
+      # malicious code in March 2026 (as Schema Guard's trivy.yml). Dependabot bumps it.
+      - name: scan, all findings to SARIF
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: dbinvent/yt:latest
+          format: sarif
+          output: trivy-image.sarif
+          trivyignores: .trivyignore
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+      - name: gate, HIGH and CRITICAL with a fix
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: dbinvent/yt:latest
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+          skip-setup-trivy: true
+      - name: SBOM, CycloneDX
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: dbinvent/yt:latest
+          format: cyclonedx
+          output: sbom-image.cdx.json
+          skip-setup-trivy: true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: sbom-image
+          path: sbom-image.cdx.json

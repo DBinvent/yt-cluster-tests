@@ -88,9 +88,24 @@ indep_check() { # indep_check <the cluster that was changed>
 
 # I8: a cluster write commits on the leader and reaches another member
 probe_id=0
+# [gap-sql] I8's wait follows the product's: a gap that holds every write stands
+# before a compare closes it twice the longest SQL timeout of the synced tables, and
+# never less than two rounds of the leader's own rollback grace, 4 timeouts and at
+# least 10 s (ytserv recovery.rs gap_compare_after; owner, 2026-10-26) - rmc's tables
+# have no timeout of their own, so that is max(8 x def_sql_timeout_sec, 20 s); plus
+# 60 s for the compare (up to ~35 s with repairs in the logs), the pull and the
+# probe's own round: 80 s at the default 1 s
+i8_wait() { # i8_wait <node>
+    local s g
+    s=$(q "$1" <<< "select value from json_to_recordset(yt_info('c:def_sql_timeout_sec')) as x(name text, value text) where name = 'effective'" 2>/dev/null | tr -dc '0-9')
+    [ -n "$s" ] || s=1
+    g=$(( s * 8 )); [ "$g" -ge 20 ] || g=20
+    echo $(( g + 60 ))
+}
 writable() { # writable <cluster>
-    local c="$1" l w t=0 err=""
-    while [ "$t" -lt 60 ]; do
+    local c="$1" l w t=0 err="" lim=60
+    l=$(leader_of "$c"); [ -z "$l" ] || lim=$(i8_wait "$l")
+    while [ "$t" -lt "$lim" ]; do
         l=$(leader_of "$c")
         w=$(for n in $(members "$c"); do [ "$n" != "$l" ] && echo "$n"; done | head -1)
         if [ -n "$l" ] && [ -n "$w" ]; then
@@ -105,7 +120,7 @@ writable() { # writable <cluster>
         fi
         t=$((t + 6)); sleep 4
     done
-    bad "I8 $c writable within 60s (leader ${l:-none}): ${err//$'\n'/ }"
+    bad "I8 $c writable within ${lim}s (leader ${l:-none}): ${err//$'\n'/ }"
 }
 
 # everything after a step: I5, I6 (when a cluster was named), I1-I4, I8, and what

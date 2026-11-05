@@ -112,13 +112,13 @@ net_up() {
 }
 # YX_COV_MOUNT: a coverage run's volume for the instrumented ytserv's counts
 # (nightly/coverage.sh); unset otherwise.
-node_run() { # node_run <name> [clone-from]
+node_run() { # node_run <name> [clone-from]; COPY_REQUEST=1: the clone as `ytctl --copy` makes it
     local n="$1" from="${2:-}" k
     k=$(node_ip "$n"); k=${k##*.}
     docker rm -f "$(cname "$n")" >/dev/null 2>&1
     docker run -d --name "$(cname "$n")" --hostname "$n" --network "$NET" --ip "$(node_ip "$n")" \
         --network-alias "$n" -e NODE_UUID="$(node_uuid "$n")" -e DB="$DB" -e SECRET="$(secret_of "$n")" \
-        -e CLONE_FROM="$from" -e SEQ_K="$k" ${YX_COV_MOUNT:-} "$IMAGE" >/dev/null
+        -e CLONE_FROM="$from" -e COPY_REQUEST="${COPY_REQUEST:-}" -e SEQ_K="$k" ${YX_COV_MOUNT:-} "$IMAGE" >/dev/null
 }
 load_run() {
     docker rm -f "$(cname "$LOAD")" >/dev/null 2>&1

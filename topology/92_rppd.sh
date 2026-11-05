@@ -86,10 +86,19 @@ sleep 8
 
 rows="$(q "$L" "select count(*) from rppd_config")"
 echo "     rppd_config rows: ${rows:-0} (seeded 1)"
-[ "${rows:-0}" -ge "${#NODES[@]}" ] \
-	&& ok "ytserv registered the roster in rppd_config ($rows rows for ${#NODES[@]} nodes)" \
-	|| bad "rppd_config has ${rows:-0} row(s) for ${#NODES[@]} nodes - the runtime \
+# [rppd-spare] the roster holds every node but a forever spare: it writes nothing, so a
+# function run there - its queue message - was lost (ytserv P18, 2026-10-29)
+RPPD_NODES=()
+for _n in "${NODES[@]}"; do is_spare_node "$_n" || RPPD_NODES+=("$_n"); done
+[ "${rows:-0}" -ge "${#RPPD_NODES[@]}" ] \
+	&& ok "ytserv registered the roster in rppd_config ($rows rows for ${#RPPD_NODES[@]} nodes, no spare)" \
+	|| bad "rppd_config has ${rows:-0} row(s) for ${#RPPD_NODES[@]} nodes (no spare) - the runtime \
 did not pick up the cluster"
+for _n in "${NODES[@]}"; do
+	is_spare_node "$_n" || continue
+	check "the forever spare $_n is not in the rppd roster" "0" \
+		"$(q "$L" "select count(*) from rppd_config where host like '$_n:%' or host_name = '$_n'")"
+done
 
 masters="$(q "$L" "select count(*) from rppd_config where master")"
 check "exactly one node is the rppd master" "1" "$masters"

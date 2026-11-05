@@ -1,18 +1,11 @@
-# jepsen/run.sh, the latest run only (README.md): when it began (UTC), the nodes'
-# yt-cluster build, how many nodes, the test options, the verdict (valid, invalid,
-# unknown), the anomalies Elle found and the consistency models they rule out, the
-# sessions left holding a transaction over a minute at the end (stuck, all nodes),
-# ytserv's CLUSTER DIVERGENCE log lines (divergence, all nodes), the nodes naming
-# no leader at the end (leaderless), and where
-# its store is (store/, not in git).
-- run: 2026-10-25T10:12:27Z
-  build: 1.20.2
+- run: 2026-11-05T00:07:36Z
+  build: 1.20.10
   nodes: 5
-  options: "--workload append --nemesis partition,kill,pause --time-limit 300 --rate 50 --concurrency 2n --isolation serializable --expected-consistency-model cursor-stability --no-sc"
+  options: "--workload rw --nemesis partition,kill,pause,packet --time-limit 300 --rate 50 --concurrency 2n --isolation serializable --expected-consistency-model cursor-stability --recon"
   verdict: valid
   stuck: 0
   divergence: 0
   leaderless: 0
   converged: yes
   recon: {repaired: 0, blocked: 0}
-  store: store/yt-cluster append serializable all kill,partition,pause/2026-10-25T10:13:05.964172447Z
+  store: store/yt-cluster rw serializable all sc recon kill,packet,partition,pause/2026-11-05T00:08:14.840963081Z

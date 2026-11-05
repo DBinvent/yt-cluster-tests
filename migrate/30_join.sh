@@ -37,7 +37,7 @@ lxc file push "$MIG_DEB" "$(cname "$k")/tmp/yt-cluster.deb" >/dev/null
 xn "$k" env DEBIAN_FRONTEND=noninteractive apt-get install -qy /tmp/yt-cluster.deb >/dev/null 2>&1 \
 	&& ok "node $k: apt installs $(basename "$MIG_DEB")" || { bad "node $k: apt install"; finish; }
 for m in $(members) "$k"; do ipn "$m"; done > "$RUN/peers.$k"
-xn "$k" mkdir -p /etc/yt-cluster && lxc file push "$RUN/peers.$k" "$(cname "$k")/etc/yt-cluster/peers" >/dev/null
+push_peers "$k" "$RUN/peers.$k" || bad "node $k: its roster file, three tries"
 check "node $k: the roster file lists every member and itself" "$(members | wc -l | awk '{print $1 + 1}')" "$(xn "$k" grep -c . /etc/yt-cluster/peers)"
 xn "$k" ytctl -v --batch -t "$CFG" --peers /etc/yt-cluster/peers --cluster "$(cat "$RUN/cluster")" --config-trigger \
 	--db "postgresql://postgres@localhost/postgres?host=/var/run/postgresql" > "$RUN/ytctl.$k.log" 2>&1
@@ -98,5 +98,8 @@ first() { [ "$(qc "$k" "select count(*) from mig_seq where node = '$(nuuid "$k")
 wait_for 60 first && ok "node $k: its writer's rows commit ($(writer_counts "$k"))" \
 	|| bad "node $k: its writer's rows do not commit: $(writer_counts "$k"), last [$(xn "$k" tail -1 /root/mig/writer.log 2>/dev/null)]"
 check "node $k's join refused no application write on any node" "$refused0" "$(refused_all)"
+[ "$(refused_all)" = "$refused0" ] || for m in $(members); do
+	xn "$m" sh -c "grep ' ERR ' /root/mig/writer.log" 2>/dev/null | cut -c1-200 | sed "s/^/   ....  node $m refused: /"
+done
 for m in $(members); do say "   ....  node $m writer: $(writer_counts "$m")"; done
 finish

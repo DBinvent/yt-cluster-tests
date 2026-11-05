@@ -71,7 +71,9 @@ look like they are exercising a fix that was never deployed. Check with:
 | `31_commit.sh` | the commit path: explicit and automatic completion, rollback, a prepare vetoed on one member, a failed statement mid-transaction (nothing left open anywhere), PK update / delete / truncate, a 500-row transaction |
 | `86_schema_block.sh`, `87_node_block.sh`, `89_recover.sh` | blocking at table and node scope, a node gone and back |
 | `89b_recovery.sh` | recovery T2/T3: a node's copy repaired from the majority under a lock the leader sees (rows it lacks, the newest above its maximum, one only it has, an ignored column kept); a row no majority decides blocked cluster-wide and recorded, released once the copies agree |
-| `32_schema_change.sh` | a schema change rolled across the running cluster (followers first, the leader last, rumba.md) under writes: the same schema on every node before and after (columns, defaults, positions, constraints, indexes), writes across the mixed window, the schema gate reporting it and clearing, the new column replicating, then an index, a NOT NULL default column and the contract step; S9 the gate judging a widened column by SchemaGuard's rules, defaults and `sg_migration=with_size_cut` |
+| `38_sge_worker.sh` | a schema migration rolled by the sge worker from a row in `sge_history`: the origin first, the leader last; a failure halts it; the origin killed and the leader takes over; a node away and returned to; all at once, by cluster and by table; and nodes killed, paused, cut off and two down together during a roll with writes going on, every node ending on one schema with every acknowledged write; scripts from a zip or a folder on the origin alone, carried to the others with their md5 and size on each row, and from git on one commit |
+| `39_s3_blob.sh` | blobs into an S3 store, on RustFS: `move` inside the transaction, `quick` and `copy` after it, the store down, wrong keys, a rollback, ytserv killed with a file waiting, the origin away, rows there before a mode was set, a 10 MB row between nodes |
+| `32_schema_change.sh` | a schema change rolled across the running cluster (followers first, the leader last, sge_worker.md) under writes: the same schema on every node before and after (columns, defaults, positions, constraints, indexes), writes across the mixed window, the schema gate reporting it and clearing, the new column replicating, then an index, a NOT NULL default column and the contract step; S9 the gate judging a widened column by SchemaGuard's rules, defaults and `sg_migration=with_size_cut` |
 | `23_split.sh` | a real network split (routes cut inside the containers): 4/3 - the minority never leads or commits, heals; 3/3 - neither side commits, one leader after |
 | `92_rppd.sh`, `93_etcd.sh`, `94_clickhouse.sh` | Python server functions on commit, the etcd API v3 surface, the ClickHouse sink |
 | `93b_etcd_upsert.sh` | etcd into Postgres without rppd (`etcd_upsert`): a queue's JSON messages and a prefix's puts upserted into synced tables by the leader - an update keeps the columns it does not carry, a value that is not JSON is rejected and the queue goes on |
@@ -98,12 +100,12 @@ ends with the line the nightly reads. `PLAN.md` is the plan they came from.
 
 The server-function scripts - `05_gitsrv`, `92_rppd`, `92b`, `92c`, `92d`,
 `91_otel`, `94_clickhouse`, `98_mpp_df`, `25_cross_db` - call Python functions,
-which only `ytserv-py`, the build with rppd, has; the rest run on the regular
+which only `ytserv-all`, the build with rppd, has; the rest run on the regular
 `ytserv`. `YX_GROUP` picks the half and with it the build the nodes run
 (`YX_SERVER_BIN`, passed to `node-entrypoint.sh` as `YT_SERVER_BIN`):
 
-    ./run_all.sh                     # all: every script, nodes on ytserv-py
-    YX_GROUP=py ./run_all.sh         # the server-function scripts, on ytserv-py
+    ./run_all.sh                     # all: every script, nodes on ytserv-all
+    YX_GROUP=py ./run_all.sh         # the server-function scripts, on ytserv-all
     YX_GROUP=regular ./run_all.sh    # the rest, on the regular ytserv
 
 The nightly runs the two halves as two suites, `topology-py` and `topology`,

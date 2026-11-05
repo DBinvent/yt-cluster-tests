@@ -25,17 +25,21 @@ Two checks, on yt-cluster's tree as it was built (YT_PGXT, default ../../yt-clus
   a `cfg_attr(.., forbid(unsafe_code))` as no forbid at all. Its own target dir
   (target/unsafe-check): other flags would rebuild target/release.
 
-It is the regular ytserv's badge: ytserv-py, the build with Python functions,
+It is the regular ytserv's badge: ytserv-all, the build with Python functions,
 links pyo3 and libpython and takes SECRET out of its environment in one unsafe
 call of its own.
 
-Green: both hold. A vulnerability in ytserv's tree, or unsafe code that compiled,
-turns it red and says which. A check that could not run (no cargo-audit, no
-network for its advisory database) is named instead of guessed. Renewed, like the
+Green: both hold. Each advisory is graded by its CVSS score, as cargo audit prints it
+(or worked out from a CVSS 3 vector), and the badge names the levels - "1 medium
+advisory": red only for a high or critical one (7.0 and up) or unsafe code that
+compiled; a medium, low or unrated one (RustSec gives many no score) is yellow (owner,
+2026-10-25: a medium advisory is no critical compromise). A check that could not run
+(no cargo-audit, no network for its advisory database) is named instead of guessed. Renewed, like the
 nightly badge, only by a run that published - and written the same way: shields.io
 draws it, a temp file renamed over the old one (badge.py).
 """
 import json
+import math
 import os
 import re
 import subprocess
@@ -75,17 +79,76 @@ def ytserv_tree() -> set:
     return out
 
 
-def audit(tree: set) -> tuple:
-    """(advisories of ytserv's tree, or None when the audit could not run; what it says)"""
+LEVELS = ["critical", "high", "medium", "low", "unrated"]   # worst first
+
+# CVSS 3.x base metrics (FIRST's specification, 3.1)
+CVSS3 = {"AV": {"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.2}, "AC": {"L": 0.77, "H": 0.44},
+         "UI": {"N": 0.85, "R": 0.62}, "CIA": {"H": 0.56, "L": 0.22, "N": 0.0}}
+PR = {False: {"N": 0.85, "L": 0.62, "H": 0.27}, True: {"N": 0.85, "L": 0.68, "H": 0.5}}
+
+
+def cvss3_score(vector: str) -> float | None:
+    """The base score of a CVSS 3.x vector, None for anything else (a CVSS 4 one)"""
+    if not vector or not vector.startswith("CVSS:3."):
+        return None
+    try:
+        m = dict(part.split(":") for part in vector.split("/")[1:])
+        changed = m["S"] == "C"
+        iss = 1 - (1 - CVSS3["CIA"][m["C"]]) * (1 - CVSS3["CIA"][m["I"]]) * (1 - CVSS3["CIA"][m["A"]])
+        impact = 7.52 * (iss - 0.029) - 3.25 * (iss - 0.02) ** 15 if changed else 6.42 * iss
+        exploit = 8.22 * CVSS3["AV"][m["AV"]] * CVSS3["AC"][m["AC"]] * PR[changed][m["PR"]] * CVSS3["UI"][m["UI"]]
+    except (KeyError, ValueError):
+        return None
+    if impact <= 0:
+        return 0.0
+    raw = min((1.08 if changed else 1.0) * (impact + exploit), 10.0)
+    i = round(raw * 100000)   # 3.1's roundup: up to one decimal, float noise aside
+    return i / 100000.0 if i % 10000 == 0 else (math.floor(i / 10000) + 1) / 10.0
+
+
+def level(score: float | None) -> str:
+    if score is None:
+        return "unrated"
+    return "critical" if score >= 9.0 else "high" if score >= 7.0 else "medium" if score >= 4.0 else "low"
+
+
+def printed_scores() -> dict:
+    """advisory id -> the score cargo audit prints for it ("Severity: 5.9 (medium)"),
+    CVSS 4 included; the database is the one the JSON run just fetched"""
+    r = run(["cargo", "audit", "--no-fetch"], timeout=600)
+    scores, current = {}, None
+    for line in r.stdout.splitlines():
+        if line.startswith("ID:"):
+            current = line.split(":", 1)[1].strip()
+        elif line.startswith("Severity:") and current:
+            m = re.match(r"\s*([0-9.]+)", line.split(":", 1)[1])
+            if m:
+                scores[current] = float(m.group(1))
+    return scores
+
+
+def audit(tree: set | None) -> tuple:
+    """(advisories of ytserv's tree as (id, crate, level), or None when the audit could not
+    run; what it says). A tree of None takes the whole workspace (a check by hand)."""
     r = run(["cargo", "audit", "--json"], timeout=600)
     try:
         d = json.loads(r.stdout)
     except ValueError:
         return None, f"cargo audit did not run: {(r.stderr.strip().splitlines() or ['no output'])[-1]}"
-    hits = sorted({f"{v['advisory']['id']} {v['package']['name']}"
-                   for v in d.get("vulnerabilities", {}).get("list", [])
-                   if (v["package"]["name"], v["package"]["version"]) in tree})
-    return hits, ", ".join(hits) if hits else "no advisory in ytserv's tree"
+    found = {(v["advisory"]["id"], v["package"]["name"], v["advisory"].get("cvss") or "")
+             for v in d.get("vulnerabilities", {}).get("list", [])
+             if tree is None or (v["package"]["name"], v["package"]["version"]) in tree}
+    printed = printed_scores() if found else {}
+    hits = sorted(((aid, crate, level(printed.get(aid, cvss3_score(vector)))) for aid, crate, vector in found),
+                  key=lambda h: (LEVELS.index(h[2]), h[0]))
+    return hits, ", ".join(f"{aid} {crate} ({lv})" for aid, crate, lv in hits) if hits else "no advisory in ytserv's tree"
+
+
+def advisories_said(hits: list) -> str:
+    """'1 medium advisory', '1 high, 2 unrated advisories'"""
+    counts = {lv: sum(1 for h in hits if h[2] == lv) for lv in LEVELS}
+    said = ", ".join(f"{n} {lv}" for lv, n in counts.items() if n)
+    return f"{said} advisor{'y' if len(hits) == 1 else 'ies'}"
 
 
 def unsafe_forbidden() -> tuple:
@@ -104,12 +167,12 @@ def badge() -> tuple:
     tree = ytserv_tree()
     hits, audit_says = audit(tree)
     clean, unsafe_says = unsafe_forbidden()
-    parts = ["audit: not run" if hits is None else "audit clean" if not hits else
-             f"{len(hits)} advisor{'y' if len(hits) == 1 else 'ies'}",
+    parts = ["audit: not run" if hits is None else "audit clean" if not hits else advisories_said(hits),
              "unsafe: not checked" if clean is None else "unsafe forbidden" if clean else "unsafe found"]
     ok = hits == [] and clean is True
-    failed = bool(hits) or clean is False
-    color = "brightgreen" if ok else "red" if failed else "lightgrey"
+    severe = clean is False or any(h[2] in ("critical", "high") for h in hits or [])
+    color = ("brightgreen" if ok else "red" if severe else "yellow" if hits
+             else "lightgrey")
     return ({"label": f"ytserv {ytserv_version()}", "message": " · ".join(parts), "color": color},
             f"audit: {audit_says}; unsafe: {unsafe_says}")
 

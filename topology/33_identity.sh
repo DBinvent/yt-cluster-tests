@@ -110,12 +110,24 @@ for n in "${NODES[@]}"; do
 		"$(q "$n" "select qty || '|' || total from ident_t where id = 1")"
 done
 
-q n2 "begin; insert into ident_t (qty, note) values (100, 'n2'); select yt_complete(true); commit;" >/dev/null
+# [diag] what n2's insert said, kept: a refusal or a duplicate key is the cause the
+# checks below cannot show (q drops psql's errors) - printed when I3 fails (nightly
+# 2026-10-26: I3 failed in the whole suite on the lane host, passed on its own)
+I3_SAID="$(printf '%s\n' "begin; insert into ident_t (qty, note) values (100, 'n2'); select yt_complete(true); commit;" \
+	| rh "docker exec -i -u postgres -e PGOPTIONS='-c lock_timeout=20s -c statement_timeout=30s' n2 psql -X -tAq -d $YX_DB 2>&1" 2>&1 \
+	| tr '\n' ' ')"
 sleep 5
+I3_BAD=0
 for n in "${NODES[@]}"; do
-	check "I3 n2's own row on $n, its keys past n1's" "6|6|200|6" \
-		"$(q "$n" "select id || '|' || s || '|' || total || '|' || g from ident_t where note = 'n2'")"
+	got="$(q "$n" "select id || '|' || s || '|' || total || '|' || g from ident_t where note = 'n2'")"
+	[ "$got" = "6|6|200|6" ] || I3_BAD=1
+	check "I3 n2's own row on $n, its keys past n1's" "6|6|200|6" "$got"
 done
+if [ "$I3_BAD" = 1 ]; then
+	echo "  [diag] I3: n2's insert said: [$I3_SAID]"
+	echo "  [diag] I3: n2's sequences id,s,g: $(q n2 "select (select last_value || ',' || is_called from ident_t_id_seq) || ' ' || (select last_value || ',' || is_called from ident_t_s_seq) || ' ' || (select last_value || ',' || is_called from ident_g)")"
+	for n in "${NODES[@]}"; do echo "  [diag] I3: $n: $(info "$n" O cluster)"; done
+fi
 
 # ── I4-I5: a copy (a stage job) ─────────────────────────────────────────────
 L="$(leader_now)"

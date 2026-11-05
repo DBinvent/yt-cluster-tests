@@ -3,11 +3,11 @@
 # the unit tests and the end-to-end suites ran. nightly/nightly.sh measures it in a
 # run that finds nightly/coverage.yaml missing (or with --coverage), through these:
 #
-#   nightly/coverage.sh build <deb> <out.deb>   # instrumented ytserv, ytserv-py + ytctl, and <deb> carrying them
+#   nightly/coverage.sh build <deb> <out.deb>   # instrumented ytserv, ytserv-all + ytctl, and <deb> carrying them
 #   nightly/coverage.sh unit                    # the workspace's cargo tests, instrumented
 #   nightly/coverage.sh report <dir> <yaml>     # <dir>/e2e/<suite>/*.profraw + the unit profiles
 #
-# build: ytserv, ytserv-py (the test clusters run it) and ytctl, release profile,
+# build: ytserv, ytserv-all (the test clusters run it) and ytctl, release profile,
 #   yt-pgxt's own crates compiled with
 #   `-C instrument-coverage --cfg yt_coverage` (coverage-rustc.sh; the registry
 #   crates plain), in yt-pgxt/target/coverage - never target/release, which the
@@ -17,7 +17,7 @@
 #   (ytcluster-common/src/coverage.rs) - rewritten every 5 s, so a node killed by
 #   its test keeps all but its last seconds. A suite mounts a docker volume of its
 #   own over the directory (YX_COV_MOUNT), so the counts outlive the containers.
-# unit: `cargo llvm-cov --workspace --no-fail-fast --no-report`, then ytserv-py's
+# unit: `cargo llvm-cov --workspace --no-fail-fast --no-report`, then ytserv-all's
 #   (--features ytserv/rppd) - the unit suite of a coverage run, the same tests and
 #   the same "test result:" lines.
 # report: per suite, every end-to-end suite together, and the unit tests merged
@@ -53,12 +53,12 @@ build() {
 		|| die "needs cargo-llvm-cov and the llvm-tools component (rustup component add llvm-tools-preview)"
 	(cd "$YT_PGXT" && export YT_COV_ROOT="$(realpath "$YT_PGXT")" RUSTC_WRAPPER="$HERE/coverage-rustc.sh" \
 		CARGO_TARGET_DIR="$COV_TARGET" && cargo build --release -p ytserv -p ytctl \
-		&& cargo build --release -p ytserv --features ytserv/rppd --bin ytserv-py) \
+		&& cargo build --release -p ytserv --features ytserv/rppd --bin ytserv-all) \
 		|| die "the instrumented build failed"
 	stage="$(mktemp -d)"
 	dpkg-deb -R "$deb" "$stage" || die "cannot unpack $deb"
 	install -m 755 "$COV_TARGET/release/ytserv" "$stage/usr/local/bin/yt-cluster/ytserv"
-	install -m 755 "$COV_TARGET/release/ytserv-py" "$stage/usr/local/bin/yt-cluster/ytserv-py"
+	install -m 755 "$COV_TARGET/release/ytserv-all" "$stage/usr/local/bin/yt-cluster/ytserv-all"
 	install -m 755 "$COV_TARGET/release/ytctl" "$stage/usr/local/bin/ytctl"
 	install -d -m 1777 "$stage/var/lib/yt-cluster-cov"
 	(cd "$stage" && find . -path ./DEBIAN -prune -o -type f -printf '%P\0' | sort -z | xargs -0 md5sum > DEBIAN/md5sums)
@@ -72,7 +72,7 @@ unit() {
 	cd "$YT_PGXT" || return 1
 	local rc=0
 	cargo llvm-cov --workspace --no-fail-fast --no-report || rc=1
-	cargo llvm-cov -p ytserv --features ytserv/rppd --bin ytserv-py --no-fail-fast --no-report || rc=1
+	cargo llvm-cov -p ytserv --features ytserv/rppd --bin ytserv-all --no-fail-fast --no-report || rc=1
 	return $rc
 }
 
@@ -82,7 +82,7 @@ e2e_lcov() {
 	"$LLVM_BIN/llvm-profdata" merge -sparse --failure-mode=all "$@" -o "${out%.lcov}.profdata" 2>"${out%.lcov}.merge.log" \
 		|| { echo "  WARN  no usable profile for $(basename "$out")"; return 1; }
 	"$LLVM_BIN/llvm-cov" export -format=lcov -instr-profile "${out%.lcov}.profdata" \
-		-ignore-filename-regex="$IGNORE" "$COV_TARGET/release/ytserv" -object "$COV_TARGET/release/ytserv-py" -object "$COV_TARGET/release/ytctl" > "$out"
+		-ignore-filename-regex="$IGNORE" "$COV_TARGET/release/ytserv" -object "$COV_TARGET/release/ytserv-all" -object "$COV_TARGET/release/ytctl" > "$out"
 }
 
 report() {
@@ -102,7 +102,7 @@ report() {
 	mapfile -t files < <(find "$dir/e2e" -name '*.profraw' -size +0 2>/dev/null)
 	if [ "${#files[@]}" -gt 0 ] && e2e_lcov "$dir/e2e.lcov" "${files[@]}"; then
 		"$LLVM_BIN/llvm-cov" show -format=html -output-dir "$dir/e2e-html" -instr-profile "$dir/e2e.profdata" \
-			-ignore-filename-regex="$IGNORE" "$COV_TARGET/release/ytserv" -object "$COV_TARGET/release/ytserv-py" -object "$COV_TARGET/release/ytctl" >/dev/null 2>&1
+			-ignore-filename-regex="$IGNORE" "$COV_TARGET/release/ytserv" -object "$COV_TARGET/release/ytserv-all" -object "$COV_TARGET/release/ytctl" >/dev/null 2>&1
 	fi
 	ROOT="$YT_PGXT" DIR="$dir" YAML="$yaml" python3 - <<'EOF'
 import glob, json, os, sys

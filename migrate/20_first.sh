@@ -19,7 +19,7 @@ fi
 # the node: its own address is the whole roster, so its uuid is the one every
 # later node's --peers derives for it
 ipn 1 > "$RUN/peers.1"
-xn 1 mkdir -p /etc/yt-cluster && lxc file push "$RUN/peers.1" "$(cname 1)/etc/yt-cluster/peers" >/dev/null
+push_peers 1 "$RUN/peers.1" && ok "node 1: its roster file is in place" || { bad "node 1: its roster file"; finish; }
 xn 1 ytctl -v --batch -t "$CFG" --peers /etc/yt-cluster/peers --config-trigger \
 	--users-db "$MIG_DB" --tables public.mig_seq \
 	--db "postgresql://postgres@localhost/postgres?host=/var/run/postgresql" > "$RUN/ytctl.1.log" 2>&1

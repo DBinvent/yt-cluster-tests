@@ -53,13 +53,19 @@ for o in walk(d):
 sys.exit(1)' "$@"
 }
 
-# check: a purge with the token, of a URL nothing is cached under - it can, or it is not written
+# check: a purge with the token, of a URL nothing is cached under - it can, or it is not
+# written. A token just made is not known to the API at once: refused, it is asked again
+# for about a minute (2026-10-27: the check came straight after the token was made, was
+# refused, and nothing was written)
 check() {
-	local r
-	r="$(printf 'header = "Authorization: Bearer %s"\n' "$CF_PURGE_TOKEN" \
-		| curl -sS -m 20 -K - -X POST -H 'Content-Type: application/json' \
-			--data "{\"files\": [\"$CHECK_URL\"]}" "$CF_API/zones/$CF_ZONE_ID/purge_cache" 2>&1)"
-	grep -q '"success": *true' <<< "$r" && return 0
+	local r i
+	for i in 1 2 3 4 5 6 7; do
+		r="$(printf 'header = "Authorization: Bearer %s"\n' "$CF_PURGE_TOKEN" \
+			| curl -sS -m 20 -K - -X POST -H 'Content-Type: application/json' \
+				--data "{\"files\": [\"$CHECK_URL\"]}" "$CF_API/zones/$CF_ZONE_ID/purge_cache" 2>&1)"
+		grep -q '"success": *true' <<< "$r" && return 0
+		[ "$i" = 7 ] || { echo "   not yet: $(tr -d '\n' <<< "$r" | cut -c1-100) - again in 10 s" >&2; sleep 10; }
+	done
 	echo "the check purge failed: $(tr -d '\n' <<< "$r" | cut -c1-300)" >&2
 	return 1
 }

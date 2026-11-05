@@ -1,32 +1,32 @@
 #!/usr/bin/env python3
-"""Render the newest nightly run as a badge image, served from the apt host.
+"""Render the newest nightly run as two badge images, served from the apt host, and the
+coverage table the second one links to.
 
-    nightly/badge.py                    # results.yaml next to this file -> nightly/badge.svg
-    nightly/badge.py --out PATH         # write the image there (nightly.sh: REPO_DIR/paks/nightly/badge.svg)
-    nightly/badge.py --print            # print the badge and the shields.io URL, fetch nothing
+    nightly/badge.py                    # results.yaml next to this file -> nightly/badge.svg, coverage.svg
+    nightly/badge.py --out PATH         # the first image there, coverage.svg beside it (nightly.sh: REPO_DIR/paks/nightly/)
+    nightly/badge.py --print            # print the badges and the shields.io URLs, fetch and write nothing
 
-The badge is what dbinvent.com shows next to the release it announces:
+The badges are what dbinvent.com shows next to the release it announces, read through its
+own Worker from these two (owner, 2026-11-05: [nightly|<version>: <total> tests] [coverage|81%]):
 
-    https://apt.dbinvent.com/paks/nightly/badge.svg
+    https://apt.dbinvent.com/paks/nightly/badge.svg       nightly | 1.2.0: 5.6K tests
+                                                          nightly | 1.2.0: 5.6K tests · 1 failed
+    https://apt.dbinvent.com/paks/nightly/coverage.svg    coverage | 81%
 
-    nightly 1.2.0 | 3K e2e tests with 86% coverage
-    nightly 1.2.0 | 3K e2e tests · 1 failed with 86% coverage
-
-The count is the end-to-end suites' checks - every suite but the unit tests -
-rounded to thousands (2,854 is 3K); the coverage is ytserv's (owner, 2026-10-19:
-"3K e2e tests with 86% coverage"). Green says they all passed.
+The total is every suite's checks, the unit tests too, in thousands with one decimal (5,624
+is 5.6K). The coverage is ytserv's. Green says they all passed.
 
 A promoted run that ran only the unit tests (nightly.sh --force --suites unit, to
 publish after a run that passed every suite but could not publish, 2026-10-20)
-states the end-to-end count of the newest run of the same deb whose end-to-end
-suites all passed: it ran none of its own, and "0 e2e tests" would not be the truth.
+adds the end-to-end count of the newest run of the same deb whose end-to-end
+suites all passed: it ran none of its own, and its unit tests alone would not be the truth.
 
 The badge is the newest promotion: the newest run that published its package
 (`published:` set in results.yaml). A run that failed, or passed and published
-nothing (a coverage run, --no-publish), leaves the badge as it is - it vouches for
-what can be installed, and nightly.sh renews it only after a run that published.
+nothing (a coverage run, --no-publish), leaves the badges as they are - they vouch for
+what can be installed, and nightly.sh renews them only after a run that published.
 
-The label is the ytserv tested, the message the total and how it went. A promoted
+The nightly badge's message is the ytserv tested, the total and how it went. A promoted
 run passed every suite, so it is green; red is only for an entry that says
 published but failed, which nightly.sh never writes. A suite skipped for a missing
 outside service is named: it tested nothing, and a green badge should not hide
@@ -34,13 +34,17 @@ that. Coverage is ytserv's line coverage, unit and end-to-end tests together,
 from coverage.yaml - the last measurement: a run measures only when that file is
 missing (or lists fewer suites than a whole run), so most runs carry none of their own.
 
-The image is drawn here, at the end of the run: shields.io's static badge renders
+coverage.md, next to this file, is the table behind the coverage badge: coverage.yaml by
+crate and by suite. Written here on every run that draws the badges, and pushed to the
+public repository by hand now and then, with the rest of it.
+
+The images are drawn here, at the end of the run: shields.io's static badge renders
 label, message and color into an SVG, and the SVG is written in place of the old
 one (a temp file renamed over it, so a fetch never sees half of it). Nothing reads
-it from GitHub, so no push is needed: under /paks/ the apt host's nginx serves a
+them from GitHub, so no push is needed: under /paks/ the apt host's nginx serves a
 name with no version in it as max-age=300, must-revalidate, and Cloudflare follows
-that - a new badge is on the page within five minutes. shields.io unreachable
-(after a few tries): nothing written, the previous badge stays, exit 1.
+that - a new badge is on the page within ten minutes. shields.io unreachable
+(after a few tries): nothing written, the previous badges stay, exit 1.
 
 Only the tail of results.yaml is read: the file only grows, and the newest
 promotion is the last `- run` entry with `published:` set - the last TAIL lines,
@@ -59,6 +63,7 @@ HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results.yaml"
 BADGE = HERE / "badge.svg"
 COVERAGE = HERE / "coverage.yaml"
+COVERAGE_TABLE = HERE / "coverage.md"
 SHIELDS = "https://img.shields.io/static/v1"
 TAIL = 30
 TRIES = 3
@@ -110,18 +115,26 @@ def e2e_tested(path: Path, deb: str) -> int:
         n *= 4
 
 
-def ytserv_coverage() -> float | None:
-    """ytserv's percent in coverage.yaml, as nightly.sh last measured it."""
+def read_coverage() -> dict | None:
+    """coverage.yaml as nightly.sh last wrote it, None when it cannot be read."""
     try:
-        crates = yaml.safe_load(COVERAGE.read_text())["crates"]
-        return next(float(c["percent"]) for c in crates if c.get("name") == "ytserv")
-    except (OSError, yaml.YAMLError, KeyError, TypeError, ValueError, StopIteration):
+        data = yaml.safe_load(COVERAGE.read_text())
+    except (OSError, yaml.YAMLError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def ytserv_coverage(data: dict | None) -> float | None:
+    """ytserv's percent in coverage.yaml."""
+    try:
+        return next(float(c["percent"]) for c in data["crates"] if c.get("name") == "ytserv")
+    except (KeyError, TypeError, ValueError, StopIteration):
         return None
 
 
 def thousands(n: int) -> str:
-    """A count as the badge states it: thousands, rounded (2,854 is 3K)."""
-    return f"{n / 1000:.0f}K" if n >= 1000 else f"{n:,}"
+    """A count as the badge states it: thousands with one decimal (5,624 is 5.6K)."""
+    return f"{n / 1000:.1f}K" if n >= 1000 else f"{n:,}"
 
 
 def badge(run: dict) -> dict:
@@ -130,22 +143,63 @@ def badge(run: dict) -> dict:
     passed, failed = int(totals.get("passed", 0)), int(totals.get("failed", 0))
     suites = run.get("suites") or []
     skipped = sum(1 for s in suites if s.get("result") == "skipped")
-    # the end-to-end checks: every suite's but the unit tests'
-    e2e_suites = [s for s in suites if s.get("name") != "unit"]
-    e2e = sum(int(s.get("passed", 0)) + int(s.get("failed", 0)) for s in e2e_suites)
-    if suites and not e2e_suites:
+    total = passed + failed
+    if suites and all(s.get("name") == "unit" for s in suites):
         # only the unit tests ran: the end-to-end count this deb was tested with
-        e2e = e2e_tested(RESULTS, str((run.get("version") or {}).get("deb", "")))
-    tests = f"{thousands(e2e)} e2e tests" if suites else f"{thousands(passed + failed)} tests"
-    coverage = ytserv_coverage()
-    with_coverage = f" with {coverage:.0f}% coverage" if coverage is not None else ""
+        total += e2e_tested(RESULTS, str((run.get("version") or {}).get("deb", "")))
+    tests = f"{thousands(total)} tests"
     if run.get("result") == "pass":
         color = "brightgreen"
-        message = tests + with_coverage + (f" · {skipped} suite{'s' if skipped > 1 else ''} skipped" if skipped else "")
+        message = tests + (f" · {skipped} suite{'s' if skipped > 1 else ''} skipped" if skipped else "")
     else:
         color = "red"
-        message = (f"{tests} · {failed:,} failed" if suites else "build failed") + with_coverage
-    return {"label": f"nightly {version}", "message": message, "color": color}
+        message = f"{tests} · {failed:,} failed" if suites else "build failed"
+    return {"label": "nightly", "message": f"{version}: {message}", "color": color}
+
+
+def coverage_badge(percent: float) -> dict:
+    color = "brightgreen" if percent >= 80 else "yellow" if percent >= 60 else "red"
+    return {"label": "coverage", "message": f"{percent:.0f}%", "color": color}
+
+
+def percent(v) -> str:
+    return f"{float(v):.1f}%"
+
+
+def coverage_table(data: dict) -> str:
+    """coverage.md: what the coverage badge stands on. Public: nothing local in it."""
+    version = (data.get("version") or {}).get("ytserv", "?")
+    lines = data.get("lines") or {}
+    out = [
+        "# Code coverage",
+        "",
+        "The lines of YT Cluster's Rust code that the nightly's tests ran: the unit tests and",
+        "every end-to-end suite, against an instrumented ytserv and ytctl",
+        "([coverage.sh](coverage.sh) says what counts). The coverage badge shows ytserv's figure.",
+        "",
+        f"Written from [coverage.yaml](coverage.yaml): run {data.get('run', '?')}, measured"
+        f" {str(data.get('measured', '?'))[:10]}",
+        f"on ytserv {version}, run result: {data.get('result', '?')}. A run measures only when"
+        " asked or when that file is",
+        "missing, so the figures can be older than the newest release.",
+        "",
+        "## By crate",
+        "",
+        "| Crate | Lines | Covered | By unit tests | By end-to-end suites |",
+        "|---|--:|--:|--:|--:|",
+    ]
+    for c in data.get("crates") or []:
+        out.append(f"| {c.get('name')} | {int(c.get('lines', 0)):,} | {percent(c.get('percent', 0))}"
+                   f" | {percent(c.get('unit', 0))} | {percent(c.get('e2e', 0))} |")
+    out.append(f"| **All** | **{int(lines.get('total', 0)):,}** | **{percent(lines.get('percent', 0))}** | | |")
+    out += ["", "## By suite", "", "The share of all those lines each one ran alone. They overlap, so they do not add up.",
+            "", "| Suite | Lines it ran |", "|---|--:|"]
+    names = {"unit": "unit tests", "e2e": "all end-to-end suites together"}
+    by = data.get("by") or {}
+    for key in ["unit", "e2e"] + sorted(k for k in by if k not in names):
+        if key in by:
+            out.append(f"| {names.get(key, key)} | {percent(by[key])} |")
+    return "\n".join(out) + "\n"
 
 
 def render(b: dict) -> bytes:
@@ -182,16 +236,26 @@ def main() -> int:
     except (OSError, ValueError, yaml.YAMLError, IndexError, TypeError) as err:
         print(f"badge: {err}", file=sys.stderr)
         return 1
-    b = badge(run)
+    data = read_coverage()
+    pct = ytserv_coverage(data)
+    images = [(out, badge(run))]
+    if pct is not None:
+        images.append((out.with_name("coverage.svg"), coverage_badge(pct)))
     if "--print" in sys.argv:
-        print(f"{b['label']} | {b['message']} ({b['color']})\n{SHIELDS}?{urllib.parse.urlencode(b)}")
+        for _, b in images:
+            print(f"{b['label']} | {b['message']} ({b['color']})\n{SHIELDS}?{urllib.parse.urlencode(b)}")
         return 0
     try:
-        write(out, render(b))
+        # both drawn before either is written: the page never shows a new one beside an old one
+        drawn = [(path, b, render(b)) for path, b in images]
+        for path, b, svg in drawn:
+            write(path, svg)
+            print(f"badge: {path} <- run {run.get('run')}: {b['label']} | {b['message']}")
+        if data is not None:
+            write(COVERAGE_TABLE, coverage_table(data).encode())
     except OSError as err:
         print(f"badge: {err}", file=sys.stderr)
         return 1
-    print(f"badge: {out} <- run {run.get('run')}: {b['label']} | {b['message']}")
     return 0
 
 

@@ -41,10 +41,16 @@
 #    target, EL9, musl, the extension - then the deb into the apt repository, the
 #    EL9 rpm into REPO_DIR/yum/el9, the tarball of the static (musl) binaries into
 #    REPO_DIR/paks (ytcluster_dist/build_tgz.sh), and the image dbinvent/yt
-#    (ytcluster_dist/docker/publish.sh: built from the deb as apt serves it). And
-#    sge, when its version (sge/Cargo.toml) is one the repository does not list:
-#    its deb, its tarball and the image dbinvent/sge (sge/dist/publish.sh). A
-#    failed build publishes nothing; a failed step stops the ones after it.
+#    (ytcluster_dist/docker/publish.sh: built from the deb as apt serves it). sge is
+#    neither built nor published here, nor its SBOMs written: it is a product of its
+#    own (owner, 2026-10-31), watched only as the library ytserv links. A failed
+#    build publishes nothing; a failed step stops the ones after it.
+#    What a step replaces under the same URL - the deb (its name carries only
+#    major.minor), its .sig, yum's index, the *-latest tarballs - is purged from
+#    the CDN's edge after it (CF_ZONE_ID, CF_PURGE_TOKEN in .env:
+#    nightly/cf-purge-token.sh): with no token that purges at the publish, nothing
+#    is published. .env is read again at each purge: a token set up while a run is
+#    under way counts.
 # 6. The run is appended to nightly/results.yaml, oldest first: a page shows it
 #    newest first by reading the list in reverse.
 # 7. A run that published (a promotion) renews the badge dbinvent.com shows:
@@ -82,6 +88,8 @@ export USER="${USER:-$(id -un)}"
 
 HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 TESTS="$(cd "$HERE/.." && pwd)"
+# the purge token and the zone from the environment, not .env: kept as they are (cf_purge)
+CF_FROM_ENV="${CF_PURGE_TOKEN:+1}"; CF_ZONE_FROM_ENV="${CF_ZONE_ID:+1}"
 if [ -f "$TESTS/.env" ]; then
 	_keep="$(export -p)"; set -a; . "$TESTS/.env"; set +a; eval "$_keep"; unset _keep
 fi
@@ -91,8 +99,10 @@ DIST="${DIST:-$GIT_ROOT/ytcluster_dist}"
 INFRA_APT="${INFRA_APT:-$GIT_ROOT/infra_apt}"
 REPO_DIR="${REPO_DIR:-}"   # the apt repository root, yum/el9 under it: .env
 GPG_KEY="${GPG_KEY:-D9988976429AE53380B9E08C47C722E2BC8094E8}"
+PUBLIC_APT="${PUBLIC_APT:-https://apt.dbinvent.com}"   # the apt host, as the internet reaches it
 # the edge's copies of what a publish replaced (purge_edge): .env; the token stays
-# in this shell, no suite needs it
+# in this shell, no suite needs it. A publish needs it: with no token that purges,
+# it replaces nothing (purge_ready)
 CF_ZONE_ID="${CF_ZONE_ID:-}"
 CF_PURGE_TOKEN="${CF_PURGE_TOKEN:-}"; export -n CF_PURGE_TOKEN
 RMC_SSH="${RMC_SSH:-}"
@@ -125,7 +135,7 @@ in_lane() {
 # [lanes] LXC_SSH: the host the lxc suite's LXD container runs on - an ssh target,
 # its scripts and the build's files copied there (s_lxc); empty: here
 LXC_SSH="${LXC_SSH:-}"
-# topology-py: fixture A's server-function scripts, on ytserv-py (the build with
+# topology-py: fixture A's server-function scripts, on ytserv-all (the build with
 # Python functions); topology: the rest of it, on the regular ytserv
 ALL_SUITES="unit topology topology-py hier lxc migrate llm topo topo-faults topo-membership rmc jepsen"
 # suites a coverage measurement does not count: migrate installs the package as an
@@ -205,13 +215,16 @@ for p in m["packages"]:
 # fp <repo dir> [dir...]: the content of every .rs file under the repository (or
 # under the dirs given) - committed or not, tracked or not, ignored ones never.
 # Only code counts: a doc, a script, a Cargo.toml version bump changes nothing.
+# Sorted in the C locale, whatever the caller's: cron runs in it, and a run by hand
+# from a UTF-8 shell sorted the same files another way - another fingerprint for the
+# same code, a change the next cron run would see (2026-10-27).
 fp() {
 	local d="$1"; shift
 	[ -e "$d/.git" ] || { echo "absent"; return; }
 	local specs=() p
 	if [ $# -eq 0 ]; then specs=(':(glob)**/*.rs'); else for p in "$@"; do specs+=(":(glob)$p/**/*.rs"); done; fi
 	(cd "$d" && git ls-files -co --exclude-standard -z -- "${specs[@]}" 2>/dev/null \
-		| sort -zu | xargs -0 -r sha256sum 2>/dev/null) | sha256sum | cut -c1-16
+		| LC_ALL=C sort -zu | xargs -0 -r sha256sum 2>/dev/null) | sha256sum | cut -c1-16
 }
 short_rev() { # <repo dir>: the commit, +dirty when the working tree differs from it
 	local d="$1" r
@@ -270,6 +283,72 @@ if [ "$TRIGGER" != coverage ] && [ -n "$LAST_V" ] && dpkg --compare-versions "$D
 
 say "== nightly $(now): $TRIGGER - changed: ${CHANGED:-none} (watching: $WATCH)"
 say "   deb $PKG_V, build $DEB_V (published: ${PUB_V:-none}, build ${LAST_V:-none}), ytserv $YTS_V; suites: $NIGHTLY_SUITES${LANE_HOST:+ (lanes: unit here, ${LANE_SUITES} on $LANE_HOST)}${LXC_SSH:+, lxc on $LXC_SSH}; publish: $NIGHTLY_PUBLISH; coverage: $( [ "$COVERAGE" = 1 ] && echo "measured$( [ -f "$COVERAGE_FILE" ] && { cov_whole || echo " (the last one was partial)"; } || echo " ($(basename "$COVERAGE_FILE") missing)")" || echo no)"
+# [deb-version] cf_purge <url>...: Cloudflare's copies of these URLs dropped (purge
+# by URL) - with CF_ZONE_ID and CF_PURGE_TOKEN (an API token: Zone - Cache Purge -
+# Purge, on dbinvent.com) from .env. Asked again (PURGE_ONCE unset) for about five minutes while the API
+# does not answer, fails (5xx) or holds back (429): a file replaced and not purged is
+# held at the edge a day; a refusal (4xx) is not asked again (review of 2026-10-27).
+# 0, or 1 with PURGE_WHY (what the API or curl answered: the log) and PURGE_SHORT
+# (the same in a few words of ours, none of Cloudflare's: the run's note, which is
+# committed). The token goes to curl on stdin, never on a command line.
+cf_purge() {
+	PURGE_WHY=""; PURGE_SHORT=""
+	# as .env has it now, unless the environment gave it: a token set up or replaced while
+	# a run is under way counts at its next purge - the publish's, hours after the start
+	# - each on its own: a zone from the environment with the token in .env stays (review
+	# of 2026-10-27: it was read back empty)
+	if { [ -z "$CF_FROM_ENV" ] || [ -z "$CF_ZONE_FROM_ENV" ]; } && [ -f "$TESTS/.env" ]; then
+		local z t
+		{ IFS= read -r z; IFS= read -r t; } < <(unset CF_ZONE_ID CF_PURGE_TOKEN; set +u
+			. "$TESTS/.env" > /dev/null 2>&1; printf '%s\n%s\n' "${CF_ZONE_ID:-}" "${CF_PURGE_TOKEN:-}")
+		[ -n "$CF_ZONE_FROM_ENV" ] || CF_ZONE_ID="$z"
+		[ -n "$CF_FROM_ENV" ] || CF_PURGE_TOKEN="$t"
+	fi
+	if [ -z "$CF_ZONE_ID" ] || [ -z "$CF_PURGE_TOKEN" ]; then
+		PURGE_SHORT="no CF_ZONE_ID or CF_PURGE_TOKEN in .env"; return 1
+	fi
+	local r code wait waits="10 20 40 60 60 60 60 -"
+	# PURGE_ONCE: a check that only warns asks once - its retries held a run up to five
+	# minutes each, a publish's own purge waiting again after it (review of 2026-10-27)
+	[ -n "${PURGE_ONCE:-}" ] && waits="-"
+	for wait in $waits; do
+		r="$(printf 'header = "Authorization: Bearer %s"\n' "$CF_PURGE_TOKEN" \
+			| curl -sS -m 20 -K - -X POST -H 'Content-Type: application/json' -w '\nhttp_code=%{http_code}\n' \
+				--data "{\"files\": [$(printf '"%s",' "$@" | sed 's/,$//')]}" \
+				"https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache" 2>&1)"
+		code="$(grep -oP '^http_code=\K[0-9]+' <<< "$r" | tail -1)"; r="$(grep -v '^http_code=' <<< "$r")"
+		[ "$code" = 200 ] && grep -q '"success": *true' <<< "$r" && return 0
+		case "$code" in 429|5??|000|"") ;; *) break ;; esac
+		[ "$wait" = - ] || sleep "$wait"
+	done
+	PURGE_WHY="$(tr -d '\n' <<< "$r" | cut -c1-300)"
+	case "$code" in
+		429) PURGE_SHORT="Cloudflare's API held back (HTTP 429)" ;;
+		5??) PURGE_SHORT="Cloudflare's API failed (HTTP $code)" ;;
+		4??) PURGE_SHORT="Cloudflare refused it (HTTP $code)" ;;
+		200) PURGE_SHORT="Cloudflare did not purge it" ;;
+		*) PURGE_SHORT="Cloudflare's API did not answer" ;;
+	esac
+	return 1
+}
+# said now, not hours later at the publish: a green run's publish purges the edge, or
+# publishes nothing (review of 2026-10-27: a token that had gone was found only after
+# the suites). A dry run asks Cloudflare nothing.
+if [ "$NIGHTLY_PUBLISH" = 1 ]; then
+	if [ -z "$CF_ZONE_ID" ] || [ -z "$CF_PURGE_TOKEN" ]; then
+		# a run reads .env again at each purge (cf_purge): one set up by the publish counts
+		say "   no CF_ZONE_ID or CF_PURGE_TOKEN in .env: set one up before the publish (nightly/cf-purge-token.sh), or a green run publishes nothing"
+	elif [ "$DRY" != 1 ]; then
+		if PURGE_ONCE=1 cf_purge "$PUBLIC_APT/cf-purge-token.check"; then say "   edge purge: the token purges"
+		else
+			case "$PURGE_SHORT" in
+				# the token, or the zone: one that works, set up by the publish, counts (cf_purge)
+				"Cloudflare refused"*|"Cloudflare did not"*) say "   edge purge fails - $PURGE_SHORT${PURGE_WHY:+ ($PURGE_WHY)}: set a working token up before the publish (nightly/cf-purge-token.sh), or a green run publishes nothing" ;;
+				*) say "   edge purge fails now - $PURGE_SHORT${PURGE_WHY:+ ($PURGE_WHY)}: unless it works by the publish, a green run publishes nothing" ;;
+			esac
+		fi
+	fi
+fi
 if [ "$DRY" = 1 ]; then
 	[ "$NEED_BUMP" = 1 ] && say "   would bump the build's patch past $LAST_V, and set ytserv's version to it"
 	[ "$NEED_BUMP" = 0 ] && [ "$YTS_V" != "$DEB_V" ] && say "   would set ytserv's version to the build's, $DEB_V"
@@ -345,8 +424,8 @@ build() {
 	cd "$YT_PGXT" || return 1
 	FORCE=1 bash ytpgc/build-all-ytpgc.sh || { echo "  FAIL  build: the extension (build-all-ytpgc.sh)"; return 1; }
 	cargo build --release -p ytserv -p ytctl || { echo "  FAIL  build: cargo build ytserv ytctl"; return 1; }
-	# ytserv-py, the build with rppd (Python functions): the one the test clusters run
-	cargo build --release -p ytserv --features ytserv/rppd --bin ytserv-py || { echo "  FAIL  build: cargo build ytserv-py"; return 1; }
+	# ytserv-all, the build with rppd (Python functions): the one the test clusters run
+	cargo build --release -p ytserv --features ytserv/rppd --bin ytserv-all || { echo "  FAIL  build: cargo build ytserv-all"; return 1; }
 	# the third-party crates by license tag, shipped beside LICENSE (the list in the
 	# tree stays when this fails)
 	python3 -I ytctl/lib-licenses.py || echo "  WARN  lib-licenses.txt not refreshed"
@@ -360,13 +439,13 @@ build() {
 }
 
 # ── 4. the suites ───────────────────────────────────────────────────────────────
-# the workspace, then ytserv's tests again as ytserv-py: its rppd code builds only
+# the workspace, then ytserv's tests again as ytserv-all: its rppd code builds only
 # with the feature
 s_unit() {
 	cd "$YT_PGXT" || return 1
 	local rc=0
 	cargo test --workspace --no-fail-fast || rc=1
-	cargo test -p ytserv --features ytserv/rppd --bin ytserv-py --no-fail-fast || rc=1
+	cargo test -p ytserv --features ytserv/rppd --bin ytserv-all --no-fail-fast || rc=1
 	return $rc
 }
 # a command on topology's and hier's docker host (YX_HOST: an ssh target, or local)
@@ -376,7 +455,7 @@ on_docker_host() {
 }
 # fixture A in two halves (topology/run_a.sh YX_GROUP), each a fixture of its own:
 # topology the regular ytserv's, topology-py the server-function scripts' on
-# ytserv-py - under an image name of its own, so the two can build on one host at once
+# ytserv-all - under an image name of its own, so the two can build on one host at once
 s_topology() {
 	cd "$TESTS/topology"
 	export YT_CLUSTER_DEB="$SUITE_DEB" YX_NODES="n1 n2 n3 n4 n5 n6 n7" YX_GROUP=regular
@@ -419,7 +498,7 @@ s_lxc() {
 	# extension's SQL went missing), listed relative to it
 	for f in "$YT_PGXT/$bin/ytctl" "$YT_PGXT/$bin/ytserv" "$YT_PGXT"/target/glibc*/ytserv-glibc* \
 		"$YT_PGXT"/target/glibc*/ytctl-glibc* "$YT_PGXT/target/musl/ytserv-musl" \
-		"$YT_PGXT/$bin/ytserv-py" "$YT_PGXT"/target/glibc*/ytserv-py-glibc* "$YT_PGXT/target/musl/ytserv-py-musl" \
+		"$YT_PGXT/$bin/ytserv-all" \
 		"$YT_PGXT/ytpgc/dist" \
 		"$YT_PGXT/ytpgc/yt_cluster.control" "$YT_PGXT"/ytpgc/yt_cluster--*.sql; do
 		[ -e "$f" ] && files+=("${f#"$YT_PGXT"/}")
@@ -629,7 +708,7 @@ host_lane() {
 	return $rc
 }
 
-RESULT=pass; BUILD=pass; PUBLISHED_DEB=""; PUBLISHED_RPM=""; PUBLISHED_TGZ=""; PUBLISHED_IMAGE=""; PUBLISHED_SGE=""; NOTE=""; COVERAGE_PCT=""; COV_NOTE=""
+RESULT=pass; BUILD=pass; PUBLISHED_DEB=""; PUBLISHED_RPM=""; PUBLISHED_TGZ=""; PUBLISHED_IMAGE=""; NOTE=""; COVERAGE_PCT=""; COV_NOTE=""
 if suite build build; then
 	if [ "$COVERAGE" = 1 ]; then
 		if suite coverage-build cov_build; then SUITE_DEB="$LOGS/yt-cluster_${DEB_V}_amd64-pg18-coverage.deb"
@@ -678,12 +757,22 @@ fi
 echo "$TESTED_FP" > "$STATE/tested.fp"
 
 # ── 5. publish ──────────────────────────────────────────────────────────────────
-# Every step checked by hand, never by `set -e`: these run as the condition of an
-# `if` (suite release release && suite publish publish), where bash ignores it - so
+# Every step checked by hand, never by `set -e`: these run as an && list (suite
+# release release && suite publish publish), where bash ignores it - so
 # a failed release build went on to "OK" with no file, publish "published" nothing,
 # and the runs of 2026-10-12 and 13 recorded 0.18.81 and 1.18.86 as published and
 # renewed the badge while apt still served 0.12.1.
 release() {
+	# the publish after it purges the edge, or publishes nothing: said here too, while
+	# there is time to set a token up - the publish's purge reads .env again (cf_purge)
+	if ! PURGE_ONCE=1 cf_purge "$PUBLIC_APT/cf-purge-token.check"; then
+		case "$PURGE_SHORT" in
+			# no token, or one refused: the operator's to set up; an outage: the API's to end
+			"no CF_ZONE_ID"*|"Cloudflare refused"*|"Cloudflare did not"*)
+				echo "  WARN  edge purge fails now - $PURGE_SHORT: set a token up before the publish (nightly/cf-purge-token.sh), or nothing is published" ;;
+			*) echo "  WARN  edge purge fails now - $PURGE_SHORT: unless it works by the publish, nothing is published" ;;
+		esac
+	fi
 	cd "$YT_PGXT" || return 1
 	BASE_IMAGE=almalinux:9 GLIBC_TAG=2_34 ./build_glibc.sh \
 		|| { echo "  FAIL  release: build_glibc.sh (EL9, glibc 2.34) exited $?"; return 1; }
@@ -701,13 +790,37 @@ release() {
 	echo "  OK    release build: $(basename "$REL_DEB"), $(basename "$REL_RPM")"
 }
 publish() {
-	local deb rpm
+	local deb rpm rc purged key deb_urls=()
 	deb="$(grep -oP '(?<=^deb=).*' "$LOGS/release.out" 2>/dev/null)"; rpm="$(grep -oP '(?<=^rpm=).*' "$LOGS/release.out" 2>/dev/null)"
 	{ [ -f "$deb" ] && [ -f "$rpm" ]; } \
 		|| { echo "  FAIL  publish: no release build to publish (deb=${deb:-none} rpm=${rpm:-none})"; return 1; }
+	# again, before the repository changes: the token may have gone during the build
+	purge_ready || return 1
+	# from here on a Ctrl-C, a lost terminal (HUP) or a signal to the run's process group
+	# (kill -- -<pgid>): what the steps may have replaced is purged before the run ends as
+	# asked - between a replace and its purge, the edge would hand out the file before for
+	# a day. A TERM to the main shell alone does not reach this shell: the publish goes on
+	# to its end, purges and all, unrecorded (review of 2026-10-27)
+	trap 'publish_stopped "$deb" "$rpm" INT' INT; trap 'publish_stopped "$deb" "$rpm" TERM' TERM
+	trap 'publish_stopped "$deb" "$rpm" HUP' HUP
 	DEB="$deb" REPO_DIR="$REPO_DIR" CONF_DIR="$DIST/repo-conf" CODENAME=yt-cluster PACKAGE=yt-cluster GPG_KEY="$GPG_KEY" \
-		INSTALL_HTML="$DIST/install.html" "$INFRA_APT/scripts/publish-apt.sh" \
-		|| { echo "  FAIL  deb not published: publish-apt.sh exited $?"; return 1; }
+		INSTALL_HTML="$DIST/install.html" "$INFRA_APT/scripts/publish-apt.sh"; rc=$?
+	# [deb-version] the edge holds both a day (the apt host's nginx, $pool_cache) and
+	# this build replaced them at the same path: its copies of the earlier one go - after
+	# a publish-apt.sh that failed too, which may have replaced them before it did
+	key="$(reprepro -b "$REPO_DIR" --list-format '${$filekey}\n' list yt-cluster yt-cluster 2>/dev/null | head -1)"
+	[ -n "$key" ] && deb_urls+=("$PUBLIC_APT/$key")
+	deb_urls+=("$PUBLIC_APT/$(basename "$deb").sig")
+	purge_edge "${deb_urls[@]}"; purged=$?
+	[ "$rc" = 0 ] || { echo "  FAIL  deb not published: publish-apt.sh exited $rc"; return 1; }
+	# replaced, and the edge's copy not dropped through a round of retries: a second round.
+	# Still not: stopped - an index the edge holds against another deb is apt's "Hash Sum
+	# mismatch", and the rest checks the edge - with a note of its own: the deb went out at
+	# the origin (LOGS/purge.stuck; review of 2026-10-27: the note said "the release build
+	# or the publish failed" while the origin served the build)
+	if [ "$purged" != 0 ]; then
+		purge_edge "${deb_urls[@]}" || { echo "$PKG_V - $PURGE_SHORT" > "$LOGS/purge.stuck"; return 1; }
+	fi
 	# what apt now serves: the version this run built, or it was not published -
 	# and, the version being the release's, this run's build of it
 	local now; now="$(published_deb)"
@@ -716,25 +829,48 @@ publish() {
 	# only the latest: the signatures of the versions before it go
 	find "$REPO_DIR" -maxdepth 1 -name 'yt-cluster_*_amd64.deb.sig' ! -name "$(basename "$deb").sig" -delete
 	echo "  OK    deb published: $(basename "$deb"), build $DEB_V"
-	# [deb-version] the edge holds both a day (the apt host's nginx, $pool_cache) and
-	# this build replaced them at the same path: its copies of the earlier one go
-	purge_edge "$PUBLIC_APT/$(reprepro -b "$REPO_DIR" --list-format '${$filekey}\n' list yt-cluster yt-cluster | head -1)" \
-		"$PUBLIC_APT/$(basename "$deb").sig"
 	# its createrepo fallback bind-mounts the local repository: this host's daemon;
 	# KEEP=1: only the latest rpm stays in yum/el9
-	DOCKER_HOST=unix:///var/run/docker.sock KEEP=1 RPM="$rpm" REPO_DIR="$REPO_DIR" GPG_KEY="$GPG_KEY" "$DIST/publish_rpm.sh" \
-		|| { echo "  FAIL  rpm not published: publish_rpm.sh exited $?"; return 1; }
+	DOCKER_HOST=unix:///var/run/docker.sock KEEP=1 RPM="$rpm" REPO_DIR="$REPO_DIR" GPG_KEY="$GPG_KEY" "$DIST/publish_rpm.sh"; rc=$?
+	# yum's index and its signature, rewritten in place, and the rpm, when this build is
+	# one more of the version (its name carries the build: the same name again) - after a
+	# publish_rpm.sh that failed too. And the deb's again: a fetch of the build before,
+	# under way at an edge when the file was replaced, may have landed after the purge
+	purge_edge "$PUBLIC_APT/yum/el9/repodata/repomd.xml" "$PUBLIC_APT/yum/el9/repodata/repomd.xml.asc" \
+		"$PUBLIC_APT/yum/el9/packages/$(basename "$rpm")" "${deb_urls[@]}"; purged=$?
+	[ "$rc" = 0 ] || { echo "  FAIL  rpm not published: publish_rpm.sh exited $rc"; return 1; }
+	[ "$purged" = 0 ] || return 1
 	echo "  OK    rpm published: $(basename "$rpm")"
 	# what anyone can install now, as the internet sees it
 	public_available "$PKG_V" "$(sha256sum < "$deb" | cut -d' ' -f1)" "$(basename "$rpm")" || return 1
 	# apt serves this build from here on, whatever fails after: the next run bumps
 	echo "$DEB_V" > "$STATE/published.version"
+	# the deb's a last time, once a fetch of the whole of it came and went (public_available's):
+	# one of the build before, that long under way, has landed by now too (review of 2026-10-27)
+	purge_late "${deb_urls[@]}"
 	publish_tgz || return 1
 	publish_image || return 1
-	publish_sge
 }
+# [deb-version] publish_stopped <deb> <rpm> <signal>: the publish's trap - every URL its
+# steps replace, purged, then the signal again, so the run ends as it was asked to
+publish_stopped() {
+	trap - INT TERM HUP
+	local key; key="$(reprepro -b "$REPO_DIR" --list-format '${$filekey}\n' list yt-cluster yt-cluster 2>/dev/null | head -1)"
+	echo "  WARN  publish stopped (SIG$3): purging what it may have replaced"
+	if cf_purge ${key:+"$PUBLIC_APT/$key"} "$PUBLIC_APT/$(basename "$1").sig" \
+		"$PUBLIC_APT/yum/el9/repodata/repomd.xml" "$PUBLIC_APT/yum/el9/repodata/repomd.xml.asc" \
+		"$PUBLIC_APT/yum/el9/packages/$(basename "$2")" \
+		"$PUBLIC_APT/paks/yt-cluster-latest.tar.gz" "$PUBLIC_APT/paks/yt-cluster-latest.tar.gz.sha256" \
+		"$PUBLIC_APT/paks/yt-cluster-latest.tar.gz.sig" "$PUBLIC_APT/paks/yt-cluster.json"; then
+		echo "  WARN  purged"
+	else
+		echo "  WARN  not purged: $PURGE_SHORT"
+	fi
+	kill -"$3" "$BASHPID"
+}
+
 # What the publish step put out besides the deb and the rpm, a line each, for the
-# record (publish runs in a shell of its own): tgz=<build>, image=<ref>, sge=<version>
+# record (publish runs in a shell of its own): tgz=<build>, image=<ref>
 PUBLISHED_OUT="$LOGS/published.out"
 # [tgz] The static (musl) ytctl and ytserv and every major's extension, for a host
 # with no deb or rpm (ytcluster_dist/build_tgz.sh, from the release build), into
@@ -742,18 +878,19 @@ PUBLISHED_OUT="$LOGS/published.out"
 # yt-cluster-<build>-<sha8>.tar.gz with its .sha256 and .sig, the
 # yt-cluster-latest.tar.gz link to it, and the manifest yt-cluster.json.
 publish_tgz() {
-	local out tgz sum got art i
+	local out tgz sum got art i rc
 	out="$(mktemp)"
 	GITHUB_OUTPUT="$out" "$DIST/build_tgz.sh" "$GIT_ROOT" \
 		|| { echo "  FAIL  tgz: build_tgz.sh exited $?"; rm -f "$out"; return 1; }
 	tgz="$(grep -oP '(?<=^tgz=).*' "$out" | tail -1)"; rm -f "$out"
 	[ -f "$tgz" ] || { echo "  FAIL  tgz: build_tgz.sh named no tarball"; return 1; }
-	TGZ="$tgz" NAME=yt-cluster VERSION="$DEB_V" REPO_DIR="$REPO_DIR" GPG_KEY="$GPG_KEY" "$INFRA_APT/scripts/publish-pak.sh" \
-		|| { echo "  FAIL  tgz not published: publish-pak.sh exited $?"; return 1; }
-	sum="$(sha256sum < "$tgz" | cut -d' ' -f1)"; art="yt-cluster-$DEB_V-${sum:0:8}.tar.gz"
-	# the link and the manifest revalidate within minutes; the edge's copies go now
-	purge_edge "$PUBLIC_APT/paks/yt-cluster-latest.tar.gz" "$PUBLIC_APT/paks/yt-cluster-latest.tar.gz.sha256" \
+	TGZ="$tgz" NAME=yt-cluster VERSION="$DEB_V" REPO_DIR="$REPO_DIR" GPG_KEY="$GPG_KEY" "$INFRA_APT/scripts/publish-pak.sh"; rc=$?
+	# the link and the manifest revalidate within minutes; the edge's copies go now -
+	# after a publish-pak.sh that failed too
+	purge_late "$PUBLIC_APT/paks/yt-cluster-latest.tar.gz" "$PUBLIC_APT/paks/yt-cluster-latest.tar.gz.sha256" \
 		"$PUBLIC_APT/paks/yt-cluster-latest.tar.gz.sig" "$PUBLIC_APT/paks/yt-cluster.json"
+	[ "$rc" = 0 ] || { echo "  FAIL  tgz not published: publish-pak.sh exited $rc"; return 1; }
+	sum="$(sha256sum < "$tgz" | cut -d' ' -f1)"; art="yt-cluster-$DEB_V-${sum:0:8}.tar.gz"
 	for i in $(seq 1 6); do
 		got="$(public_get -m 120 "$PUBLIC_APT/paks/$art" 2>/dev/null | sha256sum | cut -d' ' -f1)"
 		[ "$got" = "$sum" ] && break
@@ -773,43 +910,45 @@ publish_image() {
 		|| { echo "  FAIL  image not published: docker/publish.sh exited $?"; return 1; }
 	echo "image=dbinvent/yt:$DEB_V" >> "$PUBLISHED_OUT"
 }
-# [sge] Schema Guard, when its version (sge/Cargo.toml) is one the repository does
-# not list: its deb into the same distribution, its tarball and the image
-# dbinvent/sge (sge/dist/publish.sh). A version it lists stays as it is.
-publish_sge() {
-	local sge="$GIT_ROOT/sge" v listed
-	[ -x "$sge/dist/publish.sh" ] || { echo "  sge: no $sge/dist/publish.sh - not published"; return 0; }
-	v="$(cargo_version "$sge/Cargo.toml")"
-	listed="$(reprepro -b "$REPO_DIR" list yt-cluster schema-guard 2>/dev/null | awk '{print $NF; exit}')"
-	if [ "${listed%-*}" = "$v" ]; then echo "  sge $v: the repository lists it already ($listed)"; return 0; fi
-	PUSH=1 REPO_DIR="$REPO_DIR" GPG_KEY="$GPG_KEY" INFRA_APT="$INFRA_APT" "$sge/dist/publish.sh" \
-		|| { echo "  FAIL  sge $v not published: sge/dist/publish.sh exited $?"; return 1; }
-	purge_edge "$PUBLIC_APT/paks/sge-latest.tar.gz" "$PUBLIC_APT/paks/sge-latest.tar.gz.sha256" \
-		"$PUBLIC_APT/paks/sge-latest.tar.gz.sig" "$PUBLIC_APT/paks/sge.json"
-	echo "  OK    sge $v published: the deb, paks/sge-latest.tar.gz, dbinvent/sge:$v"
-	echo "sge=$v" >> "$PUBLISHED_OUT"
-}
+# [sbom] each product's SBOMs and Trivy's result in its public repository: security.sh
+source "$HERE/security.sh"
 # [publish] The apt index and the rpm as the internet sees them: through public
 # DNS, not this host's /etc/hosts, which may name the apt host's LAN address. Up to
 # a minute, for the edge to revalidate (the index is served max-age=0).
-PUBLIC_APT="${PUBLIC_APT:-https://apt.dbinvent.com}"
 public_get() { curl -fsS -m 20 --doh-url https://1.1.1.1/dns-query "$@"; }
-# [deb-version] Cloudflare's copies of these URLs dropped (purge by URL), with
-# CF_ZONE_ID and CF_PURGE_TOKEN (an API token: Zone - Cache Purge - Purge, on
-# dbinvent.com) from .env. Best effort: what decides is public_available below,
-# which reads the bytes the edge serves. The token goes to curl on stdin, never
-# on a command line.
+# [deb-version] The edge's copies of what a step replaced, dropped (cf_purge). A step
+# of the publish, not a best effort: a file it replaced at the same URL, the edge hands
+# out the one before for up to a day - a newer index against an older deb is apt's
+# "Hash Sum mismatch" (2026-10-27: no token in .env, the purge only warned, and
+# 1.20.4's index went out against the edge's 1.20.3).
 purge_edge() { # <url>...
-	if [ -z "$CF_ZONE_ID" ] || [ -z "$CF_PURGE_TOKEN" ]; then
-		echo "  WARN  edge not purged: no CF_ZONE_ID or CF_PURGE_TOKEN in .env"; return 0
-	fi
-	local r
-	r="$(printf 'header = "Authorization: Bearer %s"\n' "$CF_PURGE_TOKEN" \
-		| curl -sS -m 20 -K - -X POST -H 'Content-Type: application/json' \
-			--data "{\"files\": [$(printf '"%s",' "$@" | sed 's/,$//')]}" \
-			"https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache" 2>&1)"
-	if grep -q '"success": *true' <<< "$r"; then echo "  OK    edge purged: $*"
-	else echo "  WARN  edge not purged: $(tr -d '\n' <<< "$r" | cut -c1-300)"; fi
+	if cf_purge "$@"; then echo "  OK    edge purged: $*"; return 0; fi
+	echo "  FAIL  edge not purged: $* - $PURGE_SHORT${PURGE_WHY:+ ($PURGE_WHY)}"
+	return 1
+}
+# [deb-version] purge_late <url>...: purge_edge for what a step replaced once the deb and
+# the rpm are out and checked: one that fails is a WARN and a word in the run's note
+# (LOGS/purge.late), not a failed step - the build is published whatever this says, and
+# a failed step records it as not, and skips the ones after it (review of 2026-10-27)
+purge_late() { # <url>...
+	if cf_purge "$@"; then echo "  OK    edge purged: $*"; return 0; fi
+	echo "  WARN  edge not purged: $* - $PURGE_SHORT${PURGE_WHY:+ ($PURGE_WHY)}"
+	echo "$PURGE_SHORT" >> "$LOGS/purge.late"
+}
+# [deb-version] Whether purge_edge can drop what the publish will replace: a purge of
+# a URL nothing is cached under, as nightly/cf-purge-token.sh checks the token it
+# makes. Asked before anything changes - one that fails publishes nothing, and apt
+# keeps serving the build before it, whole. Why, in a few words, for the run's note:
+# LOGS/purge.why.
+purge_ready() {
+	if cf_purge "$PUBLIC_APT/cf-purge-token.check"; then echo "  OK    edge purge: the token purges"; return 0; fi
+	local hint=""
+	# no token, or one the API refuses: one to make; anything else - DNS, a timeout,
+	# a 5xx - is not the token's doing
+	case "$PURGE_SHORT" in "no CF_ZONE_ID"*|"Cloudflare refused"*|"Cloudflare did not"*) hint=" - nightly/cf-purge-token.sh sets a token up" ;; esac
+	echo "$PURGE_SHORT$hint" > "$LOGS/purge.why"
+	echo "  FAIL  nothing published: the edge purge failed - $PURGE_SHORT$hint${PURGE_WHY:+ ($PURGE_WHY)}"
+	return 1
 }
 # [deb-version] By checksum, not version: the release's version stands for each of
 # its builds. And the file itself, as the edge hands it out - the pool path is the
@@ -827,25 +966,47 @@ public_available() { # <deb version> <its sha256> <rpm file name>
 		|| { echo "  FAIL  deb not available: $PUBLIC_APT serves ${v:-nothing}${s:+ (sha256 ${s:0:12})}, not $1 (sha256 ${2:0:12})"; return 1; }
 	echo "  OK    deb available: $PUBLIC_APT serves yt-cluster $1 (sha256 ${2:0:12})"
 	for i in $(seq 1 6); do
-		s="$(public_get -m 120 "$PUBLIC_APT/$f" 2>/dev/null | sha256sum | cut -d' ' -f1)"
-		[ "$s" = "$2" ] && break
-		sleep 10
+		# a fetch that failed hashes nothing: not another build (review of 2026-10-27)
+		if ! s="$(public_get -m 120 "$PUBLIC_APT/$f" 2>/dev/null | sha256sum | cut -d' ' -f1)"; then
+			s=""; echo "  WARN  deb file: $PUBLIC_APT/$f could not be fetched"
+		elif [ "$s" = "$2" ]; then
+			break
+		# another build: a fetch of it under way when the file was replaced landed at this
+		# edge after the purges - it holds that a day, so it is dropped again before the
+		# next look (review of 2026-10-27)
+		elif cf_purge "$PUBLIC_APT/$f"; then
+			echo "  WARN  deb file: $PUBLIC_APT/$f is another build (sha256 ${s:0:12}) - purged again"
+		else
+			echo "  WARN  deb file: $PUBLIC_APT/$f is another build (sha256 ${s:0:12}) - not purged: $PURGE_SHORT"
+		fi
+		[ "$i" = 6 ] || sleep 10
 	done
-	[ "$s" = "$2" ] || { echo "  FAIL  deb not available: $PUBLIC_APT/$f is another build (sha256 ${s:0:12}) - held at the edge?"; return 1; }
+	[ "$s" = "$2" ] || { echo "  FAIL  deb not available: $PUBLIC_APT/$f $([ -n "$s" ] && echo "is another build (sha256 ${s:0:12}) - held at the edge?" || echo "could not be fetched")"; return 1; }
 	echo "  OK    deb file: $PUBLIC_APT/$f is this build"
 	public_get -o /dev/null -I "$PUBLIC_APT/yum/el9/packages/$3" 2>/dev/null \
 		|| { echo "  FAIL  rpm not available: $PUBLIC_APT/yum/el9/packages/$3"; return 1; }
 	echo "  OK    rpm available: $PUBLIC_APT/yum/el9/packages/$3"
 }
 if [ "$RESULT" = pass ] && [ "$NIGHTLY_PUBLISH" = 1 ]; then
-	if suite release release && suite publish publish; then
+	# out, or the deb and the rpm out and a step after them failed: publish wrote
+	# published.version once both were public - this run's build, the start having bumped
+	# past the one there. Published either way, a pass: what apt serves is tested and
+	# out, and the note names the step (owner, 2026-10-27; it said "not published" while
+	# apt served the build)
+	suite release release && suite publish publish; pub=$?
+	if [ "$pub" = 0 ] || [ "$(cat "$STATE/published.version" 2>/dev/null)" = "$DEB_V" ]; then
 		PUBLISHED_DEB="$PKG_V"; PUBLISHED_RPM="$DEB_V"   # the deb as apt lists it; its build: version.deb
 		echo "$DEB_V" > "$STATE/published.version"
 		PUBLISHED_TGZ="$(grep -oP '(?<=^tgz=).*' "$PUBLISHED_OUT" 2>/dev/null | tail -1)"
 		PUBLISHED_IMAGE="$(grep -oP '(?<=^image=).*' "$PUBLISHED_OUT" 2>/dev/null | tail -1)"
-		PUBLISHED_SGE="$(grep -oP '(?<=^sge=).*' "$PUBLISHED_OUT" 2>/dev/null | tail -1)"
+		# the step by its name only - the note is committed, no host in it
+		[ "$pub" = 0 ] || NOTE="published; then the $(grep -m1 -oP '(?<=FAIL  )(tgz|image)' "$LOGS/publish.log" 2>/dev/null || echo next) step failed (publish.log)"
 	else
 		RESULT=fail; NOTE="tested green, but the release build or the publish failed"
+		# refused for the edge purge, before anything was built or replaced (purge_ready)
+		[ -s "$LOGS/purge.why" ] && NOTE="tested green, but nothing published: the edge purge failed - $(cat "$LOGS/purge.why")"
+		# the deb replaced at the origin, its edge copy not purged in two rounds: the rest stopped
+		[ -s "$LOGS/purge.stuck" ] && NOTE="tested green; the deb $(cat "$LOGS/purge.stuck") - replaced at the origin, the edge's copy not purged: purge its URLs by hand (publish.log), the rpm and the rest not published"
 	fi
 elif [ "$TRIGGER" = coverage ] && [ "$RESULT" = pass ]; then
 	NOTE="tested green; a coverage run of published sources publishes nothing"
@@ -854,6 +1015,8 @@ elif [ "$RESULT" = pass ]; then
 elif [ -z "$NOTE" ]; then
 	NOTE="not published: a suite failed"
 fi
+# published, and an edge's copy not dropped after it (purge_late)
+[ -s "$LOGS/purge.late" ] && NOTE="${NOTE:+$NOTE; }the edge not purged after the publish - $(tail -1 "$LOGS/purge.late") (publish.log)"
 [ -n "$COV_NOTE" ] && NOTE="${NOTE:+$NOTE; }$COV_NOTE"
 # no host names here: results.yaml is committed (the reason is in the suite's log)
 [ -n "$SKIPPED" ] && NOTE="${NOTE:+$NOTE; }skipped: $SKIPPED (its outside service did not answer)"
@@ -863,7 +1026,7 @@ END="$(now)"
 # [flags-ab] topology 29b_flags_ab's one-line measurement of the flags that are off by
 # default (peer_stream, one_pc): informational, it never fails the run
 AB_LINE="$(grep -h '^  AB: ' "$LOGS/topology.log" 2>/dev/null | tail -1 | sed 's/^  AB: //' || true)"
-export START END TRIGGER CHANGED DEB_V YTS_V BUMPED RESULT BUILD NOTE PUBLISHED_DEB PUBLISHED_RPM PUBLISHED_TGZ PUBLISHED_IMAGE PUBLISHED_SGE RUN_ID ROWS RESULTS COVERAGE_PCT AB_LINE
+export START END TRIGGER CHANGED DEB_V YTS_V BUMPED RESULT BUILD NOTE PUBLISHED_DEB PUBLISHED_RPM PUBLISHED_TGZ PUBLISHED_IMAGE RUN_ID ROWS RESULTS COVERAGE_PCT AB_LINE
 export DURATION=$(( $(secs) - T0 ))
 export REVS="$(for r in $WATCH; do echo "$r=${REV[$r]}"; done)"
 python3 - <<'EOF'
@@ -902,7 +1065,7 @@ out.append(f"  result: {e['RESULT']}")
 if e.get("COVERAGE_PCT"):
     out.append(f"  coverage: {e['COVERAGE_PCT']}")
 pub = {k: v for k, v in (("deb", e["PUBLISHED_DEB"]), ("rpm", e["PUBLISHED_RPM"]), ("tgz", e.get("PUBLISHED_TGZ")),
-                         ("image", e.get("PUBLISHED_IMAGE")), ("sge", e.get("PUBLISHED_SGE"))) if v}
+                         ("image", e.get("PUBLISHED_IMAGE"))) if v}
 out.append("  published: " + ("{" + ", ".join(f"{k}: {q(v)}" for k, v in pub.items()) + "}" if pub else "null"))
 if e.get("AB_LINE"):
     out.append(f"  ab: {q(e['AB_LINE'])}")
@@ -912,7 +1075,12 @@ with open(e["RESULTS"], "a") as fh:
     fh.write("\n".join(out) + "\n")
 EOF
 
-# ── 7. the badge, the history ───────────────────────────────────────────────────
+# ── 7. the badge, the security reports, the history ────────────────────────────
+# [sbom] each product's SBOMs and Trivy's result, after a green run
+if [ "$RESULT" = pass ]; then
+	security_reports >> "$LOGS/security.log" 2>&1
+	say "   security: $(grep -cE '^  OK ' "$LOGS/security.log") report(s) written (security.log)"
+fi
 # the badge vouches for what can be installed: only a promotion renews it, straight
 # on the apt host
 if [ -z "$PUBLISHED_DEB" ]; then
@@ -938,6 +1106,7 @@ if [ "${NIGHTLY_PUSH:-0}" = 1 ]; then
 		say "   results not pushed: not on main, or unpushed commits wait there"
 	elif PUSHED=(nightly/results.yaml) \
 	     && { [ ! -f "$COVERAGE_FILE" ] || PUSHED+=(nightly/coverage.yaml); } \
+	     && { [ ! -d "$TESTS/security" ] || PUSHED+=(security); } \
 	     && git -C "$TESTS" add -- "${PUSHED[@]}" \
 	     && git -C "$TESTS" commit -q -m "nightly $RUN_ID: $RESULT" -- "${PUSHED[@]}" \
 	     && git -C "$TESTS" push -q origin HEAD:main; then

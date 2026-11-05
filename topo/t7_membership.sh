@@ -15,7 +15,9 @@
 #     minute, and the two members left must elect - which only a quorum counted
 #     without the dead node allows (2 of 3; 2 of the old 4 is no majority).
 # M7  two nodes added at once, each a physical copy (the documented path, as
-#     rmc's add_node): both follow, both hold every row.
+#     rmc's add_node): both follow, both hold every row. One is copied as `ytctl
+#     --copy` makes a copy - its source's copy request first, seeded from the row the
+#     backup carries - the other is a plain pg_basebackup, seeded from `least`.
 # M2  a node added with no data and no position (rmc's RMC_JOIN=empty): refused,
 #     or it ends holding every row written before it joined. Then stopped and
 #     taken out of the roster again.
@@ -166,7 +168,10 @@ check "M7 both are in the running roster of every $C member" "$(members $C | wc 
 L=$(leader_of $C)
 read -r S1 S2 _ <<< "$(for m in $(others "$L"); do [ "$(node_state "$m")" = Good ] && echo "$m"; done | tr '\n' ' ')"
 S1=${S1:-$L}; S2=${S2:-$S1}
-node_run "$N1" "$S1" & p1=$!
+# $N1 as `ytctl --copy` makes a copy - the copy request on its source first, seeded from
+# the row the backup carries - and $N2 a plain pg_basebackup, seeded from `least`
+s0=$(since)
+COPY_REQUEST=1 node_run "$N1" "$S1" & p1=$!
 node_run "$N2" "$S2" & p2=$!
 wait "$p1" "$p2" || bad "M7 docker run $N1, $N2"
 for n in $N1 $N2; do wait_for 300 ext_ready "$n" && ok "M7 $n is up, a copy" || bad "M7 $n up: $(docker logs "$(cname "$n")" 2>&1 | grep -a '\[node\]' | tail -1)"; done
@@ -202,6 +207,21 @@ for n in $N1 $N2; do
         || bad "M7 $n holds every ledger row: it lacks $(lacks "$n" "$(leader_of $C)")"
 done
 load_resume $C
+# [copy-seed] each copy's start position, from where it came: the copy request's row on
+# $N1, `least` on $N2; the row gone on the source after the backup, and on $N1 once it
+# holds records of its own
+seeded=$(logs "$s0" "$N1" | grep -a '\[copy-seed\] no local WAL - seeded from' | tail -1)
+[ -n "$seeded" ] && ok "M7 $N1 seeded from its copy request: ${seeded##*position }" \
+    || bad "M7 $N1 seeded from its copy request: $(logs "$s0" "$N1" | grep -a '\[node\] the copy request\|no local WAL' | tail -2 | tr '\n' ' ')"
+# read whole, not `grep -q`: under pipefail its early exit broke the pipe and read as no match
+adopted=$(logs "$s0" "$N2" | grep -a '\[position\] no local WAL - adopted' | tail -1)
+[ -n "$adopted" ] && ok "M7 $N2, a plain copy, adopted \`least\`: $(echo "$adopted" | grep -o 'adopted [0-9.]*')" \
+    || bad "M7 $N2, a plain copy, adopted \`least\`: $(logs "$s0" "$N2" | grep -a 'no local WAL\|\[fill\]' | tail -1)"
+copy_row() { QT=20 q "$1" <<< "select count(*) from $CFG where module = 'C' and name = 'copy.$(node_uuid "$N1")'" 2>/dev/null; }
+check "M7 the copy request undone on $S1" 0 "$(copy_row "$S1")"
+row_gone() { [ "$(copy_row "$N1")" = 0 ]; }
+wait_for 60 row_gone && ok "M7 $N1's copy row gone, it holds records of its own" \
+    || bad "M7 $N1's copy row gone once it holds records of its own: $(copy_row "$N1") left"
 for holder in $(linked_by $C); do
     for n in $N1 $N2; do learn "$holder" "$n"; done
     cfg_hosts "$holder" "$C" $(members $C) $N1 $N2 || bad "M7 ${AZ[$C]}.host on $holder"

@@ -80,7 +80,7 @@ diag() {
 	for n in "${NODES[@]}"; do
 		qt "$n" "select '     $n run fn '||fn||' '||to_char(t0,'HH24:MI:SS.MS')||'-'||coalesce(to_char(t1,'HH24:MI:SS.MS'),'?') from bk_run order by t0"
 		qt "$n" "select '     $n seen '||coalesce(body::text, raw) from sh_seen order by at"
-		rh "docker logs --since 15m $n 2>&1 | { grep -E 'shaper' || true; } | tail -4 | sed 's/^/     $n log: /'" 2>/dev/null || true
+		rh "docker logs --since 15m $n 2>&1 | { grep -iE 'shaper' || true; } | tail -4 | sed 's/^/     $n log: /'" 2>/dev/null || true
 	done
 	return 0
 }

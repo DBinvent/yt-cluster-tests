@@ -24,18 +24,18 @@ export YX_AZ="${YX_AZ:-n1=top,n2=top,n3=east,n4=east,n5=west,n6=west,n7=west}"
 export YX_TIER="${YX_TIER:-top=0,east=1,west=1}"
 export YX_SPARE_NODES="${YX_SPARE_NODES:-n7}"
 
-# [ytserv-py] The server-function scripts call Python functions, which only
-# ytserv-py - the build with rppd - has; everything else runs on the regular
+# [ytserv-all] The server-function scripts call Python functions, which only
+# ytserv-all - the build with rppd - has; everything else runs on the regular
 # ytserv. YX_GROUP is what this run covers, and so the build its nodes run:
-#   all      every script, on ytserv-py - the default, by hand
-#   py       the server-function scripts, on ytserv-py (the nightly's topology-py)
+#   all      every script, on ytserv-all - the default, by hand
+#   py       the server-function scripts, on ytserv-all (the nightly's topology-py)
 #   regular  the rest, on the regular ytserv (the nightly's topology)
 # Each half needs only what it sets up itself: they run as two fixtures, on two
 # docker hosts at once if asked (nightly.sh LANE_SUITES).
-PY_SCRIPTS="05_gitsrv.sh 92_rppd.sh 92c_rppd_cadence.sh 92b_rppd_breaker.sh 92d_rppd_shaper.sh 91_otel.sh 94_clickhouse.sh 98_mpp_df.sh 25_cross_db.sh"
+PY_SCRIPTS="05_gitsrv.sh 92_rppd.sh 92c_rppd_cadence.sh 92b_rppd_breaker.sh 92d_rppd_shaper.sh 92e_rppd_test.sh 91_otel.sh 94_clickhouse.sh 98_mpp_df.sh 25_cross_db.sh"
 export YX_GROUP="${YX_GROUP:-all}"
 case "$YX_GROUP" in
-	all|py) export YX_SERVER_BIN=ytserv-py ;;
+	all|py) export YX_SERVER_BIN=ytserv-all ;;
 	regular) export YX_SERVER_BIN=ytserv ;;
 	*) echo "YX_GROUP=$YX_GROUP: all, py or regular" >&2; exit 2 ;;
 esac
@@ -111,13 +111,17 @@ else
 	# then the server-function stack (rppd -> etcd -> clickhouse, each needing
 	# the one before it to work), then MPP last - the layout, then the engine.
 	# 98 installs a 58MB wheel on every node, so it is genuinely the slowest.
+	# [sge-worker] rolled by its worker, nodes dropping during it: takes ~12 minutes
+	in_group 38_sge_worker.sh && step 38_sge_worker.sh
+	in_group 39_s3_blob.sh && step 39_s3_blob.sh # [s3]
 	# 32_schema_change.sh is held out (2026-10-12, the owner's call) until the TCP
 	# spare stops missing rows committed during a roll (its S7/S8 on n7); run it by
 	# hand meanwhile, on a running fixture: ../nightly/locked.sh ./run_a.sh 32_schema_change.sh
 	for t in 86_schema_block.sh 87_node_block.sh 89_recover.sh 89b_recovery.sh 23_split.sh \
-	         92_rppd.sh 93_etcd.sh 93b_etcd_upsert.sh 92c_rppd_cadence.sh 92b_rppd_breaker.sh 92d_rppd_shaper.sh 91_otel.sh 94_clickhouse.sh \
+	         92_rppd.sh 93_etcd.sh 93b_etcd_upsert.sh 92c_rppd_cadence.sh 92b_rppd_breaker.sh 92d_rppd_shaper.sh 92e_rppd_test.sh 91_otel.sh 94_clickhouse.sh \
 	         97_mpp.sh 98_mpp_df.sh 98_skv_join.sh 29_concurrent.sh 29b_flags_ab.sh 29c_parallel_apply.sh \
-	         29d_shard_lease.sh 99_peer_stream.sh 25_cross_db.sh 26_stage.sh 33_identity.sh 37_delta_retry.sh; do
+	         29d_shard_lease.sh 29e_unique_boundary.sh 29f_table_collision.sh 29g_composite_unique.sh \
+	         29h_foreign_key_boundary.sh 29i_keyless_rows.sh 29j_bson.sh 29k_composite_pk.sh 99_peer_stream.sh 25_cross_db.sh 26_stage.sh 33_identity.sh 37_delta_retry.sh; do
 		in_group "$t" && step "$t"
 	done
 

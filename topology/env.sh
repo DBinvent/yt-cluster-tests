@@ -31,10 +31,10 @@ YX_HOST="${YX_HOST:-local}"          # where the containers run: an ssh target, 
 YX_CLUSTER_UUID="${YX_CLUSTER_UUID:-7a1c0000-0000-5000-8000-000000000001}"
 YX_NET="${YX_NET:-yxtopo}"
 YX_IMAGE="${YX_IMAGE:-yxtopo-node}"
-# [ytserv-py] the build fixture A's nodes run (10_up.sh): ytserv-py, which has the
+# [ytserv-all] the build fixture A's nodes run (10_up.sh): ytserv-all, which has the
 # Python functions the server-function scripts call, unless run_a.sh's YX_GROUP
 # says regular - the regular ytserv, for everything else
-YX_SERVER_BIN="${YX_SERVER_BIN:-ytserv-py}"
+YX_SERVER_BIN="${YX_SERVER_BIN:-ytserv-all}"
 YX_DB="${YX_DB:-yxtopo}"
 YX_CFG="${YX_CFG:-public.yt_config}"
 YX_PORT="${YX_PORT:-7421}"

@@ -46,6 +46,13 @@
 # K14 recovery: a genesis with a recovery key; every node loses its node.key; the
 #     leader recovers with the recovery key; the others enroll, are approved, and
 #     every value reads again
+# K15 [rotate-key] ytctl --rotate_key=<name>: a name not there is created, with a value
+#     ytserv makes and prints once (43 characters); a rotation hands out the new value
+#     on every node and yt_info('X') says it rotates, without a value; a second
+#     rotation and a put are refused while it runs; --force_new replaces the new value
+#     before any use; nobody uses it, so after --adopt_sec the old value goes (the
+#     hard discard) and the row is a bare value again; no value in any config row.
+#     The use-driven discard is 36_skv_rppd.sh R5-R10 (an rppd function the consumer)
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/skv_lib.sh"
 echo "== skv store: the cluster master key and the secrets sealed under it =="
@@ -324,6 +331,63 @@ if approve_until_held 1; then ok "K14 the others enrolled with their new keys, a
 r=""
 for n in "${NODES[@]}"; do [ "$(yx "$n" --skv get recovered --print | tail -1)" = "$V-rec" ] || r="$r $n"; done
 [ -z "$r" ] && ok "K14 every node reads the value sealed before the loss" || bad "K14 the value does not read on:$r"
+
+# ── K15 [rotate-key] a value rotated in place ────────────────────────────────
+L="$(leader)"
+# K15 is about a value's rotation, not K14's recovery: with no master key left (K14
+# failed), it makes one and approves every node first
+if ! all_hold 1; then
+	echo "  K15 needs the master key everywhere: a genesis of its own"
+	yx "$L" --skv-genesis --discard --yes >/dev/null
+	approve_until_held 1 || bad "K15 setup: v1 not held on:$(not_holding 1)"
+fi
+F="$(for n in "${VOTERS[@]}"; do [ "$n" != "$L" ] && { echo "$n"; break; }; done)"
+o="$(yx "$L" --rotate_key=api_key)"
+MADE="$(echo "$o" | tail -1 | tr -d '\r')"
+case "$o" in *"was not there: created"*"made by ytserv"*) ok "K15 --rotate_key on a name not there: created, with a value ytserv made" ;;
+	*) bad "K15 create: $(echo "$o" | tail -2 | tr '\n' ' ')" ;; esac
+[ "${#MADE}" = 43 ] && ok "K15 ...printed once: 43 characters" || bad "K15 the value made: [$MADE] (${#MADE} characters)"
+check "K15 ...and it is the secret's value" "$MADE" "$(yx "$L" --skv get api_key --print | tail -1)"
+N1="rot1$RANDOM$RANDOM"; N2="rot2$RANDOM$RANDOM"
+T0=$(date +%s)
+o="$(yx "$L" --rotate_key=api_key --value=$N1 --discard_sec=10 --adopt_sec=30)"
+case "$o" in *"api_key rotating"*) ok "K15 --rotate_key with --value, --discard_sec 10, --adopt_sec 30: rotating" ;;
+	*) bad "K15 rotate: $(echo "$o" | tail -1)" ;; esac
+case "$(info "$L" X api_key)" in *"rotating since"*"not seen in use yet"*) ok "K15 yt_info('X') says it rotates, the new value not in use yet" ;;
+	*) bad "K15 yt_info('X') api_key: $(info "$L" X api_key)" ;; esac
+case "$(info "$L" X api_key)" in *"$N1"*|*"$MADE"*) bad "K15 yt_info('X') shows a value" ;; *) ok "K15 ...and shows no value" ;; esac
+check "K15 get on the leader hands out the new value" "$N1" "$(yx "$L" --skv get api_key --print | tail -1)"
+follower_reads() { [ "$(yx "$F" --skv get api_key --print | tail -1)" = "$N1" ]; }
+skv_wait 20 "the follower reads the new value" follower_reads || true
+check "K15 ...and on the follower $F" "$N1" "$(yx "$F" --skv get api_key --print | tail -1)"
+o="$(yx "$L" --rotate_key=api_key --value=$N2)"
+case "$o" in *"rotating already"*"--force_new"*) ok "K15 a second rotation while it runs is refused, naming --force_new" ;;
+	*) bad "K15 a second rotation: $(echo "$o" | tail -1)" ;; esac
+o="$(printf '%s' "$N2" | yx "$L" --skv put api_key)"
+case "$o" in *"is rotating"*) ok "K15 a put while it rotates is refused" ;; *) bad "K15 a put while rotating: $(echo "$o" | tail -1)" ;; esac
+o="$(yx "$L" --rotate_key=api_key --value=$N2 --force_new --discard_sec=10 --adopt_sec=30)"
+case "$o" in *"new value replaced, the old one kept"*) ok "K15 --force_new before any use: the new value replaced, the old one kept" ;;
+	*) bad "K15 --force_new: $(echo "$o" | tail -1)" ;; esac
+check "K15 ...the replacement handed out" "$N2" "$(yx "$L" --skv get api_key --print | tail -1)"
+# nobody uses it: past --discard_sec (10) it still rotates - the hard discard counts
+# --adopt_sec (30) from the rotation's start, --force_new or not
+w=$(( T0 + 20 - $(date +%s) )); [ "$w" -gt 0 ] && sleep "$w"
+case "$(info "$L" X api_key)" in *"rotating since"*) ok "K15 20 s in, unused: still rotating (--discard_sec counts from a use only)" ;;
+	*) bad "K15 20 s in, no longer rotating: $(info "$L" X api_key)" ;; esac
+not_rotating() { case "$(info "$L" X api_key)" in "v"*" B") return 0 ;; *) return 1 ;; esac; }
+if skv_wait 45 "the hard discard" not_rotating; then
+	ok "K15 nobody used it: --adopt_sec after the start, $(( $(date +%s) - T0 )) s, the old value went, the row a bare value again"
+else
+	bad "K15 still rotating past --adopt_sec: $(info "$L" X api_key)"
+fi
+check "K15 ...and the new value is the secret's" "$N2" "$(yx "$L" --skv get api_key --print | tail -1)"
+leak=""
+[ "${#MADE}" = 43 ] || MADE="$N1" # a value made that was not printed is no pattern: '%%' matches every row
+for n in "${NODES[@]}"; do
+	c="$(q "$n" "select count(*) from $YX_CFG where value like '%$N1%' or value like '%$N2%' or value like '%$MADE%'")"
+	[ "${c:-1}" = 0 ] || leak="$leak $n"
+done
+[ -z "$leak" ] && ok "K15 no value of the rotation in any config row, on any node" || bad "K15 a value in the config table on:$leak"
 
 cleanup
 summary
