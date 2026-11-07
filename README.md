@@ -1,7 +1,6 @@
 # YT Cluster Integration Tests
 
 **YT Cluster** [![trivy](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml/badge.svg)](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml)
-[![docker scout](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/scout.yml/badge.svg)](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/scout.yml)
 [![docker](https://img.shields.io/docker/v/dbinvent/yt?sort=semver&label=docker)](https://hub.docker.com/r/dbinvent/yt)
 · [Trivy's result and the SBOMs](security/trivy-yt-cluster.md)
 \
@@ -11,7 +10,7 @@
 · [Trivy's result and the SBOMs](https://github.com/DBinvent/sge/blob/main/security/trivy-sge.md)
 
 Each image as Docker Hub serves it, scanned by Trivy: YT Cluster's every day after the nightly
-([.github/workflows](.github/workflows); Docker Scout by hand), Schema Guard's after each publish and
+([.github/workflows](.github/workflows)), Schema Guard's after each publish and
 weekly (its own). Before a nightly run publishes YT Cluster, the same gate stops it: Trivy on
 the crates of the tested source and on an image of the build, `cargo audit` over ytserv's tree
 and its own crates compiled with unsafe code forbidden - a HIGH or CRITICAL finding with a fix,
