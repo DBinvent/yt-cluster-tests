@@ -67,8 +67,15 @@ main_pid() { xc systemctl show -p MainPID --value ytserver 2>/dev/null; }
 # fresh_db <name>: a database of its own, so no row left by an earlier install
 # (purge never touches the DB) decides what this one writes
 fresh_db() {
-	pgq postgres "drop database if exists $1 with (force)" >/dev/null \
-		&& pgq postgres "create database $1" >/dev/null
+	# a purge just before can leave PostgreSQL restarting a moment later (nightly 2026-11-07, L3):
+	# waited for, and asked again once
+	local i
+	for i in 1 2; do
+		wait_pg && pgq postgres "drop database if exists $1 with (force)" >/dev/null \
+			&& pgq postgres "create database $1" >/dev/null && return 0
+		sleep 3
+	done
+	return 1
 }
 
 # purge <label>: --purge default, exit status checked

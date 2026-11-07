@@ -497,6 +497,13 @@ check "C1 attempt stays 0" "0" "$(rowv "$A" attempt)"
 check "C1 no watch message for A" "0" "$(seen "q='watch' and body->>'pp'='$A'")"
 check "C1 no deadline message for A" "0" "$(seen "q='deadline' and body->>'pp'='$A'")"
 check "C1 no message for C either (also fed)" "0" "$(seen "body->>'pp'='$C'")"
+# [rppd-spare] a forever spare opens no queue watcher: a message etcd handed it ended in a
+# last_seen write it must refuse, and the cadence went to 'watch' while fed (ytserv P18)
+for _n in "${NODES[@]}"; do
+	is_spare_node "$_n" || continue
+	check "C1 forever spare $_n took no queue message (no refused cadence write)" "0" \
+		"$(rh "docker logs --since 10m $_n 2>&1 | { grep -c 'forever-Spare.*rppd_cron' || true; }")"
+done
 rows_dump
 
 # ── C2: watch with retry, then the deadline ──────────────────────────────────

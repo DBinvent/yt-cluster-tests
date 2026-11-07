@@ -1,6 +1,6 @@
 # Trivy: YT Cluster
 
-The nightly's scan (yt-cluster-tests nightly/nightly.sh, `security_report`), run 20261105-015251, 2026-11-05 03:32 UTC:
+The nightly's scan (yt-cluster-tests nightly/nightly.sh, `security_report`), run 20261107-122434, 2026-11-07 17:14 UTC:
 Trivy 0.69.3 on YT Cluster's crates - the lock file of the source the run tested - and on the
 image `dbinvent/yt:latest` as Docker Hub serves it: every known vulnerability counted by severity, the CRITICAL
 and HIGH ones listed.
@@ -44,9 +44,9 @@ Report Summary
 ┌──────────────────────────────────┬──────────┬─────────────────┐
 │              Target              │   Type   │ Vulnerabilities │
 ├──────────────────────────────────┼──────────┼─────────────────┤
-│ dbinvent/yt:latest (debian 13.7) │  debian  │       929       │
+│ dbinvent/yt:latest (debian 13.7) │  debian  │       890       │
 ├──────────────────────────────────┼──────────┼─────────────────┤
-│ usr/local/bin/gosu               │ gobinary │        1        │
+│ usr/local/bin/gosu               │ gobinary │        0        │
 └──────────────────────────────────┴──────────┴─────────────────┘
 Legend:
 - '-': Not scanned
@@ -57,7 +57,7 @@ Report Summary
 ┌──────────────────────────────────┬──────────┬─────────────────┐
 │              Target              │   Type   │ Vulnerabilities │
 ├──────────────────────────────────┼──────────┼─────────────────┤
-│ dbinvent/yt:latest (debian 13.7) │  debian  │       67        │
+│ dbinvent/yt:latest (debian 13.7) │  debian  │       60        │
 ├──────────────────────────────────┼──────────┼─────────────────┤
 │ usr/local/bin/gosu               │ gobinary │        0        │
 └──────────────────────────────────┴──────────┴─────────────────┘
@@ -68,16 +68,12 @@ Legend:
 
 dbinvent/yt:latest (debian 13.7)
 ================================
-Total: 67 (HIGH: 66, CRITICAL: 1)
+Total: 60 (HIGH: 59, CRITICAL: 1)
 
 ┌───────────────────┬─────────────────┬──────────┬──────────────┬──────────────────────────────────────┬───────────────┬──────────────────────────────────────────────────────────────┐
 │      Library      │  Vulnerability  │ Severity │    Status    │          Installed Version           │ Fixed Version │                            Title                             │
 ├───────────────────┼─────────────────┼──────────┼──────────────┼──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
-│ apt               │ CVE-2026-109518 │ HIGH     │ fixed        │ 3.0.3                                │ 3.0.4         │ On Debian, Ubuntu, and derivative Linux distributions, an    │
-│                   │                 │          │              │                                      │               │ on-path atta ...                                             │
-│                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-109518                  │
-├───────────────────┼─────────────────┤          ├──────────────┼──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
-│ bsdutils          │ CVE-2026-76642  │          │ affected     │ 1:2.41.5-0+deb13u1                   │               │ util-linux: util-linux: failed external mount helper still   │
+│ bsdutils          │ CVE-2026-76642  │ HIGH     │ affected     │ 1:2.41.5-0+deb13u1                   │               │ util-linux: util-linux: failed external mount helper still   │
 │                   │                 │          │              │                                      │               │ runs privileged X-mount post-hooks                           │
 │                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-76642                   │
 │                   ├─────────────────┤          │              │                                      ├───────────────┼──────────────────────────────────────────────────────────────┤
@@ -93,43 +89,11 @@ Total: 67 (HIGH: 66, CRITICAL: 1)
 │                   │                 │          │              │                                      │               │ the source, allowing X-mount.owner/group/mode...             │
 │                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-78410                   │
 ├───────────────────┼─────────────────┤          │              ├──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
-│ dirmngr           │ CVE-2026-24882  │          │              │ 2.4.7-21+deb13u1+b5                  │               │ GnuPG: GnuPG: Stack-based buffer overflow in tpm2daemon      │
-│                   │                 │          │              │                                      │               │ allows arbitrary code execution                              │
-│                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-24882                   │
-├───────────────────┤                 │          │              ├──────────────────────────────────────┼───────────────┤                                                              │
-│ gnupg             │                 │          │              │ 2.4.7-21+deb13u1                     │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-├───────────────────┤                 │          │              │                                      ├───────────────┤                                                              │
-│ gnupg-l10n        │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-├───────────────────┤                 │          │              ├──────────────────────────────────────┼───────────────┤                                                              │
-│ gpg               │                 │          │              │ 2.4.7-21+deb13u1+b5                  │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-├───────────────────┤                 │          │              │                                      ├───────────────┤                                                              │
-│ gpg-agent         │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-├───────────────────┤                 │          │              │                                      ├───────────────┤                                                              │
-│ gpgconf           │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-├───────────────────┤                 │          │              │                                      ├───────────────┤                                                              │
-│ gpgsm             │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-│                   │                 │          │              │                                      │               │                                                              │
-├───────────────────┼─────────────────┤          │              ├──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
 │ libacl1           │ CVE-2026-54369  │          │              │ 2.3.2-2+b1                           │               │ acl: Symlink traversal privilege escalation via libacl       │
 │                   │                 │          │              │                                      │               │ functions                                                    │
 │                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-54369                   │
-├───────────────────┼─────────────────┤          ├──────────────┼──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
-│ libapt-pkg7.0     │ CVE-2026-109518 │          │ fixed        │ 3.0.3                                │ 3.0.4         │ On Debian, Ubuntu, and derivative Linux distributions, an    │
-│                   │                 │          │              │                                      │               │ on-path atta ...                                             │
-│                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-109518                  │
-├───────────────────┼─────────────────┤          ├──────────────┼──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
-│ libblkid1         │ CVE-2026-76642  │          │ affected     │ 2.41.5-0+deb13u1                     │               │ util-linux: util-linux: failed external mount helper still   │
+├───────────────────┼─────────────────┤          │              ├──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
+│ libblkid1         │ CVE-2026-76642  │          │              │ 2.41.5-0+deb13u1                     │               │ util-linux: util-linux: failed external mount helper still   │
 │                   │                 │          │              │                                      │               │ runs privileged X-mount post-hooks                           │
 │                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-76642                   │
 │                   ├─────────────────┤          │              │                                      ├───────────────┼──────────────────────────────────────────────────────────────┤
@@ -212,6 +176,14 @@ Total: 67 (HIGH: 66, CRITICAL: 1)
 │ libsqlite3-0      │ CVE-2026-119373 │          │              │ 3.46.1-7+deb13u2                     │               │ sqlite: sqlite: Denial of service via heap-based buffer      │
 │                   │                 │          │              │                                      │               │ overflow in FTS5                                             │
 │                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-119373                  │
+│                   ├─────────────────┤          │              │                                      ├───────────────┼──────────────────────────────────────────────────────────────┤
+│                   │ CVE-2026-119374 │          │              │                                      │               │ sqlite: sqlite: Arbitrary code execution via corrupted FTS5  │
+│                   │                 │          │              │                                      │               │ index                                                        │
+│                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-119374                  │
+│                   ├─────────────────┤          │              │                                      ├───────────────┼──────────────────────────────────────────────────────────────┤
+│                   │ CVE-2026-119379 │          │              │                                      │               │ sqlite: sqlite: Arbitrary code execution via crafted session │
+│                   │                 │          │              │                                      │               │ changesets                                                   │
+│                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-119379                  │
 ├───────────────────┼─────────────────┤          │              ├──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
 │ libsystemd0       │ CVE-2026-16742  │          │              │ 257.13-1~deb13u1                     │               │ systemd: systemd-homed: Local privilege escalation via       │
 │                   │                 │          │              │                                      │               │ missing home-record signature verification                   │

@@ -62,7 +62,7 @@
 #   7  [dbreg] yt_info('U'): postgres the catalog, appdb a participant, a database
 #      without the extension skipped and never pooled (B10); a database whose
 #      extension comes at runtime participates within seconds and replicates, no
-#      restart; skipped by `databases = *, -app2` (written locally) it is let go
+#      restart; skipped by module U's rows `*` and `app2` = `skip` (written locally) it is let go
 #      of, can be dropped (B9), and leaves the list.
 #   8  [natural-key] a cluster insert from the leader applies on a node that wrote
 #      rows of its own (trigger off) first; a value UPDATE on the leader takes
@@ -766,9 +766,9 @@ done
 
 # skipped by the list, written locally on every node's unsynced catalog: let go
 # of without a restart - and then it can be dropped (B9)
-for n in "${NODES[@]}"; do cfg_write "$n" databases C "*, -$APP2"; done
+for n in "${NODES[@]}"; do cfg_write "$n" '*' U on; cfg_write "$n" "$APP2" U skip; done
 for n in "${NODES[@]}"; do
-	u_wait "7c" "$n" "$APP2" "skipped: -skip in databases" 45
+	u_wait "7c" "$n" "$APP2" "skipped: skip in module U" 45
 	check "7c: $n forgot cx2_t's config" "" "$(info "$n" "a:$APP2.public.cx2_t" table || true)"
 done
 for n in "${NODES[@]}"; do
@@ -779,7 +779,9 @@ done
 for n in "${NODES[@]}"; do
 	for _ in $(seq 1 45); do [ -z "$(u_line "$n" "$APP2")" ] && break; sleep 1; done
 	check "7c: $n no longer lists $APP2" "" "$(u_line "$n" "$APP2")"
-	cfg_delete "$n" databases C
+	# the name first: alone, it would be a list with nothing on it
+	cfg_delete "$n" "$APP2" U
+	cfg_delete "$n" '*' U
 	pq "$n" "drop database if exists $PLAIN" >/dev/null 2>&1
 done
 
@@ -899,7 +901,7 @@ fi
 # [phase 4/5] A users database whose config table is synced: a catalog setting
 # written there is refused on the origin and stored nowhere; a database setting
 # applies live on every node; then `ytctl --db-remove` on the leader detaches it
-# cluster-wide (`!app3` in the synced catalog's C databases), and every node lets
+# cluster-wide (`app3` = `detach` in the synced catalog's module U), and every node lets
 # go of it, so it can be dropped.
 echo "-- 12: a users database with a synced config table; ytctl --db-remove"
 APP3="${XDB_APP3:-app3}"
@@ -923,6 +925,19 @@ else
 	for n in "${NODES[@]}"; do
 		check "12a: $n: min_cluster_size unchanged" "3" "$(info "$n" "c:min_cluster_size" effective || true)"
 	done
+	# [modules] its own store it may hold; the cluster's modules are the catalog's
+	for row in "app9|U|list" "recon.chunk|F|5" "source_dir|M|/x"; do
+		IFS='|' read -r rn rm rv <<< "$row"
+		e="$(qe "$L" "insert into public.yt_config (name, module, value) values ('$rn', '$rm', '$rv')" "$APP3")"
+		case "$e" in *"belongs to the catalog"*) ok "12a: module $rm written in $APP3 is refused";; *) bad "12a: module $rm in $APP3: [$e]";; esac
+		check "12a: ...and not stored" "0" "$(q "$L" "select count(*) from public.yt_config where module = '$rm'" "$APP3")"
+	done
+	e="$(qe "$L" "insert into public.yt_config (name, module, value) values ('endpoint', 'B', 'http://store:9000'), ('bucket', 'B', 'b'), ('secret', 'B', 's')" "$APP3")"
+	[[ "$e" == *ERROR* ]] && bad "12a: its own store: $e" || ok "12a: $APP3 may hold its own store (module B)"
+	out="$(rh "docker exec -u postgres $L ytctl --config-lint -d postgres 2>&1" || true)"
+	[[ "$out" == *"$APP3.public.yt_config: B"* ]] && bad "12a: --config-lint reports $APP3's store" || ok "12a: --config-lint leaves $APP3's store alone"
+	e="$(qe "$L" "delete from public.yt_config where module = 'B'" "$APP3")"
+	[[ "$e" == *ERROR* ]] && bad "12a: removing its store: $e"
 	e="$(qe "$L" "insert into public.yt_config (name, module, value) values ('def_cluster_commit', 'C', 'all')" "$APP3")"
 	[[ "$e" == *ERROR* ]] && bad "12b: the database setting on $L: $e"
 	for n in "${NODES[@]}"; do c_wait "12b" "$n" "c:def_cluster_commit@$APP3" source "$APP3" 30; done
@@ -934,7 +949,7 @@ else
 		pq "$n" "drop database $APP3" >/dev/null 2>&1
 		check "12c: $APP3 dropped on $n" "0" "$(pq "$n" "select count(*) from pg_database where datname='$APP3'")"
 	done
-	qe "$(x_leader)" "delete from $YX_CFG where module = 'C' and name = 'databases'" postgres >/dev/null
+	qe "$(x_leader)" "delete from $YX_CFG where module = 'U'" postgres >/dev/null
 fi
 
 # ── 13 ──────────────────────────────────────────────────────────────────────
@@ -1019,7 +1034,7 @@ else
 	rh "docker exec -u postgres $L ytctl --db-remove $APP4 --drop-extension -d postgres >/dev/null 2>&1" || true
 	for n in "${NODES[@]}"; do u_wait "13" "$n" "$APP4" "detached" 90; done
 	for n in "${NODES[@]}"; do pq "$n" "drop database $APP4" >/dev/null 2>&1; done
-	qe "$(x_leader)" "delete from $YX_CFG where module = 'C' and name = 'databases'" postgres >/dev/null
+	qe "$(x_leader)" "delete from $YX_CFG where module = 'U'" postgres >/dev/null
 fi
 
 summary

@@ -135,7 +135,7 @@ cleanup() {
 	set +e
 	rh "docker rm -f $S3 >/dev/null" 2>/dev/null
 	for n in "${NODES[@]}"; do q "$n" "drop role if exists s3_app" >/dev/null 2>&1; done
-	cw "$(leader_now)" "delete from $YX_CFG where module='C' and name='s3_config'" >/dev/null
+	cw "$(leader_now)" "delete from $YX_CFG where module='B'" >/dev/null
 	local n t
 	for n in "${NODES[@]}"; do
 		for t in $TABLES; do
@@ -169,21 +169,51 @@ done
 case "$up" in 200|409) ok "the store answers, its bucket made";; *) bad "the store: [$up]"; summary;; esac
 
 echo "-- S1 a setting that cannot be right"
-e="$(cw "$L" "insert into $YX_CFG (name,module,value) values ('s3_config','C','endpoint=http://$S3:9000; bucket=$BUCKET; secret=x; secret_key=abc')")"
-[ -n "$e" ] && ok "S1 a key in the setting refused: $(printf '%s' "$e" | cut -c1-90)" || bad "S1 a key in the setting taken"
+e="$(cw "$L" "insert into $YX_CFG (name,module,value) values ('secret_key','B','abc')")"
+case "$e" in *"no setting"*) ok "S1 a key in the setting refused: $(printf '%s' "$e" | cut -c1-90)";; *) bad "S1 a key in the setting: [$e]";; esac
 case "$e" in *abc*) bad "S1 the refusal shows the value";; *) ok "S1b the refusal does not show the value";; esac
-e="$(cw "$L" "insert into $YX_CFG (name,module,value) values ('s3_config','C','endpoint=http://user:pw@$S3:9000; bucket=$BUCKET; secret=x')")"
-[ -n "$e" ] && ok "S1c a login in the endpoint refused" || bad "S1c a login in the endpoint taken"
+e="$(cw "$L" "insert into $YX_CFG (name,module,value) values ('endpoint','B','http://user:pw@$S3:9000')")"
+case "$e" in *login*) ok "S1c a login in the endpoint refused";; *) bad "S1c a login in the endpoint: [$e]";; esac
 check "S1d no store: nothing to say" "off" "$(info "$O" E s3)"
 if skv_setup; then ok "S1e the secret store on: all hold v1"; else bad "S1e v1 not held on:$(not_holding 1)"; fi
 o="$(printf '%s' "$AK:$SK" | yx "$L" --skv put s3_keys)"
 case "$o" in *rror*) bad "S1f the secret: $o";; *) ok "S1f the keys are a secret";; esac
 printf '%s' "wrongkey:wrongsecret" | yx "$L" --skv put s3_bad >/dev/null
 sleep 3
-cfg_put_s3() { cw "$L" "delete from $YX_CFG where module='C' and name='s3_config'; insert into $YX_CFG (name,module,value) values ('s3_config','C','$1')"; }
+# the store's rows of module B, given as name=value; ..., and the 2 s they may be read after
+cfg_put_s3() {
+	local values="" kv k v old="$IFS"
+	IFS=';'
+	for kv in $1; do
+		k="${kv%%=*}"; k="${k// /}"; v="${kv#*=}"
+		values="${values:+$values,}('$k','B','$v')"
+	done
+	IFS="$old"
+	cw "$L" "delete from $YX_CFG where module='B'; insert into $YX_CFG (name,module,value) values $values"
+	sleep 3
+}
 e="$(cfg_put_s3 "endpoint=http://$S3:9000; bucket=$BUCKET; secret=s3_keys; tickets=on")"
 [ -z "$e" ] && ok "S1g the store set" || bad "S1g: $e"
 check "S1h the setting holds no key" "0" "$(q "$L" "select count(*) from $YX_CFG where value like '%$SK%'")"
+reach "select count(*) from $YX_CFG where module='B'" 4 60 && ok "S1i one row per setting, on every node" || bad "S1i the rows are not on every node"
+e="$(cw "$L" "update $YX_CFG set value='http://user:pw@$S3:9000' where module='B' and name='endpoint'")"
+case "$e" in *login*) ok "S1j an UPDATE's value is checked too";; *) bad "S1j a login by UPDATE: [$e]";; esac
+e="$(cw "$L" "update $YX_CFG set name='secret_key' where module='B' and name='tickets'")"
+case "$e" in *"delete it and insert"*) ok "S1k an UPDATE of the name is refused";; *) bad "S1k a name by UPDATE: [$e]";; esac
+e="$(cw "$O" "insert into $YX_CFG (name,module,value) values ('region','B','eu')")"
+case "$e" in *leader*) ok "S1l another node's write refused: the leader's";; *) bad "S1l a follower's row: [$e]"; cw "$L" "delete from $YX_CFG where module='B' and name='region'" >/dev/null;; esac
+e="$(cw "$O" "delete from $YX_CFG where module='B' and name='tickets'")"
+case "$e" in *leader*) ok "S1m another node's delete refused";; *) bad "S1m a follower's delete: [$e]";; esac
+e="$(cw "$L" "delete from $YX_CFG where module='B' and name='bucket'")"
+[ -z "$e" ] || bad "S1n removing a row: $e"
+said=""
+for ((i = 0; i < 30; i += 2)); do said="$(info "$O" E s3)"; case "$said" in *"bucket is required"*) break;; esac; sleep 2; done
+case "$said" in *"bucket is required"*) ok "S1n a store that lacks a row says which";; *) bad "S1n [$said]";; esac
+e="$(cw "$L" "insert into $YX_CFG (name,module,value) values ('bucket','B','$BUCKET')")"
+[ -z "$e" ] && ok "S1o a row alone puts it right" || bad "S1o: $e"
+sleep 3
+e="$(cw "$L" "insert into $YX_CFG (name,module,value) values ('s3_config','C','endpoint=http://$S3:9000')")"
+case "$e" in *"module B"*) ok "S1p the old C row refused, saying where it went";; *) bad "S1p [$e]";; esac
 
 echo "-- S2 move"
 table_new s3_m "id int primary key, note text, photo bytea" "$(blob_cfg 'blob=photo:move; timeout_sec=8')"
@@ -422,7 +452,7 @@ e="$(cw "$O" "insert into s3_role values (2, $BYTES)")"
 check "S14b a write keeps its blob" "" "$e"
 reach "select photo is not null from s3_role where id = 2" t 60 && ok "S14c on every node" || bad "S14c not on every node"
 check "S14d nothing went" "404" "$(obj_code "$(key_of s3_role photo 2)")"
-e="$(cw "$L" "delete from $YX_CFG where module='C' and name='s3_config'")"
+e="$(cw "$L" "delete from $YX_CFG where module='B'")"
 [ -z "$e" ] || bad "S14e removing it: $e"
 reach "select count(*) from pg_trigger where tgrelid = '$PUB.s3_q'::regclass and tgname = 'yt_s3_blob'" 0 60 && ok "S14e the store's setting gone: the triggers too" || bad "S14e a trigger stays"
 e="$(cw "$O" "insert into s3_q values (20, $BYTES)")"

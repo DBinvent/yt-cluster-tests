@@ -10,11 +10,15 @@
 [![docker](https://img.shields.io/docker/v/dbinvent/sge?sort=semver&label=docker)](https://hub.docker.com/r/dbinvent/sge)
 · [Trivy's result and the SBOMs](https://github.com/DBinvent/sge/blob/main/security/trivy-sge.md)
 
-Each image as Docker Hub serves it, scanned by Trivy and Docker Scout: YT Cluster's every day
-after the nightly ([.github/workflows](.github/workflows)), Schema Guard's after each publish and
-weekly (its own). After each green nightly run each product's SBOMs - CycloneDX, its crates and
-its image - and Trivy's result go into its public repository (nightly/security.sh): YT
-Cluster's in [security/](security/).
+Each image as Docker Hub serves it, scanned by Trivy: YT Cluster's every day after the nightly
+([.github/workflows](.github/workflows); Docker Scout by hand), Schema Guard's after each publish and
+weekly (its own). Before a nightly run publishes YT Cluster, the same gate stops it: Trivy on
+the crates of the tested source and on an image of the build, `cargo audit` over ytserv's tree
+and its own crates compiled with unsafe code forbidden - a HIGH or CRITICAL finding with a fix,
+or a high or critical advisory, or unsafe code publishes nothing (nightly/security.sh
+`security_gate`; findings accepted go in [.trivyignore](.trivyignore), each with why). After
+each green nightly run each product's SBOMs - CycloneDX, its crates and its image - and Trivy's
+result go into its public repository (nightly/security.sh): YT Cluster's in [security/](security/).
 
 We run our tests on Debian-based Linux distributions and can’t give any promises about the compatibility with many other versions and distros, except for those we use ourselves in development now. The suites below run in docker on Ubuntu 24.04 and 26.04 with PostgreSQL 18, and the package suites (lxc/, migrate/) on Ubuntu 24.04; the cargo-make test further down runs in an Ubuntu 22.04 container with PostgreSQL 14 (`./docker.sh`).
 
@@ -62,7 +66,7 @@ rmc/ and llm/ keep their own `.env`.
    ytcluster_dist, infra_apt; never this one), committed or not, and stops when no
    `.rs` file changed since the last tested run - then nothing is built, nothing
    appended to results.yaml, no package made, no message sent, however it was
-   started;
+   started, unless coverage is due (see Coverage): then it runs for that alone;
 2. bumps the deb's patch version when it is already published, and sets ytserv's
    version to it: one number for the package and the daemon;
 3. builds the extension for every PostgreSQL major and the PostgreSQL 18 package,
@@ -82,16 +86,21 @@ rmc/ and llm/ keep their own `.env`.
    reverse.
 
 `nightly.sh --dry-run` says what a run would do; `--no-publish` tests only. There
-is no run without a code change, whatever was asked.
+is no run without a code change, whatever was asked, but for coverage that is due.
 
 ### Coverage
 
-A run that finds `nightly/coverage.yaml` missing - or written by a run of fewer
-suites - also measures code coverage: the lines of yt-pgxt's Rust workspace that
-the unit tests and every end-to-end suite ran. Rename or delete the file and the
-next night measures again - with no `.rs`
-change it runs for that alone, and publishes nothing. `--coverage` measures in the
-run started by hand. [nightly/coverage.sh](nightly/coverage.sh) does the work:
+Coverage comes after the release: a night with new code runs plain, and the first
+night without any measures code coverage, when `nightly/coverage.yaml` is missing,
+written by a run of fewer suites, or outdated: the newest run was all ok and tested
+other sources than the last measurement. So the coverage badge is a day late at best.
+It counts the lines of YT Cluster's Rust workspace that the unit tests and the
+end-to-end suites ran, migrate and jepsen apart, and only a green run counts. That run
+is for coverage alone, without those two, and publishes nothing. Each sources get one
+try: rename or delete the file and the next such night measures again, unless that
+just failed. `--coverage` measures in the run started by hand, new code too: published
+if green, and if it fails the next night runs it plain; add `--no-publish` to one with
+`--suites`. [nightly/coverage.sh](nightly/coverage.sh) does the work:
 
 - an instrumented ytserv and ytctl (yt-pgxt's own crates only) in a second
   package, which every suite installs instead of the plain one - topology, hier,

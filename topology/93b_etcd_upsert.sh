@@ -3,7 +3,8 @@
 # under a key prefix, upserted into tables by the regular ytserv
 # (ytserv/src/state/etcd_upsert.rs) - no Python on the way.
 #
-#   C etcd_upsert = '/q/up_o=public.up_o:id;/up/u/=public.up_u:id'
+#   F feed./q/up_o = public.up_o:id
+#   F feed./up/u/  = public.up_u:id
 #
 # Driven from outside, through an ordinary etcd client (yxetcd, as 93_etcd.sh),
 # on a node that is not the leader: a queue is consumed by every node (its
@@ -48,11 +49,11 @@ wait_val() {
 }
 
 # ── setup: two synced tables and the routes into them ─────────────────────────
-ROUTES='/q/up_o=public.up_o:id;/up/u/=public.up_u:id'
 for n in "${NODES[@]}"; do
 	q "$n" "drop table if exists up_o; create table up_o (id int primary key, qty int, note text default 'n');
 	        drop table if exists up_u; create table up_u (id int primary key, name text);" >/dev/null
-	cfg_write "$n" etcd_upsert C "$ROUTES"
+	cfg_write "$n" "feed./q/up_o" F "public.up_o:id"
+	cfg_write "$n" "feed./up/u/" F "public.up_u:id"
 done
 register_table public.up_o ""
 register_table public.up_u ""
@@ -115,7 +116,32 @@ check "U5 a put under the prefix is upserted" "x" "$(wait_val "$L" "select name 
 check "U5 ...and reaches $B: a synced table" "x" "$(wait_val "$B" "select name from up_u where id=10" x 30)"
 check "U5 ...and a put outside it is not" "0" "$(q "$L" "select count(*) from up_u where id=11")"
 
+# ── U8 a route added with no restart ────────────────────────────────────
+for n in "${NODES[@]}"; do cfg_write "$n" "feed./q/up_o2" F "public.up_o:id"; done
+for n in "${NODES[@]}"; do
+	for ((i = 0; i < 30; i += 2)); do v="$(info "$n" E etcd_upsert)"; case "$v" in "3 route"*) break;; esac; sleep 2; done
+	case "$v" in "3 route"*) ok "U8 $n: a route added is running";; *) bad "U8 $n: [$v]";; esac
+done
+put_json "$B" /q/up_o2/producer/u8 '{"id":80,"qty":8}'
+check "U8 its message lands" "8" "$(wait_val "$L" "select qty from up_o where id=80" 8)"
+# [etcd-spare] a forever spare consumes no queue: a message it took would never land
+for n in "${NODES[@]}"; do
+	is_spare_node "$n" || continue
+	check "U8 forever spare $n took no message it could not write" "0" \
+		"$(rh "docker logs --since 15m $n 2>&1 | { grep -c 'etcd-upsert.*forever-Spare' || true; }")"
+done
+for n in "${NODES[@]}"; do cfg_delete "$n" "feed./q/up_o2" F; done
+e="$(qe "$L" "begin; insert into $YX_CFG (name,module,value) values ('feed./up/','F','public.up_u:id'); select yt_complete(true); commit;" 2>&1 || true)"
+case "$e" in *"configured already"*) ok "U9 a route overlapping another is refused";; *) bad "U9 [$e]";; esac
+
 # ── cleanup: the routes off (pre_case restores the rest) ─────────────────────
-for n in "${NODES[@]}"; do cfg_delete "$n" etcd_upsert C; done
+for n in "${NODES[@]}"; do cfg_delete "$n" "feed./q/up_o" F; cfg_delete "$n" "feed./up/u/" F; done
+# a delete carries no setting to apply: the rows are read, and the routes go with them
+for n in "${NODES[@]}"; do
+	for ((i = 0; i < 30; i += 2)); do v="$(info "$n" E etcd_upsert)"; case "$v" in "0 route"*) break;; esac; sleep 2; done
+	case "$v" in "0 route"*) ok "U6 $n: the routes went with their rows";; *) bad "U6 $n: [$v]";; esac
+done
+e="$(qe "$L" "begin; insert into $YX_CFG (name,module,value) values ('etcd_upsert','C','/q/x=t:id'); select yt_complete(true); commit;" 2>&1 || true)"
+case "$e" in *"module F"*) ok "U7 the old C row refused, saying where it went";; *) bad "U7 [$e]";; esac
 
 summary

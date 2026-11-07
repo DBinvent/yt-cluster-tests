@@ -9,12 +9,14 @@ name: docker scout
 # Daily after the nightly publishes, and by hand: an advisory can come out with nothing
 # changed here. Scout needs a Docker Hub login: the repository secret DOCKER_TOKEN, a
 # read-only access token of the account dbinvent (as Schema Guard's scout.yml).
+# Off for now (owner, 2026-11-06): the account has no Scout access for dbinvent/yt.
+# Push and the daily schedule are commented out; by hand only, until it has.
 on:
-  push:
-    branches: [main]
-    paths: [".github/workflows/scout.yml"]
-  schedule:
-    - cron: "40 9 * * *"
+  # push:
+  #   branches: [main]
+  #   paths: [".github/workflows/scout.yml"]
+  # schedule:
+  #   - cron: "40 9 * * *"
   workflow_dispatch:
 
 permissions:

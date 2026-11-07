@@ -9,13 +9,14 @@
 #   nightly/locked.sh <command...>    # anything else on the test hosts, under the same lock
 #
 # Another run in progress (the lock, nightly/state/nightly.lock), or no code
-# change: exit 75 at once, nothing run, nothing appended, nothing sent.
+# change and no coverage due: exit 75 at once, nothing run, nothing appended, nothing sent.
 #
 # 1. Changes: a fingerprint of the .rs files of every watched repository - their
 #    content, committed or not, tracked or not (ignored ones never) - against the
 #    one the last run tested. A code change is a .rs change and nothing else: no
 #    .rs change, no run - nothing built, nothing appended, no package, no message,
-#    whatever was asked: no change, no run, no publish, no message. This
+#    whatever was asked: no change, no run, no publish, no message - but for coverage
+#    that is due (below), a run for that alone. This
 #    repository is never watched: a change to a test is not a change to test.
 # 2. Version: when the build in yt-cluster/ytctl/Cargo.toml (what ytctl --version
 #    prints, 1.20.0) is the one last published, its patch is bumped - in the
@@ -38,7 +39,10 @@
 #    on YX_HOST and RMC_SSH, lxc and migrate on LXC_SSH. LANE_HOST's images are built
 #    where the rest's are and carried over; it builds nothing.
 # 5. Every suite passed (and NIGHTLY_PUBLISH=1): the release build - every glibc
-#    target, EL9, musl, the extension - then the deb into the apt repository, the
+#    target, EL9, musl, the extension - then the security gate (security.sh
+#    security_gate: Trivy on the crates and on an image of this deb, cargo audit,
+#    unsafe code - a HIGH or CRITICAL finding with a fix publishes nothing), then the
+#    deb into the apt repository, the
 #    EL9 rpm into REPO_DIR/yum/el9, the tarball of the static (musl) binaries into
 #    REPO_DIR/paks (ytcluster_dist/build_tgz.sh), and the image dbinvent/yt
 #    (ytcluster_dist/docker/publish.sh: built from the deb as apt serves it). sge is
@@ -53,29 +57,41 @@
 #    under way counts.
 # 6. The run is appended to nightly/results.yaml, oldest first: a page shows it
 #    newest first by reading the list in reverse.
-# 7. A run that published (a promotion) renews the badge dbinvent.com shows:
-#    drawn from its entry (nightly/badge.py: shields.io renders the SVG) into
-#    REPO_DIR/paks/nightly/badge.svg - served by the apt host as
-#    https://apt.dbinvent.com/paks/nightly/badge.svg, on the page within five
-#    minutes, no push. Beside it the regular ytserv's own badge (nightly/safety_badge.py):
+# 7. A run that published (a promotion) renews the badges dbinvent.com shows:
+#    drawn from its entry (nightly/badge.py: shields.io renders the SVGs) into
+#    REPO_DIR/paks/nightly/badge.svg and coverage.svg - served by the apt host under
+#    https://apt.dbinvent.com/paks/nightly/, on the page within ten minutes, no push -
+#    and nightly/coverage.md, the table behind the coverage badge. A green run for
+#    coverage alone draws them too: the nightly badge comes out the same, from the
+#    same promotion. Beside it the regular ytserv's own badge (nightly/safety_badge.py):
 #    cargo audit over ytserv's tree, and its own crates compiled with unsafe code
 #    forbidden - REPO_DIR/paks/nightly/ytserv-safety.svg, renewed the same way.
 #    Any other run leaves the badges as they are. NIGHTLY_PUSH=1 commits results.yaml (and
-#    nightly/coverage.yaml) and pushes them - the history on GitHub - on main
+#    nightly/coverage.yaml, coverage.md) and pushes them - the history on GitHub - on main
 #    and only when no other commit is waiting to be pushed; otherwise they wait
 #    for a hand push.
 #
-# Coverage: a run that finds nightly/coverage.yaml missing, or listing fewer
-# suites than a whole run, measures it - so renaming or deleting that file has
-# the next run with a code change measure again (a run of its own for it, with no
-# change, there is not: no change, no run). Such a run builds an instrumented
+# Coverage comes after the release (owner, 2026-11-05: not a priority): a night with new
+# code runs plain, and the first night without any measures, when nightly/coverage.yaml is
+# missing, lists fewer suites than a whole run, or is outdated: the newest run was all ok
+# (every suite passed, or it published) and tested other sources than the last measurement
+# (state/coverage.fp). So the coverage badge is a day late at best. That is a run for
+# coverage alone, on the sources already tested and without the suites whose counts nothing
+# collects, and it publishes nothing; if the instrumented build fails it stops there.
+# --coverage by hand measures in a run with new code too: it is tested on the instrumented
+# package and published as usual if green; if it fails, those sources count as not tested,
+# and the next night runs them plain: the instrumented build can fail what the plain one passes,
+# and that must not cost the release. Only a measurement in a green run counts, and a
+# partial one (--coverage --suites, add --no-publish) never replaces a whole one: a suite
+# that died early must not lower the figure. Such a run builds an instrumented
 # ytserv and ytctl into a second package (nightly/coverage.sh) that every suite
 # installs in place of the plain one, runs the unit tests under cargo llvm-cov,
 # collects each suite's counts from its docker volume (lxc: from the container)
 # and writes nightly/coverage.yaml plus a `coverage:` percent in its results.yaml
-# entry; the per-file report stays in the run's logs. A measurement that produced
-# no report is not retried for the same sources (state/coverage.tried.fp) unless
-# asked with --coverage.
+# entry; the per-file report stays in the run's logs. One try per sources: a measurement
+# that did not leave a whole file is not tried again for them (state/coverage.tried.fp)
+# unless asked with --coverage. Deleting coverage.yaml has the next night without new code
+# measure again, unless that is what just failed.
 #
 # Settings: ../.env (see ../env.example). State (fingerprints, what was
 # published) in nightly/state/, logs in nightly/logs/<run>/ - neither committed.
@@ -138,10 +154,10 @@ LXC_SSH="${LXC_SSH:-}"
 # topology-py: fixture A's server-function scripts, on ytserv-all (the build with
 # Python functions); topology: the rest of it, on the regular ytserv
 ALL_SUITES="unit topology topology-py hier lxc migrate llm topo topo-faults topo-membership rmc jepsen"
-# suites a coverage measurement does not count: migrate installs the package as an
-# operator does, with no instrumented binaries - asking for it would have every
-# night measure again, since no measurement can list it; jepsen's nodes run the
-# package in an image of their own, whose counts nothing collects
+# suites a coverage measurement does not count, whose counts nothing collects: migrate
+# installs the package as an operator does, and jepsen's nodes run it in an image of
+# their own - asking for them would have every night measure again, since no measurement
+# can list them
 COV_EXEMPT="migrate jepsen"
 NIGHTLY_SUITES="${NIGHTLY_SUITES:-$ALL_SUITES}"
 NIGHTLY_PUBLISH="${NIGHTLY_PUBLISH:-1}"
@@ -237,26 +253,56 @@ WATCH="$(watch_list)"
 CUR="$(fingerprints)"
 LAST="$(cat "$STATE/tested.fp" 2>/dev/null)"
 CHANGED="$(join -a1 <(sort <<< "$CUR") <(sort <<< "$LAST") 2>/dev/null | awk 'NF < 3 || $2 != $3 {print $1}' | tr '\n' ' ')"
+# [security-gate] a run the gate stopped goes again, its sources changed or not
+# (security_step, below): a full run, as any - the build is the one it publishes
+[ -z "$CHANGED" ] && [ -f "$STATE/gate.blocked" ] && CHANGED="security-gate"
 TRIGGER=changes
-# coverage: measured when its file is missing; a failed measurement of these same
-# sources is not tried again on its own
+# coverage: measured when it is due (Coverage, above); one that did not leave a whole
+# file is not tried again on its own for these same sources
 COV_TRIED="$(cat "$STATE/coverage.tried.fp" 2>/dev/null)"
-cov_whole() { # coverage.yaml is there and measured every suite
+cov_whole() { # coverage.yaml (or the file given) is there and measured every suite
 	local have s
-	have=" $(grep -m1 '^suites:' "$COVERAGE_FILE" 2>/dev/null | cut -d: -f2- | tr -d '[]",') "
+	have=" $(grep -m1 '^suites:' "${1:-$COVERAGE_FILE}" 2>/dev/null | cut -d: -f2- | tr -d '[]",') "
 	# one measured before fixture A was split in two lists topology for both halves
 	case "$have" in *" topology-py "*) ;; *" topology "*) have="$have topology-py " ;; esac
 	for s in $ALL_SUITES; do case " $COV_EXEMPT $have" in *" $s "*) ;; *) return 1 ;; esac; done
 }
+# the newest run was all ok, and tested other sources than the last measurement: new code
+# passed since then (owner, 2026-11-05). By the sources, not the build: one build number
+# stands for every run until it is published. All ok: every suite passed, or it published -
+# a green run of a few suites by hand vouches for nothing
+cov_outdated() {
+	local entry s
+	entry="$(tac "$RESULTS" 2>/dev/null | sed '/^- run/q')"
+	grep -q '^  result: pass$' <<< "$entry" || return 1
+	if ! grep -q '^  published: {' <<< "$entry"; then
+		for s in $ALL_SUITES; do grep -q "^    - {name: \"$s\", .*result: pass}" <<< "$entry" || return 1; done
+	fi
+	[ "$(cat "$STATE/coverage.fp" 2>/dev/null)" != "$(cat "$STATE/tested.fp" 2>/dev/null)" ]
+}
+cov_why() { # why this run measures, for the log
+	[ -f "$COVERAGE_FILE" ] || { echo " ($(basename "$COVERAGE_FILE") missing)"; return 0; }
+	cov_whole || { echo " (the last one was partial)"; return 0; }
+	cov_outdated && echo " (outdated: new code passed since the last one)"
+	return 0
+}
 if [ "$COVERAGE" = auto ]; then
 	# measured on its own only by a run of every suite, and until one has: a
 	# partial measurement (--coverage --suites ...) stands in its file until then
-	if cov_whole || [ "$NIGHTLY_SUITES" != "$ALL_SUITES" ]; then COVERAGE=0; else COVERAGE=1; fi
+	COVERAGE=0
+	if [ -z "$CHANGED" ] && [ "$NIGHTLY_SUITES" = "$ALL_SUITES" ] && [ "$COV_TRIED" != "$CUR" ] && { ! cov_whole || cov_outdated; }; then COVERAGE=1; fi
 fi
-# no code change, no run: not forced, not for coverage alone - exit 75, which cron's
-# Telegram sender skips
+# no code change, no run - exit 75, which cron's Telegram sender skips - unless coverage
+# is due: then a run for that alone, on the sources already tested, publishing nothing
 if [ -z "$CHANGED" ]; then
-	say "no .rs change since the last tested run in: $WATCH - nothing run, published or sent"; exit 75
+	if [ "$COVERAGE" != 1 ]; then
+		say "no .rs change since the last tested run in: $WATCH - nothing run, published or sent"; exit 75
+	fi
+	TRIGGER=coverage; NIGHTLY_PUBLISH=0
+	# the sources are tested: only the suites that count towards the figure
+	_kept=""
+	for _s in $NIGHTLY_SUITES; do case " $COV_EXEMPT " in *" $_s "*) ;; *) _kept="${_kept:+$_kept }$_s" ;; esac; done
+	NIGHTLY_SUITES="$_kept"; unset _kept _s
 fi
 
 # ── 2. the version ──────────────────────────────────────────────────────────────
@@ -282,7 +328,7 @@ NEED_BUMP=0
 if [ "$TRIGGER" != coverage ] && [ -n "$LAST_V" ] && dpkg --compare-versions "$DEB_V" le "$LAST_V"; then NEED_BUMP=1; fi
 
 say "== nightly $(now): $TRIGGER - changed: ${CHANGED:-none} (watching: $WATCH)"
-say "   deb $PKG_V, build $DEB_V (published: ${PUB_V:-none}, build ${LAST_V:-none}), ytserv $YTS_V; suites: $NIGHTLY_SUITES${LANE_HOST:+ (lanes: unit here, ${LANE_SUITES} on $LANE_HOST)}${LXC_SSH:+, lxc on $LXC_SSH}; publish: $NIGHTLY_PUBLISH; coverage: $( [ "$COVERAGE" = 1 ] && echo "measured$( [ -f "$COVERAGE_FILE" ] && { cov_whole || echo " (the last one was partial)"; } || echo " ($(basename "$COVERAGE_FILE") missing)")" || echo no)"
+say "   deb $PKG_V, build $DEB_V (published: ${PUB_V:-none}, build ${LAST_V:-none}), ytserv $YTS_V; suites: $NIGHTLY_SUITES${LANE_HOST:+ (lanes: unit here, ${LANE_SUITES} on $LANE_HOST)}${LXC_SSH:+, lxc on $LXC_SSH}; publish: $NIGHTLY_PUBLISH; coverage: $( [ "$COVERAGE" = 1 ] && echo "measured$(cov_why)" || echo no)"
 # [deb-version] cf_purge <url>...: Cloudflare's copies of these URLs dropped (purge
 # by URL) - with CF_ZONE_ID and CF_PURGE_TOKEN (an API token: Zone - Cache Purge -
 # Purge, on dbinvent.com) from .env. Asked again (PURGE_ONCE unset) for about five minutes while the API
@@ -709,10 +755,15 @@ host_lane() {
 }
 
 RESULT=pass; BUILD=pass; PUBLISHED_DEB=""; PUBLISHED_RPM=""; PUBLISHED_TGZ=""; PUBLISHED_IMAGE=""; NOTE=""; COVERAGE_PCT=""; COV_NOTE=""
+COV_TRY="$COVERAGE"
 if suite build build; then
 	if [ "$COVERAGE" = 1 ]; then
 		if suite coverage-build cov_build; then SUITE_DEB="$LOGS/yt-cluster_${DEB_V}_amd64-pg18-coverage.deb"
-		else COVERAGE=0; COV_NOTE="coverage not measured: its build failed"; echo "$TESTED_FP" > "$STATE/coverage.tried.fp"; fi
+		else
+			COVERAGE=0; COV_NOTE="coverage not measured: its build failed"
+			# a run for coverage alone has nothing left to do: its sources are tested
+			if [ "$TRIGGER" = coverage ]; then NIGHTLY_SUITES=""; RESULT=fail; NOTE="nothing run: the instrumented build failed"; fi
+		fi
 	fi
 	# [lanes] unit here (LANE_U), LANE_SUITES on LANE_HOST (LANE_B), the rest in turn
 	LANE_B=""; LANE_U=""; LANE_REST=""
@@ -739,22 +790,36 @@ if suite build build; then
 	# the lanes' skips are in their rows, not in this shell
 	[ -n "$B_PID$U_PID" ] && SKIPPED="$(awk -F'\t' '$5 == "skipped" {printf "%s%s", (n++ ? " " : ""), $1}' "$ROWS")"
 	if [ "$COVERAGE" = 1 ]; then
-		if suite coverage cov_report; then
+		if [ "$RESULT" != pass ]; then
+			COV_NOTE="coverage not counted: a suite failed"
+		elif ! suite coverage cov_report; then
+			COV_NOTE="coverage not measured: no report"
+		elif ! cov_whole "$COV/coverage.yaml" && cov_whole; then
+			COV_NOTE="coverage of these suites only, in the run's logs: nightly/$(basename "$COVERAGE_FILE") stays whole"
+		else
 			COVERAGE_PCT="$(grep -oP '^coverage=\K.*' "$LOGS/coverage.log" | tail -1)"
-			cp "$COV/coverage.yaml" "$COVERAGE_FILE"; rm -f "$STATE/coverage.tried.fp"
+			cp "$COV/coverage.yaml" "$COVERAGE_FILE"; echo "$TESTED_FP" > "$STATE/coverage.fp"
 			# both: the workspace's here, ytserv's on the badge (badge.py) - one alone read
 			# as a drop, 81 -> 74, when both had gone up
 			YTS_PCT="$(grep -oP 'name: "ytserv", lines: [0-9]+, percent: \K[0-9.]+' "$COVERAGE_FILE" | head -1)"
 			COV_NOTE="coverage ${COVERAGE_PCT}% of yt-cluster's lines${YTS_PCT:+, ytserv ${YTS_PCT}% (on the badge)} (nightly/$(basename "$COVERAGE_FILE"))"
-		else
-			COV_NOTE="coverage not measured: no report"; echo "$TESTED_FP" > "$STATE/coverage.tried.fp"
 		fi
 	fi
 else
 	BUILD=fail; RESULT=fail; NOTE="the build failed - no suite ran"
 fi
-# tested, whatever the outcome: the same sources are not run again tomorrow
-echo "$TESTED_FP" > "$STATE/tested.fp"
+# one try per sources, unless asked: only a whole file ends it, so that deleting it asks again
+if [ "$COV_TRY" = 1 ]; then
+	if [ -n "$COVERAGE_PCT" ] && cov_whole; then rm -f "$STATE/coverage.tried.fp"; else echo "$TESTED_FP" > "$STATE/coverage.tried.fp"; fi
+fi
+# tested, whatever the outcome: the same sources are not run again tomorrow - but for new
+# code that failed while measured: the next night tests it plain, so a failure only the
+# instrumented build has cannot cost the release (3 of the 4 last measurements failed)
+if [ "$COVERAGE" = 1 ] && [ "$RESULT" = fail ] && [ "$BUILD" = pass ] && [ "$TRIGGER" != coverage ]; then
+	say "   not marked as tested: it failed while measured, the next night runs it plain"
+else
+	echo "$TESTED_FP" > "$STATE/tested.fp"
+fi
 
 # ── 5. publish ──────────────────────────────────────────────────────────────────
 # Every step checked by hand, never by `set -e`: these run as an && list (suite
@@ -906,12 +971,29 @@ publish_tgz() {
 # and latest. The Docker Hub token: DOCKER_TOKEN in infra_apt/.env, read by infra_apt
 # publish-docker.sh and kept out of this shell.
 publish_image() {
-	PUSH=1 REPO_DIR="$REPO_DIR" INFRA_APT="$INFRA_APT" "$DIST/docker/publish.sh" "$DEB_V" \
+	PUSH=1 REPO_DIR="$REPO_DIR" INFRA_APT="$INFRA_APT" TRIVY_GATE=1 TRIVY_IMAGE="$TRIVY_IMAGE" TRIVY_IGNORE="$TESTS/.trivyignore" \
+		"$DIST/docker/publish.sh" "$DEB_V" \
 		|| { echo "  FAIL  image not published: docker/publish.sh exited $?"; return 1; }
 	echo "image=dbinvent/yt:$DEB_V" >> "$PUBLISHED_OUT"
 }
 # [sbom] each product's SBOMs and Trivy's result in its public repository: security.sh
 source "$HERE/security.sh"
+# [security-gate] the step between the release build and the publish (security.sh)
+# One that stops a run leaves STATE/gate.blocked: the next run goes again on the same
+# sources (the trigger, above), since the fix is seldom a .rs change - a crate taken up
+# in Cargo.lock, a finding accepted in .trivyignore, a Debian package fixed upstream.
+# A pass, or a run that fails before the gate, takes it away.
+security_step() {
+	local deb; deb="$(grep -oP '(?<=^deb=).*' "$LOGS/release.out" 2>/dev/null)"
+	[ -f "$deb" ] || { echo "  FAIL  security: no release build to check (deb=${deb:-none})"; return 1; }
+	# the image is built on another docker host or nowhere (infra_apt publish-docker.sh)
+	case "${DOCKER_HOST:-}" in
+		ssh://*|tcp://*) ;;
+		*) echo "  FAIL  security: no build host for the image - NIGHTLY_DOCKER_HOST (ssh:// or tcp://) is needed to publish"
+		   touch "$STATE/gate.blocked"; return 1 ;;
+	esac
+	if security_gate "$deb"; then rm -f "$STATE/gate.blocked"; else touch "$STATE/gate.blocked"; return 1; fi
+}
 # [publish] The apt index and the rpm as the internet sees them: through public
 # DNS, not this host's /etc/hosts, which may name the apt host's LAN address. Up to
 # a minute, for the edge to revalidate (the index is served max-age=0).
@@ -987,13 +1069,16 @@ public_available() { # <deb version> <its sha256> <rpm file name>
 		|| { echo "  FAIL  rpm not available: $PUBLIC_APT/yum/el9/packages/$3"; return 1; }
 	echo "  OK    rpm available: $PUBLIC_APT/yum/el9/packages/$3"
 }
+# [security-gate] a run that failed before the gate: the marker goes - a failure
+# waits for new code, as always
+[ "$RESULT" = pass ] || rm -f "$STATE/gate.blocked"
 if [ "$RESULT" = pass ] && [ "$NIGHTLY_PUBLISH" = 1 ]; then
 	# out, or the deb and the rpm out and a step after them failed: publish wrote
 	# published.version once both were public - this run's build, the start having bumped
 	# past the one there. Published either way, a pass: what apt serves is tested and
 	# out, and the note names the step (owner, 2026-10-27; it said "not published" while
 	# apt served the build)
-	suite release release && suite publish publish; pub=$?
+	suite release release && suite security-gate security_step && suite publish publish; pub=$?
 	if [ "$pub" = 0 ] || [ "$(cat "$STATE/published.version" 2>/dev/null)" = "$DEB_V" ]; then
 		PUBLISHED_DEB="$PKG_V"; PUBLISHED_RPM="$DEB_V"   # the deb as apt lists it; its build: version.deb
 		echo "$DEB_V" > "$STATE/published.version"
@@ -1007,13 +1092,16 @@ if [ "$RESULT" = pass ] && [ "$NIGHTLY_PUBLISH" = 1 ]; then
 		[ -s "$LOGS/purge.why" ] && NOTE="tested green, but nothing published: the edge purge failed - $(cat "$LOGS/purge.why")"
 		# the deb replaced at the origin, its edge copy not purged in two rounds: the rest stopped
 		[ -s "$LOGS/purge.stuck" ] && NOTE="tested green; the deb $(cat "$LOGS/purge.stuck") - replaced at the origin, the edge's copy not purged: purge its URLs by hand (publish.log), the rpm and the rest not published"
+		# [security-gate] stopped before anything changed
+		awk -F'\t' '$1=="security-gate" && $5=="fail" {f=1} END {exit !f}' "$ROWS" \
+			&& NOTE="tested green, but nothing published: the security check before the publish stopped it (security-gate.log) - the next run tries again"
 	fi
 elif [ "$TRIGGER" = coverage ] && [ "$RESULT" = pass ]; then
-	NOTE="tested green; a coverage run of published sources publishes nothing"
+	NOTE="tested green; a run for coverage alone publishes nothing"
 elif [ "$RESULT" = pass ]; then
 	NOTE="tested green; publishing is off (NIGHTLY_PUBLISH=0)"
 elif [ -z "$NOTE" ]; then
-	NOTE="not published: a suite failed"
+	if [ "$TRIGGER" = coverage ]; then NOTE="a suite failed while measuring"; else NOTE="not published: a suite failed"; fi
 fi
 # published, and an edge's copy not dropped after it (purge_late)
 [ -s "$LOGS/purge.late" ] && NOTE="${NOTE:+$NOTE; }the edge not purged after the publish - $(tail -1 "$LOGS/purge.late") (publish.log)"
@@ -1037,7 +1125,7 @@ rows = []
 for line in open(e["ROWS"]):
     n, p, f, s, r, log = line.rstrip("\n").split("\t")
     rows.append((n, int(p), int(f), int(s), r))
-STEPS = ("build", "coverage-build", "coverage", "release", "publish")
+STEPS = ("build", "coverage-build", "coverage", "release", "security-gate", "publish")
 suites = [r for r in rows if r[0] not in STEPS]
 steps = [r for r in rows if r[0] in STEPS]
 out = []
@@ -1081,14 +1169,15 @@ if [ "$RESULT" = pass ]; then
 	security_reports >> "$LOGS/security.log" 2>&1
 	say "   security: $(grep -cE '^  OK ' "$LOGS/security.log") report(s) written (security.log)"
 fi
-# the badge vouches for what can be installed: only a promotion renews it, straight
-# on the apt host
-if [ -z "$PUBLISHED_DEB" ]; then
-	say "   badge kept: this run published nothing"
+# the badges vouch for what can be installed: only a promotion moves the nightly one,
+# straight on the apt host; a run for coverage alone that measured it, on sources already
+# tested, renews the coverage one, and badge.py draws the nightly one from the same promotion
+if [ -z "$PUBLISHED_DEB" ] && { [ -z "$COVERAGE_PCT" ] || [ "$TRIGGER" != coverage ] || ! cov_whole; }; then
+	say "   badges kept: this run published nothing and is no whole measurement of tested sources"
 elif python3 "$HERE/badge.py" --out "$REPO_DIR/paks/nightly/badge.svg"; then
-	say "   badge renewed: $PUBLISHED_DEB"
+	say "   badges renewed: ${PUBLISHED_DEB:-coverage measured}"
 else
-	say "   badge not written: the previous one stays"
+	say "   badges not written: the previous ones stay"
 fi
 # [safety] the regular ytserv's: what it links audited, its own crates unsafe-free
 if [ -n "$PUBLISHED_DEB" ]; then
@@ -1106,6 +1195,7 @@ if [ "${NIGHTLY_PUSH:-0}" = 1 ]; then
 		say "   results not pushed: not on main, or unpushed commits wait there"
 	elif PUSHED=(nightly/results.yaml) \
 	     && { [ ! -f "$COVERAGE_FILE" ] || PUSHED+=(nightly/coverage.yaml); } \
+	     && { [ ! -f "$HERE/coverage.md" ] || PUSHED+=(nightly/coverage.md); } \
 	     && { [ ! -d "$TESTS/security" ] || PUSHED+=(security); } \
 	     && git -C "$TESTS" add -- "${PUSHED[@]}" \
 	     && git -C "$TESTS" commit -q -m "nightly $RUN_ID: $RESULT" -- "${PUSHED[@]}" \
@@ -1115,6 +1205,6 @@ if [ "${NIGHTLY_PUSH:-0}" = 1 ]; then
 		say "   results not pushed"
 	fi
 fi
-say "== nightly $RESULT: $(awk -F'\t' '$1!="build"&&$1!="coverage-build"&&$1!="coverage"&&$1!="release"&&$1!="publish"{p+=$2;f+=$3} END{print p+0" passed, "f+0" failed"}' "$ROWS"), $(( ($(secs) - T0) / 60 )) min${PUBLISHED_DEB:+, published $PUBLISHED_DEB}${NOTE:+ - $NOTE}"
+say "== nightly $RESULT: $(awk -F'\t' '$1!="build"&&$1!="coverage-build"&&$1!="coverage"&&$1!="release"&&$1!="security-gate"&&$1!="publish"{p+=$2;f+=$3} END{print p+0" passed, "f+0" failed"}' "$ROWS"), $(( ($(secs) - T0) / 60 )) min${PUBLISHED_DEB:+, published $PUBLISHED_DEB}${NOTE:+ - $NOTE}"
 say "   logs: $LOGS"
 [ "$RESULT" = pass ]

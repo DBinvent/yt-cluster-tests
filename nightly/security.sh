@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The SBOMs and Trivy's result of YT Cluster, in its public repository (this one,
 # security/), which dbinvent.com links - Schema Guard writes its own since 2026-10-31.
-# nightly.sh sources this and calls security_reports after a green run; by hand:
+# nightly.sh sources this, calls security_gate between the release build and the
+# publish, and security_reports after a green run; by hand:
 #
 #   nightly/security.sh          # now: the source here and the image as published
 #
@@ -64,6 +65,41 @@ $(trivy_image "$img" --scanners vuln --format table --severity CRITICAL,HIGH 2>&
 	} > "$md.tmp" && mv "$md.tmp" "$md" || bad=1
 	[ "$bad" = 0 ] && echo "  OK    security: $name - SBOMs and Trivy's result in $dir" \
 		|| echo "  WARN  security: $name - not every part made ($dir)"
+}
+# [security-gate] Before anything of a run is published (owner, 2026-11-07): what it is
+# to publish, checked as the daily Trivy workflow checks the image Docker Hub serves -
+# a HIGH or CRITICAL finding with a fix stops the publish. Three checks, each run
+# whatever the others found: the crates of the tested source (Trivy on its Cargo.lock);
+# ytserv's tree audited and its own crates unsafe-free (safety_badge.py --gate: a high
+# or critical advisory, unsafe code, or a check that could not run); the image of this
+# run's deb, built from it on the build host (ytcluster_dist docker/publish.sh DEB=,
+# PUSH=0), smoke-checked and scanned there (docker/check.sh) - the image pushed later
+# is apt's, checked the same way before its push. Findings accepted: ../.trivyignore,
+# each with why. The vulnerability database: a volume on each docker host.
+security_gate() { # <deb>
+	local deb="$1" bad=0
+	if tar -c -C "$YT_PGXT" Cargo.lock -C "$TESTS" .trivyignore | DOCKER_HOST="$(trivy_docker)" docker run -i --rm \
+		-v yt-trivy-cache:/root/.cache/trivy --entrypoint sh "$TRIVY_IMAGE" -c 'mkdir -p /src && tar -x -C /src \
+		&& exec trivy fs --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+		--ignorefile /src/.trivyignore /src'; then
+		echo "  OK    security: the crates - no HIGH or CRITICAL finding with a fix (Trivy, Cargo.lock)"
+	else
+		echo "  FAIL  security: the crates - a HIGH or CRITICAL finding with a fix, or Trivy did not run (above)"; bad=1
+	fi
+	if YT_PGXT="$YT_PGXT" python3 "$HERE/safety_badge.py" --gate; then
+		echo "  OK    security: ytserv's tree audited, its own crates unsafe-free (safety_badge.py)"
+	else
+		echo "  FAIL  security: ytserv - a high or critical advisory, unsafe code, or a check that did not run (above)"; bad=1
+	fi
+	if PUSH=0 DEB="$deb" IMAGE=yt-gate/yt REPO_DIR="$REPO_DIR" INFRA_APT="$INFRA_APT" TRIVY_GATE=1 \
+		TRIVY_IMAGE="$TRIVY_IMAGE" TRIVY_IGNORE="$TESTS/.trivyignore" "$DIST/docker/publish.sh" "$DEB_V"; then
+		echo "  OK    security: the image of this deb - built, started, no HIGH or CRITICAL finding with a fix"
+	else
+		echo "  FAIL  security: the image of this deb (docker/publish.sh, above)"; bad=1
+	fi
+	# never pushed: it goes
+	docker rmi "yt-gate/yt:$DEB_V" "yt-gate/yt:${DEB_V%.*}" yt-gate/yt:latest >/dev/null 2>&1 || true
+	return "$bad"
 }
 security_reports() {
 	security_report yt-cluster "YT Cluster" "$TESTS" "$YT_PGXT" dbinvent/yt:latest

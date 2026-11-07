@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:2e31212e-6715-49ba-9c28-e71eed7ab816",
+  "serialNumber": "urn:uuid:f9356f0d-7b94-4b18-90c4-d365bebb02d6",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-05T03:30:33+00:00",
+    "timestamp": "2026-11-07T17:12:51+00:00",
     "tools": {
       "components": [
         {
@@ -20,7 +20,7 @@
       ]
     },
     "component": {
-      "bom-ref": "4ab7d3e3-c129-4a1c-8a03-bf246cdec166",
+      "bom-ref": "40a09eeb-3f72-459a-8b06-7c26dbf297eb",
       "type": "application",
       "name": "/src",
       "properties": [
@@ -33,7 +33,7 @@
   },
   "components": [
     {
-      "bom-ref": "69d5e5a7-1b5b-4bdd-8a2b-b4b394887164",
+      "bom-ref": "62c24de9-c133-445e-92e1-70adf6da0feb",
       "type": "application",
       "name": "Cargo.lock",
       "properties": [
@@ -11081,15 +11081,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/ytctl@1.20.10",
+      "bom-ref": "pkg:cargo/ytctl@1.20.13",
       "type": "library",
       "name": "ytctl",
-      "version": "1.20.10",
-      "purl": "pkg:cargo/ytctl@1.20.10",
+      "version": "1.20.13",
+      "purl": "pkg:cargo/ytctl@1.20.13",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "ytctl@1.20.10"
+          "value": "ytctl@1.20.13"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11098,15 +11098,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/ytserv@1.20.10",
+      "bom-ref": "pkg:cargo/ytserv@1.20.13",
       "type": "library",
       "name": "ytserv",
-      "version": "1.20.10",
-      "purl": "pkg:cargo/ytserv@1.20.10",
+      "version": "1.20.13",
+      "purl": "pkg:cargo/ytserv@1.20.13",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "ytserv@1.20.10"
+          "value": "ytserv@1.20.13"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11304,16 +11304,16 @@
   ],
   "dependencies": [
     {
-      "ref": "4ab7d3e3-c129-4a1c-8a03-bf246cdec166",
+      "ref": "40a09eeb-3f72-459a-8b06-7c26dbf297eb",
       "dependsOn": [
-        "69d5e5a7-1b5b-4bdd-8a2b-b4b394887164"
+        "62c24de9-c133-445e-92e1-70adf6da0feb"
       ]
     },
     {
-      "ref": "69d5e5a7-1b5b-4bdd-8a2b-b4b394887164",
+      "ref": "62c24de9-c133-445e-92e1-70adf6da0feb",
       "dependsOn": [
-        "pkg:cargo/ytctl@1.20.10",
-        "pkg:cargo/ytserv@1.20.10"
+        "pkg:cargo/ytctl@1.20.13",
+        "pkg:cargo/ytserv@1.20.13"
       ]
     },
     {
@@ -16485,7 +16485,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/ytctl@1.20.10",
+      "ref": "pkg:cargo/ytctl@1.20.13",
       "dependsOn": [
         "pkg:cargo/aes@0.9.3",
         "pkg:cargo/bb8-postgres@0.9.0",
@@ -16518,7 +16518,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/ytserv@1.20.10",
+      "ref": "pkg:cargo/ytserv@1.20.13",
       "dependsOn": [
         "pkg:cargo/async-trait@0.1.92",
         "pkg:cargo/base64@0.23.1",

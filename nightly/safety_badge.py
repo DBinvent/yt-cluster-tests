@@ -4,6 +4,8 @@
     nightly/safety_badge.py                 # -> nightly/ytserv-safety.svg
     nightly/safety_badge.py --out PATH      # nightly.sh: REPO_DIR/paks/nightly/ytserv-safety.svg
     nightly/safety_badge.py --print         # say what it found, fetch nothing
+    nightly/safety_badge.py --gate          # the nightly before its publish: exit 1 when red,
+                                            # or when a check could not run; nothing drawn
     nightly/safety_badge.py --label TEXT    # instead of "ytserv <version>": a draw by hand between
                                             # publishes checks sources the package does not carry
                                             # yet - "ytserv next" says so
@@ -173,24 +175,31 @@ def badge() -> tuple:
     severe = clean is False or any(h[2] in ("critical", "high") for h in hits or [])
     color = ("brightgreen" if ok else "red" if severe else "yellow" if hits
              else "lightgrey")
+    # [security-gate] what lets a publish go: both checks ran, no high or critical
+    # advisory, no unsafe code - a medium, low or unrated advisory passes, as Trivy's
+    # gate passes a finding below HIGH
+    passes = hits is not None and clean is True and not severe
     return ({"label": f"ytserv {ytserv_version()}", "message": " · ".join(parts), "color": color},
-            f"audit: {audit_says}; unsafe: {unsafe_says}")
+            f"audit: {audit_says}; unsafe: {unsafe_says}", passes)
 
 
 def main() -> int:
     out = Path(sys.argv[sys.argv.index("--out") + 1]) if "--out" in sys.argv else BADGE
     try:
-        b, detail = badge()
+        b, detail, passes = badge()
     except (OSError, subprocess.TimeoutExpired) as err:
         print(f"safety badge: {err}", file=sys.stderr)
         return 1
+    if "--gate" in sys.argv:
+        print(f"{b['message']} - {detail}")
+        return 0 if passes else 1
     if "--label" in sys.argv:
         b["label"] = sys.argv[sys.argv.index("--label") + 1]
     if "--print" in sys.argv:
         print(f"{b['label']} | {b['message']} ({b['color']}) - {detail}\n{SHIELDS}?{urllib.parse.urlencode(b)}")
         return 0
     try:
-        write(out, render(b))
+        write([(out, render(b))])
     except OSError as err:
         print(f"safety badge: {err}", file=sys.stderr)
         return 1

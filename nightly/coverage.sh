@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Code coverage of the nightly's tests: the lines of yt-cluster's Rust workspace that
 # the unit tests and the end-to-end suites ran. nightly/nightly.sh measures it in a
-# run that finds nightly/coverage.yaml missing (or with --coverage), through these:
+# run where it is due (nightly.sh says when; or with --coverage), through these:
 #
 #   nightly/coverage.sh build <deb> <out.deb>   # instrumented ytserv, ytserv-all + ytctl, and <deb> carrying them
 #   nightly/coverage.sh unit                    # the workspace's cargo tests, instrumented
@@ -71,6 +71,8 @@ build() {
 unit() {
 	cd "$YT_PGXT" || return 1
 	local rc=0
+	# --no-report keeps the profiles of earlier measurements, and the report would merge them
+	cargo llvm-cov clean --workspace || rc=1
 	cargo llvm-cov --workspace --no-fail-fast --no-report || rc=1
 	cargo llvm-cov -p ytserv --features ytserv/rppd --bin ytserv-all --no-fail-fast --no-report || rc=1
 	return $rc
@@ -162,11 +164,12 @@ with open(f"{d}/combined.lcov", "w") as fh:
         fh.write(f"LF:{len(lines[f])}\nLH:{len(total[f])}\nend_of_record\n")
 
 out = ["# YT Cluster code coverage: the lines of yt-cluster's Rust workspace the nightly's tests ran -",
-       "# the unit tests and every end-to-end suite, against an instrumented ytserv and ytctl",
-       "# (nightly/coverage.sh says what counts). Written by a nightly run that measured it,",
-       "# and a run measures it when this file is MISSING, or lists fewer suites than a whole",
-       "# run: rename or delete it and the next nightly measures again, even with no code",
-       "# change (nightly/nightly.sh --coverage: now). ytserv's percent is the badge's.",
+       "# the unit tests and the end-to-end suites listed below, against an instrumented ytserv and",
+       "# ytctl (nightly/coverage.sh says what counts). Written by a nightly run that measured it:",
+       "# the first night with no new code measures when this file is MISSING, lists fewer suites",
+       "# than a whole run, or is outdated (new code passed since, and the newest run was all ok).",
+       "# Only a green run counts. Rename or delete it and such a night measures again",
+       "# (nightly/nightly.sh --coverage: now). ytserv's percent is the badge's.",
        f"run: {q(e.get('RUN_ID', ''))}",
        f"measured: {q(e.get('MEASURED', ''))}",
        f"version: {{deb: {q(e.get('DEB_V', ''))}, ytserv: {q(e.get('YTS_V', ''))}}}",

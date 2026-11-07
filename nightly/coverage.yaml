@@ -1,31 +1,32 @@
 # YT Cluster code coverage: the lines of yt-cluster's Rust workspace the nightly's tests ran -
-# the unit tests and every end-to-end suite, against an instrumented ytserv and ytctl
-# (nightly/coverage.sh says what counts). Written by a nightly run that measured it,
-# and a run measures it when this file is MISSING, or lists fewer suites than a whole
-# run: rename or delete it and the next nightly measures again, even with no code
-# change (nightly/nightly.sh --coverage: now). ytserv's percent is the badge's.
-run: "20261025-105906"
-measured: "2026-10-25T14:24:54Z"
-version: {deb: "1.20.2", ytserv: "1.20.2"}
-source: "39e1494+dirty"
-result: fail
-suites: ["unit", "topology", "topology-py", "hier", "lxc", "migrate", "llm", "topo", "topo-faults", "topo-membership", "rmc"]
-lines: {total: 71050, covered: 50180, percent: 70.6}
+# the unit tests and the end-to-end suites listed below, against an instrumented ytserv and
+# ytctl (nightly/coverage.sh says what counts). Written by a nightly run that measured it:
+# the first night with no new code measures when this file is MISSING, lists fewer suites
+# than a whole run, or is outdated (new code passed since, and the newest run was all ok).
+# Only a green run counts. Rename or delete it and such a night measures again
+# (nightly/nightly.sh --coverage: now). ytserv's percent is the badge's.
+run: "20261106-120116"
+measured: "2026-11-06T15:47:37Z"
+version: {deb: "1.20.12", ytserv: "1.20.12"}
+source: "40acf8d+dirty"
+result: pass
+suites: ["unit", "topology", "topology-py", "hier", "lxc", "migrate", "llm", "topo", "topo-faults", "topo-membership", "rmc", "jepsen"]
+lines: {total: 73766, covered: 57578, percent: 78.1}
 # percent of those lines each part ran: the unit tests, the suites together, each suite
 by:
-  "unit": 46.9
-  "e2e": 42.4
-  "hier": 23.4
-  "llm": 11.5
-  "lxc": 10.8
-  "rmc": 23.9
-  "topo-faults": 27.6
-  "topo-membership": 24.2
-  "topo": 27.7
-  "topology-py": 20.1
-  "topology": 27.2
+  "unit": 51.3
+  "e2e": 48.7
+  "hier": 24.6
+  "llm": 12.0
+  "lxc": 12.5
+  "rmc": 25.2
+  "topo-faults": 29.2
+  "topo-membership": 25.8
+  "topo": 29.5
+  "topology-py": 21.8
+  "topology": 34.7
 crates:
-  - {name: "ytcluster-common", lines: 167, percent: 83.8, unit: 52.7, e2e: 47.3}
-  - {name: "ytcluster-types", lines: 1813, percent: 74.0, unit: 68.7, e2e: 26.5}
-  - {name: "ytctl", lines: 17293, percent: 38.4, unit: 27.0, e2e: 14.0}
-  - {name: "ytserv", lines: 51777, percent: 81.2, unit: 52.8, e2e: 52.4}
+  - {name: "ytcluster-common", lines: 167, percent: 86.8, unit: 55.7, e2e: 47.3}
+  - {name: "ytcluster-types", lines: 1362, percent: 76.1, unit: 70.0, e2e: 35.8}
+  - {name: "ytctl", lines: 16067, percent: 42.6, unit: 29.9, e2e: 15.5}
+  - {name: "ytserv", lines: 56170, percent: 88.2, unit: 56.9, e2e: 58.5}

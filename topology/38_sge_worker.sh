@@ -7,8 +7,8 @@
 #
 # ## What is asserted
 #
-# W1 sge_config set through the sync path: the table and its trigger on every node
-# W2 a bad sge_config is refused at the statement, and is not applied
+# W1 module M set through the sync path: the table and its trigger on every node
+# W2 a bad row of module M is refused at the statement, and is not applied
 # W3 a roll from a follower: the origin first, the leader last; every node's schema the
 #    same; the operator's row done; a hand-written yt:pending starts nothing
 # W4 a failure halts it: the node says why, the leader is not reached, and a second
@@ -42,6 +42,22 @@
 # W20 a table on one node alone: that node named as different, and its text there to read
 # W21 a node down: no answer, never the same
 # W22 a check during a roll: refused
+# W23 a CI's commit on the rows: a plan and a roll of that commit while the branch moves on, every
+#     node on it; a plan with none keeps the commit it resolved; not a whole commit, or a commit
+#     with a folder as the source: refused
+# W24 a script that writes rows: each node counts its own, and they still make one plan; a node
+#     whose database makes the script do something else is named
+# W25 every node's whole schema by pg_dump: the same, without the cluster's own tables or what
+#     each run makes its own; an index on one node and a function changed on one: that node
+#     named, its group's text showing it
+# W26 the CI's role: a bad name refused at the statement; its two functions and the checks on every
+#     node, nothing on sge's own table; it adds a check, a plan and a roll, which run and finish,
+#     and reads them; it cannot add a worker's row, nor read or write the history or the checks
+#     itself; no longer named, its rights gone on every node
+# W27 refused, not left waiting nor marked done: a roll of a version done on every node (at its
+#     commit: done); another commit of the version rolling, on another node and on the origin; two
+#     commits asked for at once; a row of another commit while a roll halts, and after the halted
+#     roll is finished
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== sge worker: migrations rolled across the cluster, nodes dropping =="
 
@@ -70,6 +86,17 @@ err_of() { printf '%s\n' "$1" | { grep -m1 -E 'ERROR:|FATAL:|PANIC:|psql: error|
 cw() { err_of "$(qx "$1" "begin; $2; select yt_complete(true); commit;")"; }
 cfg_put() { # cfg_put <name> <value>: through the sync path -> "" or the error
 	cw "$L" "delete from $YX_CFG where module='C' and name='$1'; insert into $YX_CFG (name,module,value) values ('$1','C','$2')"
+}
+# sge_put "name=value; ...": module M's rows, a row each, through the sync path -> "" or the error
+sge_put() {
+	local values="" kv k v old="$IFS"
+	IFS=';'
+	for kv in $1; do
+		k="${kv%%=*}"; k="${k// /}"; v="${kv#*=}"
+		values="${values:+$values,}('$k','M','$v')"
+	done
+	IFS="$old"
+	cw "$L" "delete from $YX_CFG where module='M'; insert into $YX_CFG (name,module,value) values $values"
 }
 script() { # script <file> <sql>: on every node, stopped ones too when they are back
 	local n
@@ -126,7 +153,10 @@ same_schema() {
 clean() {
 	local n
 	for n in "${NODES[@]}"; do
+		q "$n" "drop view if exists ${HIST}_check_groups; drop table if exists sw_cnt; drop function if exists sw_fn()" >/dev/null 2>&1
+		q "$n" "drop function if exists public.yt_sge_request(text, text, text, text); drop function if exists public.yt_sge_rows()" >/dev/null 2>&1
 		q "$n" "drop table if exists $HIST, ${HIST}_check, $T, $LOAD, sw_block, sw_only_one; drop function if exists public.yt_sge_roll() cascade" >/dev/null 2>&1
+		q "$n" "do \$\$ begin if exists (select 1 from pg_roles where rolname = 'sw_ci') then drop owned by sw_ci; drop role sw_ci; end if; end \$\$" >/dev/null 2>&1
 		rh "docker exec $n rm -rf $DIR $ZDIR $GDIR" 2>/dev/null
 	done
 }
@@ -145,15 +175,17 @@ O="${FOLLOWERS[0]}"; F="${FOLLOWERS[1]}"; G="${FOLLOWERS[2]}"; H="${FOLLOWERS[3]
 echo "  leader $L, origin $O, others $F $G $H"
 
 echo "-- W2 a bad setting is refused"
-e="$(cfg_put sge_config 'db_host=elsewhere')"
-[ -n "$e" ] && ok "W2 db_host in sge_config refused: $e" || bad "W2 db_host in sge_config taken"
-e="$(cfg_put sge_config 'no_such_setting=1')"
-[ -n "$e" ] && ok "W2b an unknown setting refused" || bad "W2b an unknown setting taken"
+e="$(sge_put 'db_host=elsewhere')"
+case "$e" in *"not set here"*) ok "W2 db_host in module M refused";; *) bad "W2 db_host in module M: [$e]";; esac
+e="$(cfg_put sge_config 'source_dir=/x')"
+case "$e" in *"module M"*) ok "W2d the old C row refused, saying where it went";; *) bad "W2d [$e]";; esac
+e="$(sge_put 'no_such_setting=1')"
+case "$e" in *"no setting of sge"*) ok "W2b an unknown setting refused";; *) bad "W2b an unknown setting: [$e]";; esac
 check "W2c nothing applied" "off" "$(info "$L" E sge)"
 
 echo "-- W1 the table and its trigger"
-e="$(cfg_put sge_config "source_dir=$DIR")"
-[ -z "$e" ] || bad "W1 sge_config: $e"
+e="$(sge_put "source_dir=$DIR")"
+[ -z "$e" ] || bad "W1 module M: $e"
 left=""
 for ((i = 0; i < 90; i += 3)); do
 	left=""
@@ -381,16 +413,18 @@ PY
 put_file() { # put_file <node> <local file> <path on the node>
 	rh "docker exec -i $1 sh -c 'mkdir -p $(dirname "$3") && cat > $3 && chmod -R a+rX $(dirname "$3")'" < "$2"
 }
-set_source() { # set_source <sge_config>: through the sync path, and every node has it
-	local e i n left
-	e="$(cfg_put sge_config "$1")"; [ -z "$e" ] || bad "sge_config $1: $e"
+set_source() { # set_source "name=value; ...": through the sync path, and every node has them
+	local e i n left want sql="select coalesce(string_agg(name || '=' || value, ';' order by name), '') from $YX_CFG where module='M'"
+	e="$(sge_put "$1")"; [ -z "$e" ] || bad "module M $1: $e"
+	want="$(q "$L" "$sql")"
 	for ((i = 0; i < 40; i += 2)); do
 		left=""
-		for n in "${NODES[@]}"; do [ "$(info "$n" E cfg.sge_config)" = "$1" ] || left=1; done
-		[ -z "$left" ] && return 0
+		for n in "${NODES[@]}"; do [ "$(q "$n" "$sql")" = "$want" ] || left=1; done
+		# and their rows are read at most every 2 s
+		[ -z "$left" ] && { sleep 3; return 0; }
 		sleep 2
 	done
-	bad "sge_config did not reach every node"
+	bad "module M did not reach every node"
 }
 row_note() { q "$1" "select coalesce(script_tag,'') || ' ' || coalesce(checksum,'') || ' ' || size from $HIST where target = '$(node_uuid "$1")' and version = '$2' order by id desc limit 1"; }
 each_row_says() { # each_row_says <version> <text> -> the nodes whose row says otherwise
@@ -598,7 +632,7 @@ check_wait() { # check_wait <node> <id> <seconds>: until the row is answered -> 
 	local i m
 	for ((i = 0; i < $3; i += 2)); do
 		m="$(q "$1" "select msg from $HIST where id = $2")"
-		case "$m" in yt:plan|yt:snapshot|"") ;; *) printf '%s' "$m"; return 0;; esac
+		case "$m" in yt:plan|yt:snapshot|yt:dump|"") ;; *) printf '%s' "$m"; return 0;; esac
 		sleep 2
 	done
 	printf '%s' "$m"
@@ -688,7 +722,239 @@ check "W22a it is on record as refused" "refused" "$(q "$F" "select state from $
 left="$(wait_msg 91.0 yt:done 240 "${NODES[@]}")" && ok "W22b the roll is not disturbed" || bad "W22b not done on:$left"
 same_schema W22b
 
-e="$(cw "$L" "delete from $YX_CFG where module='C' and name in ('sge_config', 'sge_all_at_once')")"
-[ -z "$e" ] || bad "removing sge_config: $e"
+echo "-- W23 a CI's commit on the rows, while the branch moves on"
+fresh_nodes
+printf 'alter table %s add column ci1 int;\n' "$T" > "$R/V95_0__ci.sql"
+git -C "$R" add -A; git -C "$R" commit -qm ci1
+c1="$(git -C "$R" rev-parse HEAD)"
+printf 'alter table %s add column ci2 int;\n' "$T" > "$R/V95_1__ci.sql"
+git -C "$R" add -A; git -C "$R" commit -qm ci2
+c2="$(git -C "$R" rev-parse HEAD)"
+for n in "${NODES[@]}"; do ship_repo "$n"; done
+set_source "source_git=file://$GDIR/repo; source_git_ref=rel"
+ci_row() { # ci_row <node> <version> <msg> <script_tag>: a CI's row -> its id
+	q "$1" "insert into $HIST (source, source_type, version, msg, script_tag) values ('ci', 'Y', '$2', '$3', '$4') returning id"
+}
+id="$(ci_row "$O" 95.1 yt:plan "$c1")"
+m="$(check_wait "$O" "$id" 180)"
+check "W23 the plan of the commit named, the same on every node [$(check_states "$O" "$id" | cut -c1-200)]" "yt:same" "$m"
+check "W23b its row keeps that commit" "$c1" "$(q "$O" "select script_tag from $HIST where id = $id")"
+check "W23c that commit's script in every node's plan, not the branch's next" "${#NODES[@]}:0" \
+	"$(q "$O" "select count(*) filter (where body like '%V95_0__ci.sql%') || ':' || count(*) filter (where body like '%V95_1__ci.sql%') from ${HIST}_check where history_id = $id")"
+rid="$(ci_row "$O" 95.1 yt:roll "$c1")"
+left="$(wait_msg 95.1 yt:done 240 "${NODES[@]}")" && ok "W23d the roll of that commit, done on every node" || bad "W23d not done on:$left"
+# its row says so once its worker lets go, and a plan is refused before that
+for ((i = 0; i < 60; i += 2)); do [ "$(q "$O" "select msg from $HIST where id = $rid")" = yt:done ] && break; sleep 2; done
+cols="select count(*) filter (where column_name = 'ci1') || ':' || count(*) filter (where column_name = 'ci2') from information_schema.columns where table_name = '$T'"
+check "W23e that commit's script alone" "1:0" "$(q "$L" "$cols")"
+d="$(differing "$cols")"; [ -z "$d" ] && ok "W23f the same on every node" || bad "W23f differs:$d"
+tags="$(for n in "${NODES[@]}"; do q "$n" "select script_tag from $HIST where target = '$(node_uuid "$n")' and version = '95.1' order by id desc limit 1"; done | sort -u)"
+check "W23g every node's row that commit" "$c1" "$tags"
+id="$(check_row "$O" 95.1 yt:plan)"
+check_wait "$O" "$id" 180 >/dev/null || true
+check "W23h a plan with no commit named keeps the one it resolved: the branch's" "$c2" "$(q "$O" "select script_tag from $HIST where id = $id")"
+id="$(ci_row "$O" 95.1 yt:plan main)"
+m="$(check_wait "$O" "$id" 120)"
+case "$m" in "yt:failed"*"not a whole commit"*) ok "W23i a branch's name: refused";; *) bad "W23i [$m]";; esac
+set_source "source_dir=$DIR"
+id="$(ci_row "$O" 96.0 yt:roll "$c2")"
+for ((i = 0; i < 40; i += 2)); do m="$(q "$O" "select msg from $HIST where id = $id")"; [ "$m" = yt:roll ] || break; sleep 2; done
+case "$m" in "yt:failed"*"not git"*) ok "W23j a commit with a folder as the source: refused";; *) bad "W23j [$m]";; esac
+
+echo "-- W24 a script that writes rows: each node counts its own"
+fresh_nodes
+# a table of each node's own, as many rows as its place in the list: no two counts the same
+i=0
+for n in "${NODES[@]}"; do
+	i=$((i + 1))
+	q "$n" "drop table if exists sw_cnt; create table sw_cnt (id int primary key, v int); insert into sw_cnt select g, 0 from generate_series(1, $i) g" >/dev/null
+done
+printf '%s\n' "update sw_cnt set v = v + 1;" | rh "docker exec -i $O sh -c 'cat > $DIR/V97_0__cnt.sql && chmod -R a+rX $DIR'"
+id="$(check_row "$O" 97.0 yt:plan)"
+m="$(check_wait "$O" "$id" 180)"
+check "W24 one plan, though no two nodes count the same [$(check_states "$O" "$id" | cut -c1-200)]" "yt:same" "$m"
+check "W24b every node's text, each with its own count" "${#NODES[@]}:${#NODES[@]}" \
+	"$(q "$O" "select count(*) || ':' || count(distinct body) from ${HIST}_check where history_id = $id and body like '%sw_cnt%' and body like '%V97_0__cnt.sql%'")"
+check "W24c one group, of every node" "1:${#NODES[@]}:1" "$(q "$O" "select count(*) || ':' || max(count) || ':' || bool_and(reference)::int from ${HIST}_check_groups where history_id = $id")"
+# a node that already has what a script adds: its plan says it adds nothing
+printf '%s\n' "alter table $T add column if not exists cn int;" | rh "docker exec -i $O sh -c 'cat > $DIR/V97_1__cn.sql && chmod -R a+rX $DIR'"
+q "$G" "alter table $T add column cn int" >/dev/null
+id="$(check_row "$O" 97.1 yt:plan)"
+m="$(check_wait "$O" "$id" 180)"
+check "W24d a node whose database makes the script do otherwise: named" "yt:differs $(node_uuid "$G")" "$m"
+q "$G" "alter table $T drop column cn" >/dev/null
+rh "docker exec $O rm -f $DIR/V97_0__cnt.sql $DIR/V97_1__cn.sql" 2>/dev/null
+
+group_diff() { # group_diff <node> <id>: each group's text against the reference's, as a CI shows it
+	local ref
+	ref="$(q "$1" "select body from ${HIST}_check_groups where history_id = $2 and reference limit 1")"
+	q "$1" "select md5 from ${HIST}_check_groups where history_id = $2 and not reference" | while read -r md; do
+		diff -u <(printf '%s\n' "$ref") <(q "$1" "select body from ${HIST}_check_groups where history_id = $2 and md5 = '$md'") | sed -n '3,40p'
+	done
+}
+dump_md5() { q "$O" "select md5 from ${HIST}_check where history_id = $1 and node = '$(node_uuid "$2")'"; }
+echo "-- W25 every node's whole schema, by pg_dump"
+fresh_nodes
+id="$(check_row "$O" 0 yt:dump)"
+m="$(check_wait "$O" "$id" 180)"
+check "W25 every node's whole schema the same [$(check_states "$O" "$id" | cut -c1-200)] $(group_diff "$O" "$id" | tr '\n' ' ' | cut -c1-600)" "yt:same" "$m"
+check "W25b one text, from every node" "${#NODES[@]}:1" "$(q "$O" "select count(*) || ':' || count(distinct md5) from ${HIST}_check where history_id = $id")"
+check "W25c the application's table in it, not the cluster's own tables, sequences or views" "${#NODES[@]}:0" \
+	"$(q "$O" "select count(*) filter (where body like '%CREATE TABLE public.$T (%') || ':' || count(*) filter (where body ~ 'CREATE (TABLE|SEQUENCE|VIEW) public\\.sge_history') from ${HIST}_check where history_id = $id")"
+check "W25d nothing a run makes its own: no restrict key, no session settings" "0" \
+	"$(q "$O" "select count(*) from ${HIST}_check where history_id = $id and (strpos(body, chr(92) || 'restrict') > 0 or strpos(body, 'SET statement_timeout') > 0)")"
+before_g="$(dump_md5 "$id" "$G")"; before_o="$(dump_md5 "$id" "$O")"
+q "$G" "create index sw_one_ix on $T (v)" >/dev/null
+id="$(check_row "$O" 0 yt:dump)"
+m="$(check_wait "$O" "$id" 180)"
+check "W25e an index on one node: that node named" "yt:differs $(node_uuid "$G")" "$m"
+check "W25f its own text changed, the others' not" "changed:same" \
+	"$([ "$(dump_md5 "$id" "$G")" != "$before_g" ] && echo changed || echo same):$([ "$(dump_md5 "$id" "$O")" = "$before_o" ] && echo same || echo changed)"
+check "W25g two groups: that node's shows the index" "2:1" \
+	"$(q "$O" "select count(*) || ':' || count(*) filter (where not reference and nodes = array['$(node_uuid "$G")'] and body like '%CREATE INDEX sw_one_ix%') from ${HIST}_check_groups where history_id = $id")"
+case "$(group_diff "$O" "$id")" in *"+CREATE INDEX sw_one_ix"*) ok "W25h a diff between the groups shows it";; *) bad "W25h no diff: [$(group_diff "$O" "$id" | head -5)]";; esac
+q "$G" "drop index sw_one_ix" >/dev/null
+for n in "${NODES[@]}"; do q "$n" "create or replace function sw_fn() returns int language sql as 'select 1'" >/dev/null; done
+q "$G" "create or replace function sw_fn() returns int language sql as 'select 2'" >/dev/null
+id="$(check_row "$O" 0 yt:dump)"
+check "W25i a function changed on one node: that node named" "yt:differs $(node_uuid "$G")" "$(check_wait "$O" "$id" 180)"
+q "$G" "create or replace function sw_fn() returns int language sql as 'select 1'" >/dev/null
+id="$(check_row "$O" 0 yt:dump)"
+check "W25j put back, the same again" "yt:same" "$(check_wait "$O" "$id" 180)"
+for n in "${NODES[@]}"; do q "$n" "drop function sw_fn()" >/dev/null; done
+id="$(check_row "$O" 0 yt:dump)"
+check_wait "$O" "$id" 180 >/dev/null || true
+check "W25k dropped everywhere, as it was before" "$before_g" "$(dump_md5 "$id" "$G")"
+
+echo "-- W26 the CI's role"
+fresh_nodes
+set_source "source_git=file://$GDIR/repo; source_git_ref=rel"
+for n in "${NODES[@]}"; do
+	q "$n" "do \$\$ begin if not exists (select 1 from pg_roles where rolname = 'sw_ci') then create role sw_ci; end if; end \$\$" >/dev/null
+done
+e="$(cfg_put sge_role 'sw ci')"
+[ -n "$e" ] && ok "W26 no role's name: refused at the statement" || bad "W26 'sw ci' taken"
+e="$(cfg_put sge_role sw_ci)"; [ -z "$e" ] || bad "W26a sge_role: $e"
+REQ="public.yt_sge_request(text, text, text, text)"
+rights_on() { # rights_on <1|0>: the nodes where the role's use of the two functions and the checks is not that
+	local n out=""
+	for n in "${NODES[@]}"; do
+		[ "$(q "$n" "select concat(has_function_privilege('sw_ci', '$REQ', 'EXECUTE')::int, has_function_privilege('sw_ci', 'public.yt_sge_rows()', 'EXECUTE')::int, has_table_privilege('sw_ci', '${HIST}_check', 'SELECT')::int)")" = "$1$1$1" ] || out="$out $n"
+	done
+	echo "$out"
+}
+for ((i = 0; i < 60; i += 2)); do left="$(rights_on 1)"; [ -z "$left" ] && break; sleep 2; done
+[ -z "$left" ] && ok "W26a its functions and the checks on every node" || bad "W26a not on:$left"
+d=""; for n in "${NODES[@]}"; do [ "$(q "$n" "select has_table_privilege('sw_ci', '$HIST', 'SELECT,INSERT,UPDATE,DELETE')::int")" = 0 ] || d="$d $n"; done
+[ -z "$d" ] && ok "W26b nothing on sge's own table" || bad "W26b a right on the history on:$d"
+ci() { qx "$1" "set role sw_ci; $2"; }
+ci_wait() { # ci_wait <node> <id> <seconds>: as the role, until the row is answered -> what it says
+	local i m
+	for ((i = 0; i < $3; i += 2)); do
+		m="$(ci "$1" "select msg from public.yt_sge_rows() where id = $2" | tail -1)"
+		case "$m" in yt:plan|yt:snapshot|yt:dump|yt:roll|"") ;; *) printf '%s' "$m"; return 0;; esac
+		sleep 2
+	done
+	printf '%s' "$m"
+	return 1
+}
+id="$(ci "$O" "select public.yt_sge_request('yt:snapshot', '0')" | tail -1)"
+case "$id" in
+	''|*[!0-9]*) bad "W26c the role adds a check: [$id]";;
+	*) check "W26c the role adds a check, and it runs" "yt:same" "$(ci_wait "$O" "$id" 120)"
+	   check "W26d and reads its groups" "1" "$(ci "$O" "select count(*) from ${HIST}_check_groups where history_id = $id" | tail -1)";;
+esac
+# with the role set, sge still deploys its own table before each run: a plan and a roll
+printf 'alter table %s add column ci3 int;\n' "$T" > "$R/V99_0__ci.sql"
+git -C "$R" add -A; git -C "$R" commit -qm ci3
+c3="$(git -C "$R" rev-parse HEAD)"
+for n in "${NODES[@]}"; do ship_repo "$n"; done
+id="$(ci "$O" "select public.yt_sge_request('yt:plan', '99.0', '$c3')" | tail -1)"
+check "W26e its plan runs on every node [$(check_states "$O" "$id" | cut -c1-200)]" "yt:same" "$(ci_wait "$O" "$id" 180)"
+id="$(ci "$O" "select public.yt_sge_request('yt:roll', '99.0', '$c3')" | tail -1)"
+check "W26f its roll finishes" "yt:done" "$(ci_wait "$O" "$id" 300)"
+left="$(wait_msg 99.0 yt:done 60 "${NODES[@]}")" && ok "W26g done on every node" || bad "W26g not done on:$left"
+same_schema W26g
+e="$(err_of "$(ci "$O" "select public.yt_sge_request('yt:done', '1')")")"
+case "$e" in *"not a row a CI may add"*) ok "W26h a worker's row: refused";; *) bad "W26h [$e]";; esac
+e="$(err_of "$(ci "$O" "select public.yt_sge_request('yt:roll', '')")")"
+case "$e" in *"no version"*) ok "W26i no version: refused";; *) bad "W26i [$e]";; esac
+for sql in "insert into $HIST (source, source_type, version, msg) values ('x', 'Y', '1', 'yt:roll')" \
+	"update $HIST set msg = 'yt:done' where msg like 'yt:%'" "select count(*) from $HIST" "delete from ${HIST}_check"; do
+	e="$(err_of "$(ci "$O" "$sql")")"
+	case "$e" in *"permission denied"*) ok "W26j refused: $(printf '%s' "$sql" | cut -c1-50)";; *) bad "W26j taken: $sql [$e]";; esac
+done
+check "W26k nothing it was refused is there" "0" "$(q "$O" "select count(*) from $HIST where source = 'x'")"
+e="$(cfg_put sge_role '')"; [ -z "$e" ] || bad "W26l sge_role emptied: $e"
+for ((i = 0; i < 60; i += 2)); do left="$(rights_on 0)"; [ -z "$left" ] && break; sleep 2; done
+[ -z "$left" ] && ok "W26l no longer named: its rights gone on every node" || bad "W26l still on:$left"
+e="$(cw "$L" "delete from $YX_CFG where module='C' and name = 'sge_role'")"; [ -z "$e" ] || bad "removing sge_role: $e"
+
+echo "-- W27 refused, not left waiting nor marked done"
+fresh_nodes
+row_msg() { q "$1" "select msg from $HIST where id = $2"; }
+row_wait() { # row_wait <node> <id> <seconds>: until the row is no longer yt:roll -> what it says
+	local i m
+	for ((i = 0; i < $3; i += 2)); do m="$(row_msg "$1" "$2")"; [ "$m" = yt:roll ] || break; sleep 2; done
+	printf '%s' "$m"
+}
+row_until() { # row_until <node> <id> <prefix> <seconds>: until the row says so -> what it says
+	local i m
+	for ((i = 0; i < $4; i += 2)); do m="$(row_msg "$1" "$2")"; case "$m" in "$3"*) break;; esac; sleep 2; done
+	printf '%s' "$m"
+}
+id="$(ci_row "$O" 99.0 yt:roll "$c3")"
+check "W27 a version done on every node, asked again at its commit: done, nothing run" "yt:done" "$(row_until "$O" "$id" yt:done 40)"
+id="$(ci_row "$O" 99.0 yt:roll "$c2")"
+# by its own rows, or, a node answering late, by what the version is rolled at: refused either way
+case "$(row_wait "$O" "$id" 40)" in "yt:failed"*"done on every node at $c3"*|"yt:failed"*"is rolled at $c3"*) ok "W27a at another commit: refused";; *) bad "W27a [$(row_msg "$O" "$id")]";; esac
+# a slow script, and another commit of its version asked for while it rolls
+printf 'select pg_sleep(20); alter table %s add column ci4 int;\n' "$T" > "$R/V100_0__slow.sql"
+git -C "$R" add -A; git -C "$R" commit -qm slow
+c4="$(git -C "$R" rev-parse HEAD)"
+for n in "${NODES[@]}"; do ship_repo "$n"; done
+first="$(ci_row "$O" 100.0 yt:roll "$c4")"
+for ((i = 0; i < 60; i += 1)); do [ "$(msg_of "$O" 100.0)" = "yt:pending" ] && break; sleep 1; done
+id="$(ci_row "$F" 100.0 yt:roll "$c3")"
+case "$(row_wait "$F" "$id" 40)" in "yt:failed"*"in progress"*) ok "W27b another commit of the version rolling, on another node: refused";; *) bad "W27b [$(row_msg "$F" "$id")]";; esac
+# on the origin, whose worker holds the roll: answered when it ends, never marked done with it
+other="$(ci_row "$O" 100.0 yt:roll "$c3")"
+left="$(wait_msg 100.0 yt:done 300 "${NODES[@]}")" && ok "W27c the roll it asked about goes on" || bad "W27c not done on:$left"
+check "W27c the row of that roll done" "yt:done" "$(row_wait "$O" "$first" 40)"
+case "$(row_wait "$O" "$other" 40)" in "yt:failed"*"is done at $c4"*) ok "W27d on the origin: refused when the roll ended, not marked done";; *) bad "W27d [$(row_msg "$O" "$other")]";; esac
+# two commits of one version asked for in one statement, before the origin's own row
+printf 'alter table %s add column ci5 int;\n' "$T" > "$R/V102_0__two.sql"
+git -C "$R" add -A; git -C "$R" commit -qm two
+c6="$(git -C "$R" rev-parse HEAD)"
+for n in "${NODES[@]}"; do ship_repo "$n"; done
+ids="$(q "$O" "insert into $HIST (source, source_type, version, msg, script_tag) values ('ci', 'Y', '102.0', 'yt:roll', '$c6'), ('ci', 'Y', '102.0', 'yt:roll', '$c3') returning id" | tr '\n' ' ')"
+read -r x y <<< "$ids"
+left="$(wait_msg 102.0 yt:done 240 "${NODES[@]}")" && ok "W27e the first rolls" || bad "W27e not done on:$left"
+check "W27e its row done" "yt:done" "$(row_wait "$O" "$x" 40)"
+case "$(row_wait "$O" "$y" 40)" in "yt:failed"*"is done at $c6"*) ok "W27f the second: refused, not marked done";; *) bad "W27f [$(row_msg "$O" "$y")]";; esac
+# a roll halted on one node, a row of another commit written while it ran: neither halted with it
+# nor done when its operator has it finished
+printf 'select pg_sleep(8); create table sw_block (x int);\n' > "$R/V101_0__block.sql"
+git -C "$R" add -A; git -C "$R" commit -qm block
+c5="$(git -C "$R" rev-parse HEAD)"
+for n in "${NODES[@]}"; do ship_repo "$n"; done
+q "$G" "create table sw_block (x int)" >/dev/null
+x="$(ci_row "$O" 103.0 yt:roll "$c5")"
+for ((i = 0; i < 60; i += 1)); do [ "$(msg_of "$O" 103.0)" = "yt:pending" ] && break; sleep 1; done
+y="$(ci_row "$O" 103.0 yt:roll "$c3")"
+for ((i = 0; i < 120; i += 2)); do case "$(row_msg "$O" "$x")" in "yt:failed halted"*) break;; esac; sleep 2; done
+case "$(row_msg "$O" "$x")" in "yt:failed halted"*) ok "W27g halted on the one node";; *) bad "W27g not halted: [$(row_msg "$O" "$x")]";; esac
+case "$(row_wait "$O" "$y" 40)" in "yt:failed"*"is halted"*) ok "W27h the other commit's row: refused, not halted with it";; *) bad "W27h [$(row_msg "$O" "$y")]";; esac
+q "$G" "drop table sw_block" >/dev/null
+q "$G" "update $HIST set msg = 'yt:pending', ok = false where target = '$(node_uuid "$G")' and version = '103.0' and msg like 'yt:failed%'" >/dev/null
+left="$(wait_msg 103.0 yt:done 300 "${NODES[@]}")" && ok "W27i set back by its operator, it finishes" || bad "W27i not done on:$left"
+check "W27j the halted roll's row done" "yt:done" "$(row_until "$O" "$x" yt:done 60)"
+case "$(row_msg "$O" "$y")" in "yt:failed"*"is halted"*) ok "W27k the other commit's row not done with it";; *) bad "W27k [$(row_msg "$O" "$y")]";; esac
+for n in "${NODES[@]}"; do q "$n" "drop table if exists sw_block" >/dev/null; done
+set_source "source_dir=$DIR"
+
+
+e="$(cw "$L" "delete from $YX_CFG where module='M' or (module='C' and name = 'sge_all_at_once')")"
+[ -z "$e" ] || bad "removing module M: $e"
 clean
 summary
