@@ -1,5 +1,8 @@
 # Trivy: YT Cluster
 
+[![trivy](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml/badge.svg)](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml) - the daily Trivy workflow on the image as Docker Hub
+serves it: it fails on a HIGH or CRITICAL finding with a fix.
+
 The nightly's scan (yt-cluster-tests nightly/nightly.sh, `security_report`), run 20261107-122434, 2026-11-07 17:14 UTC:
 Trivy 0.69.3 on YT Cluster's crates - the lock file of the source the run tested - and on the
 image `dbinvent/yt:latest` as Docker Hub serves it: every known vulnerability counted by severity, the CRITICAL

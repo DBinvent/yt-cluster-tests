@@ -32,8 +32,8 @@ to_file() { # <out> <command...>: the command's stdout into <out>, only when it 
 	local out="$1"; shift
 	"$@" > "$out.tmp" && [ -s "$out.tmp" ] && mv "$out.tmp" "$out" || { rm -f "$out.tmp"; return 1; }
 }
-security_report() { # <name> <title> <repo dir> <source dir> <image>
-	local name="$1" title="$2" dir="$3/security" src="$4" img="$5" bad=0 md crates image
+security_report() { # <name> <title> <repo dir> <source dir> <image> [<Trivy workflow url>]
+	local name="$1" title="$2" dir="$3/security" src="$4" img="$5" wf="${6:-}" bad=0 md crates image
 	mkdir -p "$dir" || { echo "  WARN  security: no $dir"; return 1; }
 	to_file "$dir/sbom-$name.cdx.json" trivy_crates "$src" --format cyclonedx || bad=1
 	to_file "$dir/sbom-$name-image.cdx.json" trivy_image "$img" --format cyclonedx || bad=1
@@ -47,6 +47,13 @@ $(trivy_image "$img" --scanners vuln --format table --severity CRITICAL,HIGH 2>&
 	{
 		echo "# Trivy: $title"
 		echo
+		# [workflow-link] the daily workflow's live badge, linking to it (owner, 2026-11-07):
+		# dbinvent.com's Trivy badge links here
+		if [ -n "$wf" ]; then
+			echo "[![trivy]($wf/badge.svg)]($wf) - the daily Trivy workflow on the image as Docker Hub"
+			echo "serves it: it fails on a HIGH or CRITICAL finding with a fix."
+			echo
+		fi
 		echo "The nightly's scan (yt-cluster-tests nightly/nightly.sh, \`security_report\`), run $RUN_ID, $(date -u +'%Y-%m-%d %H:%M') UTC:"
 		echo "Trivy $(echo "$TRIVY_IMAGE" | sed -E 's/^[^:]+:([^@]+).*/\1/') on $title's crates - the lock file of the source the run tested - and on the"
 		echo "image \`$img\` as Docker Hub serves it: every known vulnerability counted by severity, the CRITICAL"
@@ -102,7 +109,8 @@ security_gate() { # <deb>
 	return "$bad"
 }
 security_reports() {
-	security_report yt-cluster "YT Cluster" "$TESTS" "$YT_PGXT" dbinvent/yt:latest
+	security_report yt-cluster "YT Cluster" "$TESTS" "$YT_PGXT" dbinvent/yt:latest \
+		https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml
 	# sge's are its own to write, not the nightly's (owner, 2026-10-31)
 	return 0
 }
