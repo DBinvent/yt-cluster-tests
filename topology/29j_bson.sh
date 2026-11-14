@@ -15,7 +15,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== bson: the extension's BSON functions on a node =="
 
-SQL="$REPO_ROOT/ytpgc/test_bson.sql"
+SQL="$LITE_ROOT/ytpgc/test_bson.sql"
 [ -f "$SQL" ] || { bad "no $SQL (is the extension's source next to the tests?)"; summary; }
 N="${NODES[0]}"
 

@@ -84,10 +84,16 @@ RUN ldconfig \
 # The extension has to sit in PostgreSQL's own directories; on a real node
 # `ytctl --batch` does this copy. Here it is baked into the image so N
 # containers share the layer.
-RUN cp /usr/local/include/yt-cluster/yt_cluster0_5-pg18-glibc2_39.so \
-       "$(pg_config --pkglibdir)/yt_cluster.so" \
+# By pattern, not by version: the library's name and the script's carry the
+# extension's version (YT Cluster's major.minor), and the package brings the update
+# scripts from earlier versions beside the script (12_ext_update.sh). One library for
+# this PostgreSQL and this glibc, or the build stops: two would be two versions.
+RUN so="$(ls /usr/local/include/yt-cluster/yt_cluster*-pg18-glibc2_39.so)" \
+    && { [ "$(printf '%s\n' "$so" | wc -l)" = 1 ] \
+         || { echo "one yt_cluster library for PostgreSQL 18 and glibc 2.39 expected in the package, found:" $so >&2; exit 1; }; } \
+    && cp "$so" "$(pg_config --pkglibdir)/yt_cluster.so" \
     && cp /usr/local/include/yt-cluster/yt_cluster.control \
-          /usr/local/include/yt-cluster/yt_cluster--0.5.sql \
+          /usr/local/include/yt-cluster/yt_cluster--*.sql \
        "$(pg_config --sharedir)/extension/"
 
 # The cluster WAL directory. pg_basebackup does not copy it and neither does

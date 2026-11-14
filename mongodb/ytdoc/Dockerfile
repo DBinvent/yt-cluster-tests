@@ -14,7 +14,7 @@ FROM ${YT_BASE_IMAGE}
 COPY yt-cluster.deb /tmp/yt-cluster.deb
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends /tmp/yt-cluster.deb postgresql-18-documentdb; \
+    apt-get install -y --no-install-recommends --allow-downgrades /tmp/yt-cluster.deb postgresql-18-documentdb; \
     rm -rf /var/lib/apt/lists/* /tmp/yt-cluster.deb; \
     B=/usr/local/bin/yt-cluster; E=/usr/local/include/yt-cluster; \
     rm -f /usr/local/bin/ytctl-* "$B"/ytserv-* "$E"/*.a; \

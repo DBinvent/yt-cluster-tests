@@ -14,8 +14,12 @@ RUN apt-get update -q \
 RUN ldconfig \
     && test -x /usr/local/bin/yt-cluster/ytserv \
     && ! ldd /usr/local/bin/yt-cluster/ytserv | grep -q "not found"
-RUN cp /usr/local/include/yt-cluster/yt_cluster0_5-pg18-glibc2_39.so "$(pg_config --pkglibdir)/yt_cluster.so" \
-    && cp /usr/local/include/yt-cluster/yt_cluster.control /usr/local/include/yt-cluster/yt_cluster--0.5.sql \
+# By pattern: the names carry the extension's version. One library, or the build stops.
+RUN so="$(ls /usr/local/include/yt-cluster/yt_cluster*-pg18-glibc2_39.so)" \
+    && { [ "$(printf '%s\n' "$so" | wc -l)" = 1 ] \
+         || { echo "one yt_cluster library for PostgreSQL 18 and glibc 2.39 expected in the package, found:" $so >&2; exit 1; }; } \
+    && cp "$so" "$(pg_config --pkglibdir)/yt_cluster.so" \
+    && cp /usr/local/include/yt-cluster/yt_cluster.control /usr/local/include/yt-cluster/yt_cluster--*.sql \
           "$(pg_config --sharedir)/extension/"
 RUN mkdir -p /var/yt-cluster /var/log/yt-cluster \
     && chown postgres:postgres /var/yt-cluster /var/log/yt-cluster

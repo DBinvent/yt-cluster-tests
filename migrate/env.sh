@@ -17,6 +17,12 @@ MIG_PG="${MIG_PG:-18}"
 # database servers <prefix>-1 .. -4; node 1 is the server the application ran on
 MIG_PREFIX="${MIG_PREFIX:-ytmig}"
 MIG_NODES="${MIG_NODES:-1 2 3 4}"
+# the node added by `ytctl --copy` (35_copy.sh), a box of its own beside the others; empty:
+# no copy
+MIG_COPY="${MIG_COPY-5}"
+# the hot rows the copy's source updates while the backup runs (35_copy.sh, hot.sh): row 0,
+# which every update moves, and these, each moved by one update in turn
+MIG_HOT_ROWS="${MIG_HOT_ROWS:-20000}"
 # container NIC: bridge (lxdbr0) or macvlan, as lxc/env.sh. The containers fetch
 # PostgreSQL from apt.postgresql.org: where Docker drops lxdbr0's forwarding, macvlan.
 MIG_NIC="${MIG_NIC:-${YX_NIC:-bridge}}"
@@ -126,6 +132,20 @@ writer_start() {
 		bash /root/mig/writer.sh "$(nuuid "$n")" "$MIG_LOOP" "$MIG_PAUSE" >/dev/null 2>&1
 }
 writer_done() { xn "$1" test -e /root/mig/done; }
+# the hot rows' updater of node n, as a transient unit there (hot.sh); its committed count
+hot_start() {
+	local n="$1"
+	xn "$n" mkdir -p /root/mig
+	lxc file push "$MIG_HERE/hot.sh" "$(cname "$n")/root/mig/hot.sh" >/dev/null
+	xn "$n" systemd-run --unit=mig-hot --setenv=PGPASSWORD="$MIG_PASS" \
+		--setenv=MIG_DB="$MIG_DB" --setenv=MIG_USER="$MIG_USER" \
+		bash /root/mig/hot.sh "$MIG_HOT_ROWS" >/dev/null 2>&1
+}
+# ...stopped after the batch running, which hot.sh gives up on after 120 s
+hot_stop() { xn "$1" touch /root/mig/hot.stop; local i; for i in $(seq 1 150); do xn "$1" test -e /root/mig/hot.done && return 0; sleep 1; done; return 1; }
+hot_count() { xn "$1" sh -c "grep -c '^UPDATE 2' /root/mig/hot.log 2>/dev/null"; }
+# every node's mig_hot: its rows and their values
+hot_digest() { qc "$1" "select count(*) || ' ' || coalesce(sum(n), 0) || ' ' || md5(coalesce(string_agg(id || ':' || n, ',' order by id), '')) from mig_hot"; }
 # dump_on <n>: the application's database and the roles, by pg_dump on server n,
 # into postgres's home there (DUMP_AT)
 DUMP_AT=/var/lib/postgresql

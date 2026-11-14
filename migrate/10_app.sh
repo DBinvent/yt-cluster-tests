@@ -5,6 +5,7 @@
 #   mig_seq    (node uuid, seq) - each node's writer adds its rows 1, 2, 3 ...
 #   mig_local  rows the application wrote once; not put on the cluster, so a new
 #              node has them from the dump alone
+#   mig_hot    row 0 and MIG_HOT_ROWS more, updated while a copy's backup runs (35_copy.sh)
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 say "-- $(now) node 1: the application's database"
@@ -18,9 +19,12 @@ create table mig_seq (node uuid not null, seq int not null, at timestamptz not n
     primary key (node, seq));
 create table mig_local (id int primary key, v text not null);
 insert into mig_local select g, md5(g::text) from generate_series(1, $MIG_LOCAL_ROWS) g;
+create table mig_hot (id int primary key, n bigint not null default 0);
+insert into mig_hot (id) select g from generate_series(0, $MIG_HOT_ROWS) g;
 SQL
 check "node 1: mig_local holds the application's $MIG_LOCAL_ROWS rows" "$MIG_LOCAL_ROWS" \
 	"$(qc 1 "select count(*) from mig_local")"
+check "node 1: mig_hot holds its row 0 and $MIG_HOT_ROWS more" "$((MIG_HOT_ROWS + 1))" "$(qc 1 "select count(*) from mig_hot")"
 
 writer_start 1 || bad "node 1: the writer did not start"
 first() { [ "$(qc 1 "select count(*) from mig_seq")" -ge 5 ] 2>/dev/null; }

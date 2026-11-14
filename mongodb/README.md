@@ -11,6 +11,12 @@ the same hosts, limits and load for each phase, one phase after the other:
 | `yt1` | the same | `cluster_commit=nodes>=1`: its node and one more; the others merge it in |
 | `yt2` | the same | `merge_async` (`merge.md` 2.5): on its own node at once, checked in after; every other node merges it in |
 
+`nodes>=1` and `merge_async` are safe only with one data source - here one per path: each node's
+client writes a path of its own. Two transactions writing the same path under them leave no right
+copy: the higher subterm's copy from its source wins, the row is blocked on the cluster's sync until
+the copies agree (no new transaction counts as newer meanwhile), and writes of the same term and
+subterm are resolved by hand.
+
 **The document.** Database `perf`, collection `doc`, `_id` `doc`: a `profile` and a counter
 `{n: 0}` at each of `education`, `jobs`, `achievement`, `awards`; `social` and `hobby` are
 empty lists. Node i's writer increments path i's `n` (`$inc`) - on 6 nodes nodes 5 and 6

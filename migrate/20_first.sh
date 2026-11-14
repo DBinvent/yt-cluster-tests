@@ -39,6 +39,12 @@ wait_for 60 is_state 1 Leader && ok "node 1 leads its cluster of one, term $(ter
 	|| bad "node 1 does not lead: [$(state_of 1)]"
 check "node 1: mig_seq has its sync trigger" 1 \
 	"$(qc 1 "select count(*) from pg_trigger where tgrelid = 'mig_seq'::regclass and tgname = 'zytsync_public_mig_seq_trigger'")"
+# mig_hot on the cluster too, as yt_setup registers a table by hand: the copy's hot rows
+q 1 <<'SQL' >/dev/null || bad "node 1: mig_hot registered"
+select * from yt_setup('public.mig_hot', '', true, 'public.yt_config');
+SQL
+check "node 1: mig_hot has its sync trigger" 1 \
+	"$(qc 1 "select count(*) from pg_trigger where tgrelid = 'mig_hot'::regclass and tgname = 'zytsync_public_mig_hot_trigger'")"
 qc 1 "select value from $CFG where module = 'C' and name = 'cluster'" postgres > "$RUN/cluster"
 [ -s "$RUN/cluster" ] && ok "node 1: cluster uuid $(cat "$RUN/cluster")" || bad "node 1: no C cluster row"
 add_member 1

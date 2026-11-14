@@ -26,6 +26,14 @@ else
 	bad "the nodes' mig_seq differ after ${MIG_WAIT}s"
 	for n in $(members); do say "   ....  node $n: $(digest "$n")"; done
 fi
+# the hot rows the copy's source updated (35_copy.sh): every node the same
+hsame() { local n d; d=$(hot_digest "$(members | head -1)"); for n in $(members); do [ "$(hot_digest "$n")" = "$d" ] || return 1; done; }
+if wait_for "$MIG_WAIT" hsame; then
+	ok "every node holds the same mig_hot: $(hot_digest "$(members | head -1)")"
+else
+	bad "the nodes' mig_hot differ after ${MIG_WAIT}s"
+	for n in $(members); do say "   ....  node $n: $(hot_digest "$n")"; done
+fi
 ldigest() { qc "$1" "select count(*) || ' ' || md5(string_agg(id || ':' || v, ',' order by id)) from mig_local"; }
 d=$(ldigest 1)
 for n in $(members); do check "node $n: mig_local as node 1's, from the dumps" "$d" "$(ldigest "$n")"; done

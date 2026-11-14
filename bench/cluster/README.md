@@ -52,7 +52,8 @@ protobuf, precomputed so the harness needs no running node (on one,
 
 ## What `nodes1` needs from the engine (`nosync` needs none of this)
 
-`nosync` is a plain pgbench target and runs today. `nodes1` needs two pieces,
+`nosync` is a plain pgbench target and runs today. `nodes=0` (shown `nodes>=1`: the origin alone) is safe only with one data source - one node writes the table. A row more than one transaction writes under it (a network split, a retry on another node) has no right copy: the higher subterm's copy from its source wins, the row is blocked on the cluster's sync until the copies agree (no new transaction counts as newer meanwhile), and writes of the same term and subterm are resolved by hand. The bench
+keeps to it: each node runs its own disjoint stream. `nodes1` needs two pieces,
 both now handled:
 
 1. **`at_least` - handled by config, no patch required.** The bench encodes

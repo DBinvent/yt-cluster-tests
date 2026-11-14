@@ -44,8 +44,8 @@ YT_PID=""
 stop_node() {
     echo "[node] stopping: ytserv, then PostgreSQL (fast)"
     [ -n "$YT_PID" ] && kill -TERM "$YT_PID" 2>/dev/null || true
-    pkill -TERM -f yt-cluster/ytserv 2>/dev/null || true
-    for _ in 1 2 3 4 5; do pgrep -f yt-cluster/ytserv >/dev/null || break; sleep 0.2; done
+    pkill -TERM -f 'yt-cluster/(ytserv|yt-lite)' 2>/dev/null || true
+    for _ in 1 2 3 4 5; do pgrep -f 'yt-cluster/(ytserv|yt-lite)' >/dev/null || break; sleep 0.2; done
     pg_ctlcluster 18 main stop -m fast 2>/dev/null || true
     exit 0
 }
@@ -176,10 +176,15 @@ fi
 # so a ytserv (or `sleep`) in the foreground kept SIGTERM from stop_node.
 # YT_SERVER_BIN: the regular ytserv, or ytserv-all - the build with rppd (Python
 # functions), as `ytctl --all` installs it - for the scripts that call server
-# functions (topology/run_a.sh YX_GROUP); nothing else is accepted.
-case "${YT_SERVER_BIN:=ytserv}" in ytserv|ytserv-all) ;;
-    *) echo "[node] YT_SERVER_BIN=$YT_SERVER_BIN: ytserv or ytserv-all"; exit 2 ;; esac
-su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yt-cluster/${YT_SERVER_BIN} '${DB_URL}' ${CFG_TABLE}" &
+# functions (topology/run_a.sh YX_GROUP); [lite] or yt-lite - YT lite, a node of one
+# database and an az of its own below a cluster (hier/85_lite.sh): its settings are
+# module-L rows of the config table, its CA kept in the postgres user's home; nothing
+# else is accepted.
+case "${YT_SERVER_BIN:=ytserv}" in ytserv|ytserv-all|yt-lite) ;;
+    *) echo "[node] YT_SERVER_BIN=$YT_SERVER_BIN: ytserv, ytserv-all or yt-lite"; exit 2 ;; esac
+YT_ARGS="'${DB_URL}' ${CFG_TABLE}"
+[ "$YT_SERVER_BIN" = yt-lite ] && YT_ARGS="'${DB_URL}' --config ${CFG_TABLE}"
+su postgres -s /bin/bash -c "set -a; . ${YT_ENV}; set +a; exec /usr/local/bin/yt-cluster/${YT_SERVER_BIN} ${YT_ARGS}" &
 YT_PID=$!
 wait "$YT_PID" || echo "[node] ytserv exited $? - container held open for inspection"
 YT_PID=""

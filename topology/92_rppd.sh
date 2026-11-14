@@ -26,7 +26,7 @@
 #
 # `serve_rppd` is off by default, on purpose: "a cluster that silently starts
 # executing rows a tool wrote into a table is the worst possible default"
-# (`rmc.rs`). The `rppd_*` tables are not in `yt_cluster--0.5.sql`: ytserv creates them
+# (`rmc.rs`). The `rppd_*` tables are not in the extension's script: ytserv creates them
 # (2026-10-16, `[rppd-tables]`) - with serve_rppd on, by SchemaGuard over rppd's
 # own rppd.yaml, in the database rppd uses (the catalog here) - and no
 # `rppd_event` triggers, since the function does not exist. This test once

@@ -6,13 +6,14 @@
     nightly/safety_badge.py --print         # say what it found, fetch nothing
     nightly/safety_badge.py --gate          # the nightly before its publish: exit 1 when red,
                                             # or when a check could not run; nothing drawn
-    nightly/safety_badge.py --label TEXT    # instead of "ytserv <version>": a draw by hand between
-                                            # publishes checks sources the package does not carry
-                                            # yet - "ytserv next" says so
+    nightly/safety_badge.py --label TEXT    # instead of "audit": a draw by hand between publishes
+                                            # checks sources the package does not carry yet -
+                                            # "audit next" says so
 
     https://apt.dbinvent.com/paks/nightly/ytserv-safety.svg
 
-    ytserv 1.19.0 | audit clean · unsafe forbidden
+    audit | passed                                  (both hold)
+    audit | 1 medium advisory · unsafe forbidden    (what was found, when not)
 
 Two checks, on yt-cluster's tree as it was built (YT_PGXT, default ../../yt-cluster):
 
@@ -21,7 +22,7 @@ Two checks, on yt-cluster's tree as it was built (YT_PGXT, default ../../yt-clus
   an advisory of a crate only ytctl links (rsa, through russh) is not ytserv's.
 - unsafe: `cargo check -p ytserv` with unsafe code forbidden (RUSTFLAGS
   `-F unsafe_code`). Cargo caps the lints of registry crates, so it fails exactly
-  when a crate of ytserv's own - ytserv, ytcc, ytct, etcds, rppd-common,
+  when a crate of ytserv's own - ytserv, ytct, etcds, rppd-common,
   schema_guard, diff_doc, marg - compiles unsafe code in the build that ships: the
   compiler's word, cfg included, where a scan of the sources (cargo geiger) reads
   a `cfg_attr(.., forbid(unsafe_code))` as no forbid at all. Its own target dir
@@ -169,7 +170,7 @@ def badge() -> tuple:
     tree = ytserv_tree()
     hits, audit_says = audit(tree)
     clean, unsafe_says = unsafe_forbidden()
-    parts = ["audit: not run" if hits is None else "audit clean" if not hits else advisories_said(hits),
+    parts = ["not run" if hits is None else "clean" if not hits else advisories_said(hits),
              "unsafe: not checked" if clean is None else "unsafe forbidden" if clean else "unsafe found"]
     ok = hits == [] and clean is True
     severe = clean is False or any(h[2] in ("critical", "high") for h in hits or [])
@@ -179,8 +180,9 @@ def badge() -> tuple:
     # advisory, no unsafe code - a medium, low or unrated advisory passes, as Trivy's
     # gate passes a finding below HIGH
     passes = hits is not None and clean is True and not severe
-    return ({"label": f"ytserv {ytserv_version()}", "message": " · ".join(parts), "color": color},
-            f"audit: {audit_says}; unsafe: {unsafe_says}", passes)
+    # [label] "audit | passed" when both hold (owner, 2026-11-07), else what was found
+    return ({"label": "audit", "message": "passed" if ok else " · ".join(parts), "color": color},
+            f"ytserv {ytserv_version()}: audit: {audit_says}; unsafe: {unsafe_says}", passes)
 
 
 def main() -> int:

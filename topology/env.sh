@@ -22,6 +22,9 @@ fi
 # The yt-pgxt checkout the suite builds from and encodes table configs with:
 # YT_PGXT, or a sibling of this repository.
 REPO_ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster}"
+# The extension (ytpgc: its builds in dist/, the control file, the SQL script) is the
+# public yt-cluster-lite's: YT_LITE, or a sibling of this repository.
+LITE_ROOT="${YT_LITE:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster-lite}"
 
 YX_HOST="${YX_HOST:-local}"          # where the containers run: an ssh target, or local
 # [peering] The cluster's own uuid, written to every node as module-C `cluster`.

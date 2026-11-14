@@ -490,7 +490,11 @@ fail is a demo.
        bench with a wall-clock start barrier, quiesces, polls convergence,
        and writes CSV. Conditions: `nosync` (no trigger - the denominator)
        and `nodes1` (`ClusterCommit::Nodes{at_least:0}` - origin commits
-       after a `checkin` conflict/order check, async fan-out). An Ansible
+       after a `checkin` conflict/order check, async fan-out). nodes=0 is safe
+       only with one data source - the streams are disjoint, one node writes
+       each row; a row more than one transaction writes under it has no right
+       copy: the higher subterm's copy from its source wins, and the row is
+       blocked on the cluster's sync until the copies agree. An Ansible
        play is still the right end state for provisioning the package +
        roster; `bench/cluster/` is the scenario side and runs today.
 3. [~] `bench/cluster/run.sh` takes a condition, runs one disjoint stream per

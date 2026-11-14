@@ -29,6 +29,8 @@ __pycache__/
 
 # jepsen/: the store of each run (results.yaml is kept), and Leiningen's output
 /jepsen/store/
+# pgbench-m2m/: a run's logs by hand (the nightly's go to its run's logs)
+/pgbench-m2m/logs/
 /jepsen/target/
 /jepsen/.lein-*
 /jepsen/.nrepl-port

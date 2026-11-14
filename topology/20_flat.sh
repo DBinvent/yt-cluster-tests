@@ -15,8 +15,9 @@ done
 # register_table, not yt_setup: yt_setup creates the trigger and writes the
 # module-A row in ONE transaction, and on a node whose config table is synced
 # that write is refused unless the node is the leader - rolling the CREATE
-# TRIGGER back with it. The node then has neither, and every write there dies
-# with `yt_complete: not connected`. See env.sh.
+# TRIGGER back with it. The node then has neither, and its writes there stay on
+# it, unsent (until 2026-11-14 a session's first transaction there also died with
+# `yt_complete: not connected`). See env.sh.
 register_table public.flat_t
 restart_all
 await_cluster

@@ -66,7 +66,9 @@ q "$k" <<'SQL' >/dev/null || bad "node $k: the database registered"
 select yt_info('U+');
 select * from yt_setup('public.yt_config', '', true, 'public.yt_config');
 SQL
-trg() { qc "$1" "select string_agg(tgrelid::regclass || '.' || tgname, ' ' order by 1) from pg_trigger where not tgisinternal"; }
+# by name: `order by 1` in an aggregate is the constant 1, the catalog's order - a table
+# registered after the others (mig_hot) came in another order from the dump
+trg() { qc "$1" "select string_agg(tgrelid::regclass || '.' || tgname, ' ' order by tgrelid::regclass::text, tgname) from pg_trigger where not tgisinternal"; }
 check "node $k: the restored database has node $p's sync triggers" "$(trg "$p")" "$(trg "$k")"
 check "node $k: mig_local came in the dump" "$MIG_LOCAL_ROWS" "$(qc "$k" "select count(*) from mig_local")"
 

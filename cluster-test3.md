@@ -180,6 +180,8 @@ verifies, then **forces leadership to node1** via `yt_info('e:<node1 address>')`
 | `nodes=0, wal=half, sc=0` | `CggSAhACGgIQAQ==` |
 | `nodes=half, wal=half, sc=0` | `CggSAhABGgIQAQ==` |
 
+`nodes=0` (shown `nodes>=1`: the origin alone) is safe only with one data source - one node writes the table. A row more than one transaction writes under it (a network split, a retry on another node) has no right copy: the higher subterm's copy from its source wins, the row is blocked on the cluster's sync until the copies agree (no new transaction counts as newer meanwhile), and writes of the same term and subterm are resolved by hand.
+
 `yt_info('a:<table>')` renders `nodes>=1` for `at_least=0` (the display adds
 self); `sequential_consistency` reads `0 (no sc, no hpc)` / `1 (sc)` /
 `2 (sc + hpc)`.

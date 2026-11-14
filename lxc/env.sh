@@ -9,6 +9,9 @@ if [ -f "$TESTS_ROOT/.env" ]; then
 fi
 # The yt-pgxt checkout: YT_PGXT, or a sibling of this repository.
 REPO_ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster}"
+# The extension (ytpgc: its builds in dist/, the control file, the SQL script) is the
+# public yt-cluster-lite's: YT_LITE, or a sibling of this repository.
+LITE_ROOT="${YT_LITE:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster-lite}"
 
 YX_CONTAINER="${YX_CONTAINER:-ytctl-test}"
 YX_IMAGE="${YX_IMAGE:-ubuntu:24.04}"

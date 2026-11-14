@@ -32,12 +32,12 @@ else
 		fi
 	done
 	# extension binaries + control/sql (installed by ytctl into the PG dirs)
-	if ls "$REPO_ROOT"/ytpgc/dist/*.so >/dev/null 2>&1; then
-		for f in "$REPO_ROOT"/ytpgc/dist/*; do
+	if ls "$LITE_ROOT"/ytpgc/dist/*.so >/dev/null 2>&1; then
+		for f in "$LITE_ROOT"/ytpgc/dist/*; do
 			[ -f "$f" ] && lxc file push "$f" "$YX_CONTAINER/usr/local/include/yt-cluster/"
 		done
 	fi
-	for f in "$REPO_ROOT"/ytpgc/yt_cluster.control "$REPO_ROOT"/ytpgc/yt_cluster--*.sql; do
+	for f in "$LITE_ROOT"/ytpgc/yt_cluster.control "$LITE_ROOT"/ytpgc/yt_cluster--*.sql; do
 		[ -f "$f" ] && lxc file push "$f" "$YX_CONTAINER/usr/local/include/yt-cluster/"
 	done
 	xc chmod 755 /usr/local/bin/ytctl /usr/local/bin/yt-cluster/ytserv

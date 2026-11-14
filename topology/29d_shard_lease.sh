@@ -199,7 +199,7 @@ batch "$W" 2101 40
 check "L4b $W's 40 writes committed with $O's in flight" "40" "${BATCH_N:-0}${BATCH_ERR:+ - $BATCH_ERR}"
 lease_live "$W" && bad "L4b a lease with $O's write in flight: [$(yinfo "$W" E hpc_lease)]" \
 	|| ok "L4b no lease while $O's write is in flight"
-said="$(rh "docker logs --since $t1 $W 2>&1 | grep -c 'of shard top of .* refused: a write of shard top by another node is in flight'" 2>/dev/null || true)"
+said="$(rh "docker logs --since $t1 $W 2>&1 | grep -cE 'of shard top of .* refused: (YT-E[0-9]+ )?a write of shard top by another node is in flight'" 2>/dev/null || true)"
 check "L4b $W says why" "1" "$([ "${said:-0}" -ge 1 ] && echo 1 || echo "${said:-0}")"
 wait "$inflight_pid"
 check "L4b $O's write committed" "" "$(err_of "$(cat "$inflight")")"

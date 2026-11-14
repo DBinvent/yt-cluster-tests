@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:f9356f0d-7b94-4b18-90c4-d365bebb02d6",
+  "serialNumber": "urn:uuid:1da94ef6-2093-4ee4-874f-7a851506bd3d",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-07T17:12:51+00:00",
+    "timestamp": "2026-11-12T10:54:32+00:00",
     "tools": {
       "components": [
         {
@@ -20,7 +20,7 @@
       ]
     },
     "component": {
-      "bom-ref": "40a09eeb-3f72-459a-8b06-7c26dbf297eb",
+      "bom-ref": "58648dc1-0515-456b-9dfe-bd8de337bb66",
       "type": "application",
       "name": "/src",
       "properties": [
@@ -33,7 +33,7 @@
   },
   "components": [
     {
-      "bom-ref": "62c24de9-c133-445e-92e1-70adf6da0feb",
+      "bom-ref": "a6f5c825-c0e9-4bfb-ae5f-b0f0419dd4c2",
       "type": "application",
       "name": "Cargo.lock",
       "properties": [
@@ -2097,6 +2097,23 @@
         {
           "name": "aquasecurity:trivy:PkgID",
           "value": "des@0.9.0"
+        },
+        {
+          "name": "aquasecurity:trivy:PkgType",
+          "value": "cargo"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:cargo/diff_data@0.4.1",
+      "type": "library",
+      "name": "diff_data",
+      "version": "0.4.1",
+      "purl": "pkg:cargo/diff_data@0.4.1",
+      "properties": [
+        {
+          "name": "aquasecurity:trivy:PkgID",
+          "value": "diff_data@0.4.1"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -5488,15 +5505,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/pageant@0.2.4",
+      "bom-ref": "pkg:cargo/pageant@0.2.5",
       "type": "library",
       "name": "pageant",
-      "version": "0.2.4",
-      "purl": "pkg:cargo/pageant@0.2.4",
+      "version": "0.2.5",
+      "purl": "pkg:cargo/pageant@0.2.5",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "pageant@0.2.4"
+          "value": "pageant@0.2.5"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -7001,15 +7018,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/rppd@0.2.19",
+      "bom-ref": "pkg:cargo/rppd@0.2.20",
       "type": "library",
       "name": "rppd",
-      "version": "0.2.19",
-      "purl": "pkg:cargo/rppd@0.2.19",
+      "version": "0.2.20",
+      "purl": "pkg:cargo/rppd@0.2.20",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "rppd@0.2.19"
+          "value": "rppd@0.2.20"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -7358,15 +7375,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/schema_guard@2.3.0",
+      "bom-ref": "pkg:cargo/schema_guard@2.3.2",
       "type": "library",
       "name": "schema_guard",
-      "version": "2.3.0",
-      "purl": "pkg:cargo/schema_guard@2.3.0",
+      "version": "2.3.2",
+      "purl": "pkg:cargo/schema_guard@2.3.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "schema_guard@2.3.0"
+          "value": "schema_guard@2.3.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -7690,6 +7707,23 @@
         {
           "name": "aquasecurity:trivy:PkgID",
           "value": "serde_spanned@1.1.2"
+        },
+        {
+          "name": "aquasecurity:trivy:PkgType",
+          "value": "cargo"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:cargo/serde_yaml@0.9.34%2Bdeprecated",
+      "type": "library",
+      "name": "serde_yaml",
+      "version": "0.9.34+deprecated",
+      "purl": "pkg:cargo/serde_yaml@0.9.34%2Bdeprecated",
+      "properties": [
+        {
+          "name": "aquasecurity:trivy:PkgID",
+          "value": "serde_yaml@0.9.34+deprecated"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -9874,6 +9908,23 @@
       ]
     },
     {
+      "bom-ref": "pkg:cargo/unsafe-libyaml@0.2.11",
+      "type": "library",
+      "name": "unsafe-libyaml",
+      "version": "0.2.11",
+      "purl": "pkg:cargo/unsafe-libyaml@0.2.11",
+      "properties": [
+        {
+          "name": "aquasecurity:trivy:PkgID",
+          "value": "unsafe-libyaml@0.2.11"
+        },
+        {
+          "name": "aquasecurity:trivy:PkgType",
+          "value": "cargo"
+        }
+      ]
+    },
+    {
       "bom-ref": "pkg:cargo/untrusted@0.9.0",
       "type": "library",
       "name": "untrusted",
@@ -11081,15 +11132,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/ytctl@1.20.13",
+      "bom-ref": "pkg:cargo/ytctl@1.20.18",
       "type": "library",
       "name": "ytctl",
-      "version": "1.20.13",
-      "purl": "pkg:cargo/ytctl@1.20.13",
+      "version": "1.20.18",
+      "purl": "pkg:cargo/ytctl@1.20.18",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "ytctl@1.20.13"
+          "value": "ytctl@1.20.18"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11098,15 +11149,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/ytserv@1.20.13",
+      "bom-ref": "pkg:cargo/ytserv@1.20.18",
       "type": "library",
       "name": "ytserv",
-      "version": "1.20.13",
-      "purl": "pkg:cargo/ytserv@1.20.13",
+      "version": "1.20.18",
+      "purl": "pkg:cargo/ytserv@1.20.18",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "ytserv@1.20.13"
+          "value": "ytserv@1.20.18"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11304,16 +11355,16 @@
   ],
   "dependencies": [
     {
-      "ref": "40a09eeb-3f72-459a-8b06-7c26dbf297eb",
+      "ref": "58648dc1-0515-456b-9dfe-bd8de337bb66",
       "dependsOn": [
-        "62c24de9-c133-445e-92e1-70adf6da0feb"
+        "a6f5c825-c0e9-4bfb-ae5f-b0f0419dd4c2"
       ]
     },
     {
-      "ref": "62c24de9-c133-445e-92e1-70adf6da0feb",
+      "ref": "a6f5c825-c0e9-4bfb-ae5f-b0f0419dd4c2",
       "dependsOn": [
-        "pkg:cargo/ytctl@1.20.13",
-        "pkg:cargo/ytserv@1.20.13"
+        "pkg:cargo/ytctl@1.20.18",
+        "pkg:cargo/ytserv@1.20.18"
       ]
     },
     {
@@ -12146,6 +12197,23 @@
       "ref": "pkg:cargo/des@0.9.0",
       "dependsOn": [
         "pkg:cargo/cipher@0.5.2"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/diff_data@0.4.1",
+      "dependsOn": [
+        "pkg:cargo/bb8-postgres@0.9.0",
+        "pkg:cargo/bb8@0.9.1",
+        "pkg:cargo/chrono@0.4.45",
+        "pkg:cargo/postgres-types@0.2.14",
+        "pkg:cargo/rust-i18n@4.2.4",
+        "pkg:cargo/serde-saphyr@2.0.0",
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_json@1.0.154",
+        "pkg:cargo/tokio-postgres@0.7.18",
+        "pkg:cargo/tokio@1.54.1",
+        "pkg:cargo/tracing@0.1.44",
+        "pkg:cargo/uuid@1.28.0"
       ]
     },
     {
@@ -13696,7 +13764,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/pageant@0.2.4",
+      "ref": "pkg:cargo/pageant@0.2.5",
       "dependsOn": [
         "pkg:cargo/base16ct@1.0.0",
         "pkg:cargo/byteorder@1.5.0",
@@ -13982,6 +14050,8 @@
         "pkg:cargo/chrono@0.4.45",
         "pkg:cargo/fallible-iterator@0.2.0",
         "pkg:cargo/postgres-protocol@0.6.12",
+        "pkg:cargo/serde_core@1.0.229",
+        "pkg:cargo/serde_json@1.0.154",
         "pkg:cargo/uuid@0.8.2",
         "pkg:cargo/uuid@1.28.0"
       ]
@@ -14412,7 +14482,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/rppd@0.2.19",
+      "ref": "pkg:cargo/rppd@0.2.20",
       "dependsOn": [
         "pkg:cargo/async-trait@0.1.92",
         "pkg:cargo/bb8-postgres@0.9.0",
@@ -14545,7 +14615,7 @@
         "pkg:cargo/p256@0.14.0",
         "pkg:cargo/p384@0.14.0",
         "pkg:cargo/p521@0.14.0",
-        "pkg:cargo/pageant@0.2.4",
+        "pkg:cargo/pageant@0.2.5",
         "pkg:cargo/pbkdf2@0.13.0",
         "pkg:cargo/pkcs5@0.8.1",
         "pkg:cargo/pkcs8@0.11.0",
@@ -14693,11 +14763,12 @@
       ]
     },
     {
-      "ref": "pkg:cargo/schema_guard@2.3.0",
+      "ref": "pkg:cargo/schema_guard@2.3.2",
       "dependsOn": [
         "pkg:cargo/base64@0.23.1",
         "pkg:cargo/chrono@0.4.45",
         "pkg:cargo/csv@1.4.0",
+        "pkg:cargo/diff_data@0.4.1",
         "pkg:cargo/flate2@1.1.10",
         "pkg:cargo/lazy_static@1.5.1",
         "pkg:cargo/linked-hash-map@0.5.6",
@@ -14892,6 +14963,16 @@
       "ref": "pkg:cargo/serde_spanned@1.1.2",
       "dependsOn": [
         "pkg:cargo/serde_core@1.0.229"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/serde_yaml@0.9.34%2Bdeprecated",
+      "dependsOn": [
+        "pkg:cargo/indexmap@2.14.2",
+        "pkg:cargo/itoa@1.0.18",
+        "pkg:cargo/ryu@1.0.23",
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/unsafe-libyaml@0.2.11"
       ]
     },
     {
@@ -16010,6 +16091,10 @@
       ]
     },
     {
+      "ref": "pkg:cargo/unsafe-libyaml@0.2.11",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:cargo/untrusted@0.9.0",
       "dependsOn": []
     },
@@ -16485,13 +16570,14 @@
       ]
     },
     {
-      "ref": "pkg:cargo/ytctl@1.20.13",
+      "ref": "pkg:cargo/ytctl@1.20.18",
       "dependsOn": [
         "pkg:cargo/aes@0.9.3",
         "pkg:cargo/bb8-postgres@0.9.0",
         "pkg:cargo/bb8@0.9.1",
         "pkg:cargo/clap@4.6.7",
         "pkg:cargo/crossterm@0.29.0",
+        "pkg:cargo/diff_data@0.4.1",
         "pkg:cargo/hmac@0.13.0",
         "pkg:cargo/hyper-util@0.1.21",
         "pkg:cargo/libc@0.2.191",
@@ -16503,6 +16589,7 @@
         "pkg:cargo/rust-i18n@4.2.4",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.154",
+        "pkg:cargo/serde_yaml@0.9.34%2Bdeprecated",
         "pkg:cargo/sha2@0.11.1",
         "pkg:cargo/sha3@0.12.0",
         "pkg:cargo/sudo@0.6.0",
@@ -16518,7 +16605,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/ytserv@1.20.13",
+      "ref": "pkg:cargo/ytserv@1.20.18",
       "dependsOn": [
         "pkg:cargo/async-trait@0.1.92",
         "pkg:cargo/base64@0.23.1",
@@ -16526,6 +16613,7 @@
         "pkg:cargo/bytes@1.12.1",
         "pkg:cargo/chrono@0.4.45",
         "pkg:cargo/crc32fast@1.5.2",
+        "pkg:cargo/diff_data@0.4.1",
         "pkg:cargo/diff_doc@1.0.1",
         "pkg:cargo/dns-lookup@4.0.2",
         "pkg:cargo/etcds@0.24.0",
@@ -16553,10 +16641,10 @@
         "pkg:cargo/ron@0.12.2",
         "pkg:cargo/roxmltree@0.21.1",
         "pkg:cargo/rppd-common@0.2.4",
-        "pkg:cargo/rppd@0.2.19",
+        "pkg:cargo/rppd@0.2.20",
         "pkg:cargo/rust-i18n@4.2.4",
         "pkg:cargo/rustix@1.1.5",
-        "pkg:cargo/schema_guard@2.3.0",
+        "pkg:cargo/schema_guard@2.3.2",
         "pkg:cargo/schema_guard_tokio@2.3.0",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.154",

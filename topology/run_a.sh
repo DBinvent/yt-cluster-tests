@@ -61,7 +61,8 @@ step() {
 	echo
 	echo "───────── $1 ─────────"
 	case "$1" in
-		10_up.sh|05_gitsrv.sh) ;;
+		# 12_ext_update.sh: a container of its own, no cluster - nothing to reset for it
+		10_up.sh|05_gitsrv.sh|12_ext_update.sh) ;;
 		*) [ "${YX_NO_PRECASE:-0}" = 1 ] || bash -c 'source ./env.sh; pre_case' ;;
 	esac
 	# [nightly] when it began on the docker host's clock, for its nodes' logs below
@@ -92,6 +93,9 @@ else
 	# 00_build.sh always go together.
 	step 10_up.sh
 	in_group 05_gitsrv.sh && step 05_gitsrv.sh
+	# [ext-update] the extension's update script from an earlier version, in a container
+	# of its own from the image just built: before anything that needs the cluster
+	in_group 12_ext_update.sh && step 12_ext_update.sh
 
 	# Group 1 - the regression baseline. First, because a red here is a
 	# regression from this session's work and finding that out before anything

@@ -5,6 +5,7 @@
 #   nightly/nightly.sh --dry-run      # say what a run would do, run nothing
 #   nightly/nightly.sh --no-publish   # build and test only
 #   nightly/nightly.sh --suites "unit lxc"
+#   nightly/nightly.sh --suites short # the short set: every suite but topo* and jepsen
 #   nightly/nightly.sh --coverage     # measure coverage this run (--no-coverage: not)
 #   nightly/locked.sh <command...>    # anything else on the test hosts, under the same lock
 #
@@ -111,6 +112,9 @@ if [ -f "$TESTS/.env" ]; then
 fi
 GIT_ROOT="$(cd "$TESTS/.." && pwd)"
 YT_PGXT="${YT_PGXT:-$GIT_ROOT/yt-cluster}"
+# the public repo beside it: the extension (ytpgc) and the protos' crate ytct builds with
+YT_LITE="${YT_LITE:-$GIT_ROOT/yt-cluster-lite}"
+export YT_LITE
 DIST="${DIST:-$GIT_ROOT/ytcluster_dist}"
 INFRA_APT="${INFRA_APT:-$GIT_ROOT/infra_apt}"
 REPO_DIR="${REPO_DIR:-}"   # the apt repository root, yum/el9 under it: .env
@@ -153,12 +157,18 @@ in_lane() {
 LXC_SSH="${LXC_SSH:-}"
 # topology-py: fixture A's server-function scripts, on ytserv-all (the build with
 # Python functions); topology: the rest of it, on the regular ytserv
-ALL_SUITES="unit topology topology-py hier lxc migrate llm topo topo-faults topo-membership rmc jepsen"
+ALL_SUITES="unit topology topology-py hier lxc migrate llm topo topo-faults topo-membership rmc jepsen pgbench-m2m"
+# [short] the short set (owner, 2026-11-09): every suite but topo* and jepsen - `--suites short`;
+# it publishes when every suite of it passed, as a whole run does
+SHORT_SUITES="unit hier lxc migrate llm rmc"
+# [tui] ytctl's TUI is tested apart from the nightly (owner, 2026-11-09): yt-pgxt's
+# ytctl/tests/tui_test.sh, a suite per feature. Here ytctl's unit tests (unit) and its simple
+# use (lxc: install with --batch, purge, reinstall) only
 # suites a coverage measurement does not count, whose counts nothing collects: migrate
 # installs the package as an operator does, and jepsen's nodes run it in an image of
 # their own - asking for them would have every night measure again, since no measurement
 # can list them
-COV_EXEMPT="migrate jepsen"
+COV_EXEMPT="migrate jepsen pgbench-m2m"
 NIGHTLY_SUITES="${NIGHTLY_SUITES:-$ALL_SUITES}"
 NIGHTLY_PUBLISH="${NIGHTLY_PUBLISH:-1}"
 # Where the builds' containers run (the extension, the glibc/EL9/musl targets):
@@ -178,7 +188,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 		--dry-run) DRY=1; shift ;;
 		--no-publish) NIGHTLY_PUBLISH=0; shift ;;
-		--suites) NIGHTLY_SUITES="$2"; shift 2 ;;
+		--suites) NIGHTLY_SUITES="$2"; [ "$2" = short ] && NIGHTLY_SUITES="$SHORT_SUITES"; shift 2 ;;
 		--coverage) COVERAGE=1; COV_ASKED=1; shift ;;
 		--no-coverage) COVERAGE=0; shift ;;
 		-h|--help) sed -n '2,/^set -uo/{/^set -uo/d;s/^# \{0,1\}//;p}' "$0"; exit 0 ;;
@@ -225,6 +235,8 @@ for p in m["packages"]:
         r = subprocess.run(["git", "-C", d, "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
         print(os.path.basename(r or d))'
 		echo etcd ytcluster_dist infra_apt
+		# ytproxy and yui: their own projects, which the packages ship beside ytserv (build_proxy_ui.sh)
+		echo ytproxy ytcluster_ui
 	} | tr ' ' '\n' | grep -v '^$' | grep -vx "$(basename "$TESTS")" | sort -u | tr '\n' ' '
 }
 
@@ -468,10 +480,13 @@ COV="$LOGS/coverage"
 # this version target/debian still held - the suites would test an older build.
 build() {
 	cd "$YT_PGXT" || return 1
-	FORCE=1 bash ytpgc/build-all-ytpgc.sh || { echo "  FAIL  build: the extension (build-all-ytpgc.sh)"; return 1; }
+	# the extension: yt-cluster-lite's ytpgc, by yt-cluster's wrapper (its images off this host)
+	FORCE=1 bash build_ytpgc.sh || { echo "  FAIL  build: the extension (build_ytpgc.sh)"; return 1; }
 	cargo build --release -p ytserv -p ytctl || { echo "  FAIL  build: cargo build ytserv ytctl"; return 1; }
 	# ytserv-all, the build with rppd (Python functions): the one the test clusters run
 	cargo build --release -p ytserv --features ytserv/rppd --bin ytserv-all || { echo "  FAIL  build: cargo build ytserv-all"; return 1; }
+	# ytproxy and yui, which the deb carries beside ytserv (their own projects)
+	bash build_proxy_ui.sh || { echo "  FAIL  build: ytproxy and yui (build_proxy_ui.sh)"; return 1; }
 	# the third-party crates by license tag, shipped beside LICENSE (the list in the
 	# tree stays when this fails)
 	python3 -I ytctl/lib-licenses.py || echo "  WARN  lib-licenses.txt not refreshed"
@@ -486,12 +501,14 @@ build() {
 
 # ── 4. the suites ───────────────────────────────────────────────────────────────
 # the workspace, then ytserv's tests again as ytserv-all: its rppd code builds only
-# with the feature
+# with the feature - and yt-cluster-lite's
 s_unit() {
 	cd "$YT_PGXT" || return 1
 	local rc=0
 	cargo test --workspace --no-fail-fast || rc=1
 	cargo test -p ytserv --features ytserv/rppd --bin ytserv-all --no-fail-fast || rc=1
+	# the public repo beside it: the protos' crate, the lite node and yt-lite
+	(cd "$YT_LITE" && cargo test --workspace --no-fail-fast) || rc=1
 	return $rc
 }
 # a command on topology's and hier's docker host (YX_HOST: an ssh target, or local)
@@ -544,16 +561,20 @@ s_lxc() {
 	# extension's SQL went missing), listed relative to it
 	for f in "$YT_PGXT/$bin/ytctl" "$YT_PGXT/$bin/ytserv" "$YT_PGXT"/target/glibc*/ytserv-glibc* \
 		"$YT_PGXT"/target/glibc*/ytctl-glibc* "$YT_PGXT/target/musl/ytserv-musl" \
-		"$YT_PGXT/$bin/ytserv-all" \
-		"$YT_PGXT/ytpgc/dist" \
-		"$YT_PGXT/ytpgc/yt_cluster.control" "$YT_PGXT"/ytpgc/yt_cluster--*.sql; do
+		"$YT_PGXT/$bin/ytserv-all"; do
 		[ -e "$f" ] && files+=("${f#"$YT_PGXT"/}")
 	done
-	ssh -o BatchMode=yes "$LXC_SSH" "rm -rf $at && mkdir -p $at/tests $at/pgxt" \
+	# the extension's files: yt-cluster-lite's, under lite/ there (YT_LITE)
+	local ext=() e
+	for e in "$YT_LITE/ytpgc/dist" "$YT_LITE/ytpgc/yt_cluster.control" "$YT_LITE"/ytpgc/yt_cluster--*.sql; do
+		[ -e "$e" ] && ext+=("${e#"$YT_LITE"/}")
+	done
+	ssh -o BatchMode=yes "$LXC_SSH" "rm -rf $at && mkdir -p $at/tests $at/pgxt $at/lite" \
 		&& rsync -a "$TESTS/lxc" "$LXC_SSH:$at/tests/" \
-		&& (cd "$YT_PGXT" && rsync -aR "${files[@]}" "$LXC_SSH:$at/pgxt/") || return 1
+		&& (cd "$YT_PGXT" && rsync -aR "${files[@]}" "$LXC_SSH:$at/pgxt/") \
+		&& (cd "$YT_LITE" && rsync -aR "${ext[@]}" "$LXC_SSH:$at/lite/") || return 1
 	ssh -o BatchMode=yes -o ServerAliveInterval=30 "$LXC_SSH" "cd $at/tests/lxc && unset DOCKER_HOST \
-		&& export YT_PGXT=\$HOME/$at/pgxt YX_BIN_DIR=\$HOME/$at/pgxt/$bin YX_NIC=${YX_NIC:-bridge} \
+		&& export YT_PGXT=\$HOME/$at/pgxt YT_LITE=\$HOME/$at/lite YX_BIN_DIR=\$HOME/$at/pgxt/$bin YX_NIC=${YX_NIC:-bridge} \
 		YX_COV_OUT=${YX_COV_OUT:+\$HOME/$at/cov} && ./run_all.sh" || rc=1
 	if [ -n "${YX_COV_OUT:-}" ]; then
 		mkdir -p "$YX_COV_OUT" && rsync -a "$LXC_SSH:$at/cov/" "$YX_COV_OUT/" || true
@@ -561,8 +582,9 @@ s_lxc() {
 	return $rc
 }
 # The migration (migrate/): a running database into a four-node cluster, node by
-# node from dumps, under load - LXD containers like lxc's, on LXC_SSH (empty: here),
-# the scripts and the package copied there. About 30 minutes.
+# node from dumps, under load, and a fifth node by `ytctl --copy` - LXD containers
+# like lxc's, on LXC_SSH (empty: here), the scripts and the package copied there.
+# About 35 minutes.
 s_migrate() {
 	if [ -z "$LXC_SSH" ]; then
 		cd "$TESTS/migrate" && MIG_DEB="$SUITE_DEB" MIG_NIC="${YX_NIC:-bridge}" ./run_all.sh; return
@@ -659,6 +681,13 @@ s_rmc()             { rmc_prepare && on_rmc "$RMC_UP && ./test.sh" || rmc_logs r
 s_jepsen() {
 	cd "$TESTS/jepsen" && JEPSEN_LOCKED=1 JEPSEN_OUT="$LOGS/jepsen" ./nightly_cases.sh --deb "$SUITE_DEB"
 }
+# [pgbench-m2m] (owner, 2026-11-09) six nodes over YX_HOST and LANE_HOST, pgbench on every node's
+# own tables, nodes=0 and nodes=2 by a database and a schema per node; each cell heals within
+# 100 x the SQL timeout of its load's end (pgbench-m2m/README.md). Both docker hosts: run last,
+# after the lanes. Its log, results.tsv and the nodes' logs in the run's logs (pgbench-m2m/)
+s_pgbench_m2m() {
+	cd "$TESTS/pgbench-m2m" && M2M_LOCKED=1 M2M_OUT="$LOGS/pgbench-m2m" ./run.sh --deb "$SUITE_DEB"
+}
 # a failed suite's node logs, one file per container, before the next suite's
 # layout replaces the containers; returns 1, the suite stays failed
 rmc_logs() { # <suite>
@@ -738,6 +767,7 @@ run_suite() { # <suite>: where it writes its counts, then the suite
 		topo-membership) suite topo-membership s_topo_membership ;;
 		rmc) suite rmc s_rmc ;;
 		jepsen) suite jepsen s_jepsen ;;
+		pgbench-m2m) suite pgbench-m2m s_pgbench_m2m ;;
 		*) printf '%s\t0\t1\t0\tfail\t-\n' "$1" >> "$ROWS"; say "   unknown suite $1"; return 1 ;;
 	esac
 }
@@ -766,9 +796,11 @@ if suite build build; then
 		fi
 	fi
 	# [lanes] unit here (LANE_U), LANE_SUITES on LANE_HOST (LANE_B), the rest in turn
-	LANE_B=""; LANE_U=""; LANE_REST=""
+	LANE_B=""; LANE_U=""; LANE_REST=""; LANE_LAST=""
 	for s in $NIGHTLY_SUITES; do
-		if in_lane "$s"; then LANE_B="${LANE_B:+$LANE_B }$s"
+		# [pgbench-m2m] both docker hosts: after the lanes, alone
+		if [ "$s" = pgbench-m2m ]; then LANE_LAST=pgbench-m2m
+		elif in_lane "$s"; then LANE_B="${LANE_B:+$LANE_B }$s"
 		elif [ -n "$LANE_HOST" ] && [ "$s" = unit ]; then LANE_U=unit
 		else LANE_REST="${LANE_REST:+$LANE_REST }$s"; fi
 	done
@@ -787,6 +819,7 @@ if suite build build; then
 	cov_suite none
 	case " $LANE_REST " in *" topo"*|*" rmc "*) rmc_down ;; esac
 	for p in $B_PID $U_PID; do wait "$p" || RESULT=fail; done
+	for s in $LANE_LAST; do run_suite "$s" || RESULT=fail; done
 	# the lanes' skips are in their rows, not in this shell
 	[ -n "$B_PID$U_PID" ] && SKIPPED="$(awk -F'\t' '$5 == "skipped" {printf "%s%s", (n++ ? " " : ""), $1}' "$ROWS")"
 	if [ "$COVERAGE" = 1 ]; then
@@ -839,7 +872,8 @@ release() {
 		esac
 	fi
 	cd "$YT_PGXT" || return 1
-	BASE_IMAGE=almalinux:9 GLIBC_TAG=2_34 ./build_glibc.sh \
+	# SIDECARS=1: ytproxy and yui at glibc 2.34 too, for the rpm
+	SIDECARS=1 BASE_IMAGE=almalinux:9 GLIBC_TAG=2_34 ./build_glibc.sh \
 		|| { echo "  FAIL  release: build_glibc.sh (EL9, glibc 2.34) exited $?"; return 1; }
 	local out; out="$(mktemp)"
 	EL9=1 FORCE=1 BUILD_HOST="${DOCKER_HOST:-}" GITHUB_OUTPUT="$out" "$DIST/build.sh" "$GIT_ROOT" \

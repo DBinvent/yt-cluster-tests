@@ -17,7 +17,14 @@ fi
 wait_for_container
 
 echo "Installing PostgreSQL..."
-xc apt-get update -q
+# a mirror caught mid-sync answers "File has unexpected size ... Mirror sync in progress?" and
+# apt-get update exits 100 (nightly 2026-11-10): try again after a pause, as the sync ends in minutes
+for try in 1 2 3 4 5; do
+	xc apt-get update -q -o Acquire::Retries=3 && break
+	if [ "$try" = 5 ]; then echo "  FAIL: apt-get update failed 5 times" >&2; exit 1; fi
+	echo "apt-get update failed (try $try of 5), again in 60 s"
+	sleep 60
+done
 # libprotobuf-c1: runtime dep of the yt_cluster extension .so (matches deb Depends)
 xc env DEBIAN_FRONTEND=noninteractive apt-get install -qy postgresql postgresql-client libpq-dev binutils libprotobuf-c1
 xc systemctl enable --now postgresql

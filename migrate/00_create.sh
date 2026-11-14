@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # The boxes: one container with PostgreSQL installed and nothing of YT Cluster,
-# copied into the database servers. Records each one's address and the uuid its
-# `ytctl --peers` roster gives it.
+# copied into the database servers - the copy's box (MIG_COPY) among them. Records
+# each one's address and the uuid its `ytctl --peers` roster gives it. Replication
+# connections are let in too, as a copy's source must (35_copy.sh).
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
-nodes() { local n; for n in $MIG_NODES; do cname "$n"; done; }
+nodes() { local n; for n in $MIG_NODES $MIG_COPY; do cname "$n"; done; }
 base="$MIG_PREFIX-base"
 for c in "$base" $(nodes); do lxc delete --force "$c" >/dev/null 2>&1; done
 rm -rf "${RUN:?}"/*
@@ -24,6 +25,7 @@ lxc exec "$base" -- env DEBIAN_FRONTEND=noninteractive apt-get install -qy "post
 # an ordinary server: reachable over the network, password auth
 lxc exec "$base" -- sh -c "echo \"listen_addresses = '*'\" > /etc/postgresql/$MIG_PG/main/conf.d/listen.conf \
 	&& echo 'host all all 0.0.0.0/0 scram-sha-256' >> /etc/postgresql/$MIG_PG/main/pg_hba.conf \
+	&& echo 'host replication all 0.0.0.0/0 scram-sha-256' >> /etc/postgresql/$MIG_PG/main/pg_hba.conf \
 	&& chown -R postgres:postgres /etc/postgresql/$MIG_PG/main/conf.d"
 v="$(lxc exec "$base" -- su postgres -c "psql -X -At -c 'show server_version'" 2>/dev/null | cut -d. -f1)"
 check "$base runs PostgreSQL $MIG_PG from apt.postgresql.org" "$MIG_PG" "$v"
@@ -34,7 +36,7 @@ lxc stop "$base"
 for c in $(nodes); do lxc copy "$base" "$c" && lxc start "$c"; done
 for c in $(nodes); do wait_container "$c" || bad "$c did not come up"; done
 lxc delete --force "$base" >/dev/null
-for n in $MIG_NODES; do
+for n in $MIG_NODES $MIG_COPY; do
 	ip="$(nip "$n")"
 	if [ -n "$ip" ]; then
 		echo "$ip" > "$RUN/ip.$n"

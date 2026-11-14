@@ -10,8 +10,9 @@
 # transaction. With yt_config itself synced, that write is a cluster write and is
 # refused on a non-leader ("require call from cluster leader") - and the rollback
 # took the CREATE TRIGGER with it. The node ended up with NEITHER, while the
-# leader's config said the table was registered. Every write there then failed
-# with `yt_complete: not connected`, naming neither the table nor the reason, and
+# leader's config said the table was registered. Every write there then stayed
+# on it, unsent - its session's first transaction failing with `yt_complete: not
+# connected` (until 2026-11-14), naming neither the table nor the reason - and
 # which nodes were affected depended on who won the last election.
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 echo "== yt_setup: registration works on every node, not just the leader =="

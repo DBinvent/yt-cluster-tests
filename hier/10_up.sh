@@ -36,6 +36,9 @@ start_node() { # start_node <node>: a fresh container for it
 		$YX_IMAGE >/dev/null"
 }
 echo "Starting ${#NODES[@]} nodes in ${#CLUSTERS[@]} clusters..."
+# the leaves of an earlier run (85_lite.sh, 87_load.sh) go first: one still running signs
+# in to the new upper cluster, and its pending CA is one more than 15_store.sh counts
+rh "docker rm -f l1 lt1 lt2 lt3 tt1 tt2 tt3 >/dev/null 2>&1; true"
 for n in "${NODES[@]}"; do start_node "$n"; done
 
 # A node whose container is not there is started again, once per wait. Twice a

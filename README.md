@@ -49,8 +49,10 @@ tests, each with its write-up:
 | [topo/](topo/README.md) | the runtime topology jobs on the rmc layout: the job layer, az create/delete, moves with purge, approval from above and locks, split/combine, faults, refusals, membership |
 | [llm/lab/](llm/lab/test-yt-llm.sh) | `yt_llm` and the models against a live cluster (`YT_LLM_NODES`), not docker - run by hand |
 | [mongodb/](mongodb/README.md) | YCSB on two clusters of four CPU-limited nodes over two docker hosts, one after the other: MongoDB (a replica set, every write through its primary) and YT Cluster with DocumentDB and its gateway (every node written, each document merged path by path) - one document, each node's client writing its own path of it; throughput, latency and failed writes per client, and every node the same document at the end; by hand under the nightly's lock (`mongodb/run.sh`), results in [mongodb/results.yaml](mongodb/results.yaml) |
+| [pgbench-m2m/](pgbench-m2m/README.md) | many writers to many copies: six nodes over two docker hosts, pgbench on every node's own tables (two clients on one branch row, 0-400 ms apart), `nodes=0` and `nodes=2` by a database and by a schema per node; each cell heals within 100 x the SQL timeout of its load's end - in the nightly, last, after the lanes |
 | [jepsen/](jepsen/README.md) | Jepsen: jepsen-io/sql's list-append and rw workloads written on every node at once under partitions, packet faults, ytserv killed and paused, the histories judged by Elle - correctness, no performance graphs; a docker host of five nodes and a control node - run by hand (`jepsen/run.sh`), and four of its cases in the nightly (`jepsen/nightly_cases.sh`). The findings, every one fixed, none critical: [jepsen/findings.md](jepsen/findings.md), one list by severity; one by one in [jepsen/findings.html](jepsen/findings.html); the latest run: [jepsen/results.yaml](jepsen/results.yaml) |
-| [nightly/](nightly/nightly.sh) | every suite above but llm/lab, and four of jepsen's cases, each night a watched repository changed; publishes the deb and the EL9 rpm when all pass. Results: [nightly/results.yaml](nightly/results.yaml); code coverage: [nightly/coverage.md](nightly/coverage.md), from [nightly/coverage.yaml](nightly/coverage.yaml) |
+| ytctl's TUI | apart from the nightly: yt-pgxt's `ytctl/tests/tui_test.sh`, a suite per feature (the live tests, then a scripted walk of every screen, `--analyze`: an AI agent answers five questions per feature) - by hand. The nightly runs ytctl's unit tests (unit) and its simple use (lxc) |
+| [nightly/](nightly/nightly.sh) | every suite above but llm/lab and ytctl's TUI, and four of jepsen's cases, each night a watched repository changed; publishes the deb and the EL9 rpm when all pass. Results: [nightly/results.yaml](nightly/results.yaml); code coverage: [nightly/coverage.md](nightly/coverage.md), from [nightly/coverage.yaml](nightly/coverage.yaml) |
 
 All of them build from a yt-pgxt checkout next to this one (`YT_PGXT` to point
 elsewhere) and read their settings from `.env` (see [env.example](env.example));
@@ -62,14 +64,15 @@ rmc/ and llm/ keep their own `.env`.
 
 1. fingerprints the `.rs` files of every watched repository (yt-pgxt and the
    local repositories its build uses - rppd, sge, diff-doc-rs - plus etcd,
-   ytcluster_dist, infra_apt; never this one), committed or not, and stops when no
+   ytcluster_dist, infra_apt, and ytproxy and ytcluster_ui, which the packages ship;
+   never this one), committed or not, and stops when no
    `.rs` file changed since the last tested run - then nothing is built, nothing
    appended to results.yaml, no package made, no message sent, however it was
    started, unless coverage is due (see Coverage): then it runs for that alone;
 2. bumps the deb's patch version when it is already published, and sets ytserv's
    version to it: one number for the package and the daemon;
 3. builds the extension for every PostgreSQL major and the PostgreSQL 18 package,
-   and runs unit, topology (on the regular ytserv), topology-py (fixture A's
+   and runs unit (the workspace's unit tests, ytctl's TUI among them), topology (on the regular ytserv), topology-py (fixture A's
    server-function scripts, on ytserv-all, the build with Python functions), hier,
    lxc, migrate (a running database into a cluster), llm, topo (t0-t4, t6), topo
    faults (t5), topo membership (t7) and rmc;
@@ -121,9 +124,9 @@ A run that published also renews the regular ytserv's own badge
 `cargo audit` over the crates in ytserv's tree, and `cargo check -p ytserv` with
 unsafe code forbidden (`-F unsafe_code`; cargo caps the lints of registry crates, so
 it fails only on unsafe code in ytserv's own crates). Needs `cargo-audit` on the
-build host. Each advisory is graded by its CVSS score and named on the badge ("1 medium
-advisory"): red only for a high or critical one or unsafe code, yellow for a medium, low
-or unrated one. The badge is the regular ytserv's only: ytserv-all, the build with Python
+build host. Both holding, it reads `audit | passed`; otherwise it says what was found. Each
+advisory is graded by its CVSS score and named on the badge ("1 medium advisory"): red only
+for a high or critical one or unsafe code, yellow for a medium, low or unrated one. The badge is the regular ytserv's only: ytserv-all, the build with Python
 functions, holds unsafe code - pyo3, libpython and one call of its own.
 
 ## Preparations

@@ -14,7 +14,7 @@
 #   release build reads. The package is <deb> with those binaries swapped in and
 #   /var/lib/yt-cluster-cov (mode 1777) added: every suite installs it in place of
 #   <deb>, and an instrumented process writes its counts there itself
-#   (ytcluster-common/src/coverage.rs) - rewritten every 5 s, so a node killed by
+#   (ytcluster-types/src/coverage.rs) - rewritten every 5 s, so a node killed by
 #   its test keeps all but its last seconds. A suite mounts a docker volume of its
 #   own over the directory (YX_COV_MOUNT), so the counts outlive the containers.
 # unit: `cargo llvm-cov --workspace --no-fail-fast --no-report`, then ytserv-all's

@@ -143,8 +143,10 @@ node:
   itself synced.** It creates the trigger and writes the module-`A` row in ONE
   transaction; the write is refused ("require call from cluster leader") and the
   rollback takes the `CREATE TRIGGER` with it. The node then has neither, looks
-  registered from the leader's side, and every write there fails with
-  `yt_complete: not connected` - naming neither the table nor the reason. Use
+  registered from the leader's side, and its writes there stay on it, unsent - a
+  session's first transaction failing with `yt_complete: not connected` until
+  2026-11-14, when `yt_complete` of a transaction that reached no node became 0 -
+  naming neither the table nor the reason. Use
   `register_table` / `cfg_write` / `cfg_delete` from `env.sh`.
   **FIXED 2026-09-19 in `ytpgc/pg_setup.sql`** - the config write now suppresses
   the config table's trigger and sits in its own subtransaction, so it can no

@@ -18,8 +18,8 @@
 # the caller. yt_llm(nl) returns the rows: SELECT * FROM yt_llm(..) AS t(..).
 # On every node, in $YT_DB:
 #   1. install: yt_config.value becomes text (a PEM is ~600 bytes, it was
-#      varchar(250)), then the [llm] block of ytpgc/yt_cluster--0.5.sql, which
-#      re-runs cleanly
+#      varchar(250)), then the [llm] block of the extension's script
+#      (ytpgc/yt_cluster--<version>.sql), which re-runs cleanly
 #   2. configure ytserv in yt_config: module 'C' serve_llm, llm_host and the
 #      NAMES of three module 'K' rows - the CA, the client certificate and its
 #      key from llm-client.env, all three encrypted with the nodes' app key.
@@ -84,7 +84,10 @@ fi
 # the client settings, the question file and the sample data this test reads.
 ROOT="${YT_PGXT:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster}"
 HERE="${LLM_DIR:-$ROOT/llm}"
-EXT_SQL="$ROOT/ytpgc/yt_cluster--0.5.sql"
+# the extension's script: the public yt-cluster-lite's, YT_LITE or a sibling of this
+# repository - the one of its version, the major.minor of its VERSION
+LITE_DIR="${YT_LITE:-$(cd "$TESTS_ROOT/.." && pwd)/yt-cluster-lite}"
+EXT_SQL="$LITE_DIR/ytpgc/yt_cluster--$(tr -d ' \n' < "$LITE_DIR/VERSION" 2>/dev/null | cut -d. -f1,2).sql"
 ENV_FILE="${LLM_CLIENT_ENV:-$HERE/llm-client.env}"
 
 YT_DB=${YT_DB:-pgbench}
@@ -202,6 +205,8 @@ node_sql() {
 load_env() {
     local line key val
     [ -r "$ENV_FILE" ] || { say "no $ENV_FILE"; exit 2; }
+    # the block install_sql takes from it: without it the install would run nothing and say PASS
+    grep -q '^-- \[llm\] begin' "$EXT_SQL" 2>/dev/null || { say "no [llm] block in $EXT_SQL"; exit 2; }
     while IFS= read -r line || [ -n "$line" ]; do
         [[ "$line" =~ ^[[:space:]]*(export[[:space:]]+)?(LLM_[A-Z_]+)=(.*)$ ]] || continue
         key=${BASH_REMATCH[2]}

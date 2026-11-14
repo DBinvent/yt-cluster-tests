@@ -23,8 +23,12 @@ RUN ldconfig \
 
 # The extension in PostgreSQL's own directories (on a real node `ytctl --batch`
 # copies it); baked in so the three containers share the layer.
-RUN cp /usr/local/include/yt-cluster/yt_cluster0_5-pg18-glibc2_39.so "$(pg_config --pkglibdir)/yt_cluster.so" \
-    && cp /usr/local/include/yt-cluster/yt_cluster.control /usr/local/include/yt-cluster/yt_cluster--0.5.sql \
+# By pattern: the names carry the extension's version. One library, or the build stops.
+RUN so="$(ls /usr/local/include/yt-cluster/yt_cluster*-pg18-glibc2_39.so)" \
+    && { [ "$(printf '%s\n' "$so" | wc -l)" = 1 ] \
+         || { echo "one yt_cluster library for PostgreSQL 18 and glibc 2.39 expected in the package, found:" $so >&2; exit 1; }; } \
+    && cp "$so" "$(pg_config --pkglibdir)/yt_cluster.so" \
+    && cp /usr/local/include/yt-cluster/yt_cluster.control /usr/local/include/yt-cluster/yt_cluster--*.sql \
           "$(pg_config --sharedir)/extension/"
 
 # DataFusion for the df target: a venv of its own (C llm_df_python). ytserv

@@ -1,6 +1,6 @@
 -- What the fixture needs on top of CREATE EXTENSION yt_cluster. yt_setup() and the
 -- views yt_tables_cfg / yt_help_with_defaults used to be copied here; they come
--- with the extension now (the [setup] section of yt_cluster--0.5.sql).
+-- with the extension now (the setup helpers of its script, yt_cluster--<version>.sql).
 
 -- [P6b] [skv 6.4] The join-approval gate.
 --
@@ -18,7 +18,7 @@
 --   * BEFORE, because PostgreSQL ignores an AFTER row trigger's return value
 --     and this has to inspect NEW.
 --   * yt_info(text) returns JSON -- a ONE-ELEMENT ARRAY, not a record set
---     (ytpgc/yt_cluster--0.5.sql:25) -- so `as x(name,value,module)` errors here.
+--     (ytpgc/yt_cluster--<version>.sql, yt_info) -- so `as x(name,value,module)` errors here.
 create or replace function yt_join_gate() returns trigger as $yt_join_gate$
 declare v jsonb;
 begin

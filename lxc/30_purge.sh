@@ -6,7 +6,8 @@
 # arg-purge, ytctl/src/main.rs uninstall()):
 #   - stop and disable ytserver, delete its unit                       (coded)
 #   - delete yt_cluster.so from `pg_config --pkglibdir`, yt_cluster.control and
-#     yt_cluster--0.5.sql from `pg_config --sharedir`/extension              (coded)
+#     every yt_cluster--*.sql - the script, the update scripts to it, an earlier
+#     version's - from `pg_config --sharedir`/extension                      (coded)
 #   - delete the working directory with the cluster WAL (/var/yt-cluster)  (coded)
 #   - exit 0 (it is the package pre-uninstall script)
 # Purge does not touch the database. The cleanup it prints for that (`psql
@@ -46,6 +47,11 @@ share="$(xc pg_config --sharedir 2>/dev/null || true)/extension"
 check "pg_config answers in the container (pkglibdir=[$pkglib])" test -n "$pkglib"
 check "before the purge: yt_cluster.so installed in $pkglib" present "$pkglib/yt_cluster.so"
 check "before the purge: yt_cluster.control installed in $share" present "$share/yt_cluster.control"
+# the extension's scripts by pattern: their names carry its version, and the update
+# scripts from earlier versions are installed beside the script
+ext_scripts() { xc sh -c "ls $share/yt_cluster--*.sql 2>/dev/null | wc -l"; }
+scripts_before="$(ext_scripts || true)"
+check "before the purge: the extension's script(s) installed in $share (${scripts_before:-none})" test "${scripts_before:-0}" -ge 1
 check "before the purge: the working directory /var/yt-cluster exists" present /var/yt-cluster
 
 echo "Purging..."
@@ -61,7 +67,8 @@ check "ytserver unit file deleted" \
 	bash -c "! lxc exec $YX_CONTAINER -- test -f /lib/systemd/system/ytserver.service"
 check "extension library deleted: $pkglib/yt_cluster.so" absent "$pkglib/yt_cluster.so"
 check "extension control file deleted: $share/yt_cluster.control" absent "$share/yt_cluster.control"
-check "extension script deleted: $share/yt_cluster--0.5.sql" absent "$share/yt_cluster--0.5.sql"
+scripts_after="$(ext_scripts || echo "?")"
+check "extension scripts deleted: no $share/yt_cluster--*.sql ($scripts_after left of ${scripts_before:-0})" test "$scripts_after" = 0
 # a stale WAL is what a re-install on the same box would trip over ("Sub-term
 # ... already exists"; 50_negative.sh L2 checks that end to end)
 check "working directory /var/yt-cluster (cluster WAL) deleted" absent /var/yt-cluster
