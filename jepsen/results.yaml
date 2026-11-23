@@ -1,5 +1,5 @@
-- run: 2026-11-14T10:35:54Z
-  build: 1.21.0
+- run: 2026-11-20T08:36:04Z
+  build: 1.21.3
   nodes: 5
   options: "--workload rw --nemesis partition,kill,pause,packet --time-limit 300 --rate 50 --concurrency 2n --isolation serializable --expected-consistency-model cursor-stability --recon"
   verdict: valid
@@ -8,4 +8,4 @@
   leaderless: 0
   converged: yes
   recon: {repaired: 0, blocked: 0}
-  store: store/yt-cluster rw serializable all sc recon kill,packet,partition,pause/2026-11-14T10:36:29.016676332Z
+  store: store/yt-cluster rw serializable all sc recon kill,packet,partition,pause/2026-11-20T08:36:39.801921106Z

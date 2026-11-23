@@ -479,6 +479,13 @@ COV="$LOGS/coverage"
 # bash ignores `set -e`, and a failed cargo build went on to copy whatever deb of
 # this version target/debian still held - the suites would test an older build.
 build() {
+	# [disk] the checkouts' build output cleared first (owner, 2026-11-20): it piles up - yt-cluster's
+	# reached 460G of old incremental caches and test binaries. All of it is built again in this
+	# run that needs it: yt-cluster's and yt-cluster-lite's by this step, etcd's yxetcd below; the
+	# others' (sge, rppd, schema_guard, signon) the nightly does not use
+	for r in yt-cluster yt-cluster-lite sge rppd etcd schema_guard signon; do
+		[ -d "$GIT_ROOT/$r/target" ] && { (cd "$GIT_ROOT/$r" && cargo clean -q) || echo "  WARN  build: cargo clean in $r"; }
+	done
 	cd "$YT_PGXT" || return 1
 	# the extension: yt-cluster-lite's ytpgc, by yt-cluster's wrapper (its images off this host)
 	FORCE=1 bash build_ytpgc.sh || { echo "  FAIL  build: the extension (build_ytpgc.sh)"; return 1; }
@@ -489,7 +496,13 @@ build() {
 	bash build_proxy_ui.sh || { echo "  FAIL  build: ytproxy and yui (build_proxy_ui.sh)"; return 1; }
 	# the third-party crates by license tag, shipped beside LICENSE (the list in the
 	# tree stays when this fails)
+	# [sbom] the libpython the deb ships, from this host's Ubuntu package (its security updates)
+	bash ytctl/libpython.sh || { echo "  FAIL  build: libpython.sh - no libpython3.12t64 on the build host"; return 1; }
 	python3 -I ytctl/lib-licenses.py || echo "  WARN  lib-licenses.txt not refreshed"
+	# [sbom] the SBOM of each binary, which the package ships (ytctl/sbom/), and the rows of
+	# dbinvent.com's /licenses; a project without a license stops the build - a question of
+	# redistribution for the owner, nothing published (owner, 2026-11-17)
+	PKG_V="$PKG_V" python3 -I ytctl/deb-sbom.py || { echo "  FAIL  build: deb-sbom.py - the SBOMs (a project without a license stops it)"; return 1; }
 	rm -f "target/debian/yt-cluster_${PKG_V}_amd64.deb"
 	(cd ytctl && cargo deb --variant pg18 --no-build --deb-version "$PKG_V") || { echo "  FAIL  build: cargo deb"; return 1; }
 	cp "target/debian/yt-cluster_${PKG_V}_amd64.deb" "$DEB" || { echo "  FAIL  build: no yt-cluster_${PKG_V}_amd64.deb"; return 1; }
@@ -1202,6 +1215,15 @@ EOF
 if [ "$RESULT" = pass ]; then
 	security_reports >> "$LOGS/security.log" 2>&1
 	say "   security: $(grep -cE '^  OK ' "$LOGS/security.log") report(s) written (security.log)"
+fi
+# [sbom] the published debs' libraries and licenses into dbinvent.com's D1 (its /licenses page):
+# only after a publish, so the page tells what can be installed; one that fails is a WARN
+if [ -n "$PUBLISHED_DEB" ]; then
+	if python3 -I "$HERE/deb_libs.py" >> "$LOGS/deb-libs.log" 2>&1; then
+		say "   licenses: $(tail -1 "$LOGS/deb-libs.log")"
+	else
+		say "   WARN  licenses: not written to the site's D1 (deb-libs.log)"
+	fi
 fi
 # the badges vouch for what can be installed: only a promotion moves the nightly one,
 # straight on the apt host; a run for coverage alone that measured it, on sources already

@@ -3,7 +3,7 @@
 [![trivy](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml/badge.svg)](https://github.com/DBinvent/yt-cluster-tests/actions/workflows/trivy.yml) - the daily Trivy workflow on the image as Docker Hub
 serves it: it fails on a HIGH or CRITICAL finding with a fix.
 
-The nightly's scan (yt-cluster-tests nightly/nightly.sh, `security_report`), run 20261112-050032, 2026-11-12 10:56 UTC:
+The nightly's scan (yt-cluster-tests nightly/nightly.sh, `security_report`), run 20261120-043256, 2026-11-20 11:27 UTC:
 Trivy 0.69.3 on YT Cluster's crates - the lock file of the source the run tested - and on the
 image `dbinvent/yt:latest` as Docker Hub serves it: every known vulnerability counted by severity, the CRITICAL
 and HIGH ones listed.
@@ -20,7 +20,7 @@ Report Summary
 ┌────────────┬───────┬─────────────────┐
 │   Target   │ Type  │ Vulnerabilities │
 ├────────────┼───────┼─────────────────┤
-│ Cargo.lock │ cargo │        0        │
+│ Cargo.lock │ cargo │        2        │
 └────────────┴───────┴─────────────────┘
 Legend:
 - '-': Not scanned
@@ -47,9 +47,9 @@ Report Summary
 ┌──────────────────────────────────┬──────────┬─────────────────┐
 │              Target              │   Type   │ Vulnerabilities │
 ├──────────────────────────────────┼──────────┼─────────────────┤
-│ dbinvent/yt:latest (debian 13.7) │  debian  │       989       │
+│ dbinvent/yt:latest (debian 13.7) │  debian  │      1050       │
 ├──────────────────────────────────┼──────────┼─────────────────┤
-│ usr/local/bin/gosu               │ gobinary │        1        │
+│ usr/local/bin/gosu               │ gobinary │        0        │
 └──────────────────────────────────┴──────────┴─────────────────┘
 Legend:
 - '-': Not scanned
@@ -60,7 +60,7 @@ Report Summary
 ┌──────────────────────────────────┬──────────┬─────────────────┐
 │              Target              │   Type   │ Vulnerabilities │
 ├──────────────────────────────────┼──────────┼─────────────────┤
-│ dbinvent/yt:latest (debian 13.7) │  debian  │       116       │
+│ dbinvent/yt:latest (debian 13.7) │  debian  │       118       │
 ├──────────────────────────────────┼──────────┼─────────────────┤
 │ usr/local/bin/gosu               │ gobinary │        0        │
 └──────────────────────────────────┴──────────┴─────────────────┘
@@ -71,7 +71,7 @@ Legend:
 
 dbinvent/yt:latest (debian 13.7)
 ================================
-Total: 116 (HIGH: 115, CRITICAL: 1)
+Total: 118 (HIGH: 117, CRITICAL: 1)
 
 ┌───────────────────┬─────────────────┬──────────┬──────────────┬──────────────────────────────────────┬───────────────┬──────────────────────────────────────────────────────────────┐
 │      Library      │  Vulnerability  │ Severity │    Status    │          Installed Version           │ Fixed Version │                            Title                             │
@@ -412,9 +412,13 @@ Total: 116 (HIGH: 115, CRITICAL: 1)
 │                   │                 │          │              │                                      │               │ changesets                                                   │
 │                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-119379                  │
 ├───────────────────┼─────────────────┤          │              ├──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
-│ libsystemd0       │ CVE-2026-16742  │          │              │ 257.13-1~deb13u1                     │               │ systemd: systemd-homed: Local privilege escalation via       │
+│ libsystemd-shared │ CVE-2026-16742  │          │              │ 257.13-1~deb13u1                     │               │ systemd: systemd-homed: Local privilege escalation via       │
 │                   │                 │          │              │                                      │               │ missing home-record signature verification                   │
 │                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-16742                   │
+├───────────────────┤                 │          │              │                                      ├───────────────┤                                                              │
+│ libsystemd0       │                 │          │              │                                      │               │                                                              │
+│                   │                 │          │              │                                      │               │                                                              │
+│                   │                 │          │              │                                      │               │                                                              │
 ├───────────────────┼─────────────────┤          │              ├──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
 │ libtinfo6         │ CVE-2025-69720  │          │              │ 6.5+20250216-2                       │               │ ncurses: ncurses: Buffer overflow vulnerability may lead to  │
 │                   │                 │          │              │                                      │               │ arbitrary code execution.                                    │
@@ -523,7 +527,11 @@ Total: 116 (HIGH: 115, CRITICAL: 1)
 │                   │                 │          │              │                                      │               │                                                              │
 │                   │                 │          │              │                                      │               │                                                              │
 ├───────────────────┼─────────────────┤          ├──────────────┼──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
-│ util-linux        │ CVE-2026-76642  │          │ affected     │ 2.41.5-0+deb13u1                     │               │ util-linux: util-linux: failed external mount helper still   │
+│ systemd           │ CVE-2026-16742  │          │ affected     │ 257.13-1~deb13u1                     │               │ systemd: systemd-homed: Local privilege escalation via       │
+│                   │                 │          │              │                                      │               │ missing home-record signature verification                   │
+│                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-16742                   │
+├───────────────────┼─────────────────┤          │              ├──────────────────────────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
+│ util-linux        │ CVE-2026-76642  │          │              │ 2.41.5-0+deb13u1                     │               │ util-linux: util-linux: failed external mount helper still   │
 │                   │                 │          │              │                                      │               │ runs privileged X-mount post-hooks                           │
 │                   │                 │          │              │                                      │               │ https://avd.aquasec.com/nvd/cve-2026-76642                   │
 │                   ├─────────────────┤          │              │                                      ├───────────────┼──────────────────────────────────────────────────────────────┤

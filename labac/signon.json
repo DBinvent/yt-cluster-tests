@@ -1,0 +1,19 @@
+{
+  "rules": [
+    { "kind": "regex", "pattern": "^/dept/([a-z0-9_]+)$", "group": "dept-$1", "pg_role": "labac_staff" },
+    { "kind": "name",  "pattern": "/reviewers", "group": "reviewers", "pg_role": "labac_staff" },
+    { "kind": "regex", "pattern": "^/clearance/([0-9]+)$", "level_name": "sal", "level_value": "$1" },
+    { "kind": "regex", "pattern": "^/review/([0-9]+)$", "level_name": "review", "level_value": "$1" }
+  ],
+  "resources": [
+    { "kind": "dept", "id": "sales" },
+    { "kind": "dept", "id": "eng" },
+    { "kind": "dept", "id": "hr" }
+  ],
+  "entries": [
+    { "kind": "dept", "resource": "sales", "group": "dept-sales", "level": 4 },
+    { "kind": "dept", "resource": "eng",   "group": "dept-eng",   "level": 4 },
+    { "kind": "dept", "resource": "hr",    "group": "dept-hr",    "level": 5 },
+    { "kind": "dept", "resource": "*",     "group": "reviewers",  "level": 1 }
+  ]
+}

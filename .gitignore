@@ -20,7 +20,7 @@ __pycache__/
 # settings and nightly state (env.example is the committed template)
 /.env
 /nightly/state/
-/nightly/logs/
+**/logs/
 # badge.py by hand without --out (the nightly writes it under REPO_DIR)
 /nightly/badge.svg
 /nightly/coverage.svg
@@ -34,3 +34,9 @@ __pycache__/
 /jepsen/target/
 /jepsen/.lein-*
 /jepsen/.nrepl-port
+nightly/next-args
+
+# labac/: the host program's build
+**/target/
+# its lock names the sibling checkouts until signon 1.1 and schema_guard_tokio 2.5 are published
+/labac/host/Cargo.lock

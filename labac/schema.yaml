@@ -1,0 +1,61 @@
+# [labac] The test schema of the labac login environment, deployed twice by schema_guard:
+# into app_lsr under its lsr mode (the tables registered, ytproxy rewrites the SQL) and into
+# app_rls under rls (a row-level security policy per action).
+#
+# A table's `security` says who reaches which of its rows. `schemaPath` is the dml path alone -
+# a list - or a map of the table's named paths: `dml`, the path to the value the person's
+# departments are compared with (the attribute `dept`), and the row's levels by name - `sal`,
+# the security access level, and `review`, a level of this schema's own. A person reaches a
+# row when the row's department is one of its own for the statement's action AND its level of
+# each name is the row's or higher.
+database:
+  - schemaName: public
+    tables:
+      - table:
+          tableName: projects
+          description: by department, and by the security access level - defines the attribute dept
+          security: {schemaPath: {dml: [dept], sal: [sal]}, alias: dept}
+          columns:
+            - column: {name: id, type: int, constraint: {primaryKey: true}}
+            - column: {name: dept, type: text}
+            - column: {name: sal, type: smallint}
+            - column: {name: name, type: text}
+          grant:
+            - {all: labac_staff}
+      - table:
+          tableName: docs
+          description: follows its project for the department and the security access level, and has a review level of its own
+          security:
+            schemaPath:
+              dml: [public.docs.project_id, public.projects.dept]
+              sal: [public.docs.project_id, public.projects.sal]
+              review: [review]
+            softDelete: deleted_at
+          columns:
+            - column: {name: id, type: int, constraint: {primaryKey: true}}
+            - column: {name: project_id, type: int, constraint: {foreignKey: {references: public.projects}}}
+            - column: {name: review, type: smallint}
+            - column: {name: title, type: text}
+            - column: {name: deleted_at, type: timestamptz}
+          grant:
+            - {all: labac_staff}
+      - table:
+          tableName: tasks
+          description: follows its project for the department only - the dml path alone, a list
+          security: {schemaPath: [public.tasks.project_id, public.projects.dept]}
+          columns:
+            - column: {name: id, type: int, constraint: {primaryKey: true}}
+            - column: {name: project_id, type: int, constraint: {foreignKey: {references: public.projects}}}
+            - column: {name: title, type: text}
+          grant:
+            - {all: labac_staff}
+      - table:
+          tableName: notices
+          description: by the security access level alone - no department
+          security: {schemaPath: {sal: [sal]}}
+          columns:
+            - column: {name: id, type: int, constraint: {primaryKey: true}}
+            - column: {name: sal, type: smallint}
+            - column: {name: body, type: text}
+          grant:
+            - {all: labac_staff}

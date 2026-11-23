@@ -7,7 +7,7 @@
 **Schema Guard** [![trivy](https://github.com/DBinvent/sge/actions/workflows/trivy.yml/badge.svg)](https://github.com/DBinvent/sge/actions/workflows/trivy.yml)
 [![docker scout](https://github.com/DBinvent/sge/actions/workflows/scout.yml/badge.svg)](https://github.com/DBinvent/sge/actions/workflows/scout.yml)
 [![docker](https://img.shields.io/docker/v/dbinvent/sge?sort=semver&label=docker)](https://hub.docker.com/r/dbinvent/sge)
-· [Trivy's result and the SBOMs](https://github.com/DBinvent/sge/blob/main/security/trivy-sge.md)
+· [its SBOM](https://github.com/DBinvent/sge/tree/sbom) · [libraries and licenses](https://dbinvent.com/licenses)
 
 Each image as Docker Hub serves it, scanned by Trivy: YT Cluster's every day after the nightly
 ([.github/workflows](.github/workflows)), Schema Guard's after each publish and

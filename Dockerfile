@@ -8,7 +8,13 @@ ARG POSTGRESQL_VERSION_MAJOR=14
 ARG APT_HOST=apt.dbinvent.com
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
+# [apt-retry] the archive drops connections and answers 522 now and then (nightly 2026-11-19,
+# three runs): each download retried, and apt-get-update tries the index again - from the
+# third failure on a mirror
+RUN printf 'Acquire::Retries "8";\nAcquire::http::Timeout "60";\n' > /etc/apt/apt.conf.d/80-retries \
+    && printf '%s\n' '#!/bin/sh' 'for i in 1 2 3 4 5 6; do' 'apt-get update "$@" && exit 0' '[ $i -lt 3 ] || sed -i -e "s#http://[a-z.]*archive.ubuntu.com#http://mirrors.kernel.org#g" /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null' 'sleep 20' 'done' 'exit 1' > /usr/local/bin/apt-get-update \
+    && chmod 755 /usr/local/bin/apt-get-update
+RUN apt-get-update && \
     export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -yq systemd systemd-sysv dbus dbus-user-session \
         libpq-dev libssl-dev linux-libc-dev xutils-dev libevent-dev libreadline-dev zlib1g-dev  \
@@ -20,7 +26,7 @@ RUN echo "deb http://apt.postgresql.org/pub/repos/apt jammy-pgdg main" > /etc/ap
 RUN curl -o ACCC4CF8.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
 RUN apt-key add ACCC4CF8.asc
 
-RUN apt-get update
+RUN apt-get-update
 RUN apt-get install -yq postgresql-$POSTGRESQL_VERSION_MAJOR postgresql-client-$POSTGRESQL_VERSION_MAJOR
 
 ENV RUSTUP_HOME=/opt/rust/rustup \
@@ -41,7 +47,7 @@ RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/yt-cluster.gpg] http://$
 
 RUN date >/build-date.txt
 
-RUN apt-get update && apt-get install -yq yt-cluster
+RUN apt-get-update && apt-get install -yq yt-cluster
 
 # yt-cluster depends on the generic 'postgresql' meta-package, which pulls in the latest
 # major version (e.g. 18) alongside the explicitly installed $POSTGRESQL_VERSION_MAJOR.

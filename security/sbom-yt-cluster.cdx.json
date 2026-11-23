@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:1da94ef6-2093-4ee4-874f-7a851506bd3d",
+  "serialNumber": "urn:uuid:9ca1cd3d-40b7-4a54-ace5-deacf2f41cfd",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-12T10:54:32+00:00",
+    "timestamp": "2026-11-20T11:25:36+00:00",
     "tools": {
       "components": [
         {
@@ -20,7 +20,7 @@
       ]
     },
     "component": {
-      "bom-ref": "58648dc1-0515-456b-9dfe-bd8de337bb66",
+      "bom-ref": "2d616d19-a454-4a53-a71a-e30ffb5fa5b1",
       "type": "application",
       "name": "/src",
       "properties": [
@@ -33,7 +33,7 @@
   },
   "components": [
     {
-      "bom-ref": "a6f5c825-c0e9-4bfb-ae5f-b0f0419dd4c2",
+      "bom-ref": "4b55197d-4139-4737-9df6-9be117842157",
       "type": "application",
       "name": "Cargo.lock",
       "properties": [
@@ -2122,15 +2122,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/diff_doc@1.0.1",
+      "bom-ref": "pkg:cargo/diff_doc@1.1.0",
       "type": "library",
       "name": "diff_doc",
-      "version": "1.0.1",
-      "purl": "pkg:cargo/diff_doc@1.0.1",
+      "version": "1.1.0",
+      "purl": "pkg:cargo/diff_doc@1.1.0",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "diff_doc@1.0.1"
+          "value": "diff_doc@1.1.0"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -4655,15 +4655,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/marg@0.4.5",
+      "bom-ref": "pkg:cargo/marg@0.4.7",
       "type": "library",
       "name": "marg",
-      "version": "0.4.5",
-      "purl": "pkg:cargo/marg@0.4.5",
+      "version": "0.4.7",
+      "purl": "pkg:cargo/marg@0.4.7",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "marg@0.4.5"
+          "value": "marg@0.4.7"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -7375,15 +7375,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/schema_guard@2.3.2",
+      "bom-ref": "pkg:cargo/schema_guard@2.3.3",
       "type": "library",
       "name": "schema_guard",
-      "version": "2.3.2",
-      "purl": "pkg:cargo/schema_guard@2.3.2",
+      "version": "2.3.3",
+      "purl": "pkg:cargo/schema_guard@2.3.3",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "schema_guard@2.3.2"
+          "value": "schema_guard@2.3.3"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -7392,15 +7392,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/schema_guard_tokio@2.3.0",
+      "bom-ref": "pkg:cargo/schema_guard_tokio@2.4.2",
       "type": "library",
       "name": "schema_guard_tokio",
-      "version": "2.3.0",
-      "purl": "pkg:cargo/schema_guard_tokio@2.3.0",
+      "version": "2.4.2",
+      "purl": "pkg:cargo/schema_guard_tokio@2.4.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "schema_guard_tokio@2.3.0"
+          "value": "schema_guard_tokio@2.4.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11098,15 +11098,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/ytcc@0.5.6",
+      "bom-ref": "pkg:cargo/yt-core-proto@1.21.0",
       "type": "library",
-      "name": "ytcc",
-      "version": "0.5.6",
-      "purl": "pkg:cargo/ytcc@0.5.6",
+      "name": "yt-core-proto",
+      "version": "1.21.0",
+      "purl": "pkg:cargo/yt-core-proto@1.21.0",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "ytcc@0.5.6"
+          "value": "yt-core-proto@1.21.0"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11115,15 +11115,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/ytct@0.2.2",
+      "bom-ref": "pkg:cargo/ytct@1.21.0",
       "type": "library",
       "name": "ytct",
-      "version": "0.2.2",
-      "purl": "pkg:cargo/ytct@0.2.2",
+      "version": "1.21.0",
+      "purl": "pkg:cargo/ytct@1.21.0",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "ytct@0.2.2"
+          "value": "ytct@1.21.0"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11132,15 +11132,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/ytctl@1.20.18",
+      "bom-ref": "pkg:cargo/ytctl@1.21.3",
       "type": "library",
       "name": "ytctl",
-      "version": "1.20.18",
-      "purl": "pkg:cargo/ytctl@1.20.18",
+      "version": "1.21.3",
+      "purl": "pkg:cargo/ytctl@1.21.3",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "ytctl@1.20.18"
+          "value": "ytctl@1.21.3"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11149,15 +11149,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/ytserv@1.20.18",
+      "bom-ref": "pkg:cargo/ytserv@1.21.3",
       "type": "library",
       "name": "ytserv",
-      "version": "1.20.18",
-      "purl": "pkg:cargo/ytserv@1.20.18",
+      "version": "1.21.3",
+      "purl": "pkg:cargo/ytserv@1.21.3",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "ytserv@1.20.18"
+          "value": "ytserv@1.21.3"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -11355,16 +11355,16 @@
   ],
   "dependencies": [
     {
-      "ref": "58648dc1-0515-456b-9dfe-bd8de337bb66",
+      "ref": "2d616d19-a454-4a53-a71a-e30ffb5fa5b1",
       "dependsOn": [
-        "a6f5c825-c0e9-4bfb-ae5f-b0f0419dd4c2"
+        "4b55197d-4139-4737-9df6-9be117842157"
       ]
     },
     {
-      "ref": "a6f5c825-c0e9-4bfb-ae5f-b0f0419dd4c2",
+      "ref": "4b55197d-4139-4737-9df6-9be117842157",
       "dependsOn": [
-        "pkg:cargo/ytctl@1.20.18",
-        "pkg:cargo/ytserv@1.20.18"
+        "pkg:cargo/ytctl@1.21.3",
+        "pkg:cargo/ytserv@1.21.3"
       ]
     },
     {
@@ -12217,9 +12217,10 @@
       ]
     },
     {
-      "ref": "pkg:cargo/diff_doc@1.0.1",
+      "ref": "pkg:cargo/diff_doc@1.1.0",
       "dependsOn": [
         "pkg:cargo/bson@3.1.0",
+        "pkg:cargo/prost@0.14.4",
         "pkg:cargo/roxmltree@0.21.1",
         "pkg:cargo/rust-i18n@4.2.4",
         "pkg:cargo/serde-saphyr@2.0.0",
@@ -12377,7 +12378,7 @@
       "ref": "pkg:cargo/errno@0.3.14",
       "dependsOn": [
         "pkg:cargo/libc@0.2.191",
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.52.0"
       ]
     },
     {
@@ -13172,7 +13173,7 @@
       "dependsOn": [
         "pkg:cargo/hermit-abi@0.5.3",
         "pkg:cargo/libc@0.2.191",
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.52.0"
       ]
     },
     {
@@ -13381,7 +13382,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/marg@0.4.5",
+      "ref": "pkg:cargo/marg@0.4.7",
       "dependsOn": [
         "pkg:cargo/base64@0.23.1",
         "pkg:cargo/uuid@1.28.0"
@@ -14495,7 +14496,7 @@
         "pkg:cargo/pyo3@0.29.3",
         "pkg:cargo/rppd-common@0.2.4",
         "pkg:cargo/rust-i18n@4.2.4",
-        "pkg:cargo/schema_guard_tokio@2.3.0",
+        "pkg:cargo/schema_guard_tokio@2.4.2",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.154",
         "pkg:cargo/shims@0.1.0",
@@ -14695,7 +14696,7 @@
         "pkg:cargo/errno@0.3.14",
         "pkg:cargo/libc@0.2.191",
         "pkg:cargo/linux-raw-sys@0.12.1",
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.52.0"
       ]
     },
     {
@@ -14763,7 +14764,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/schema_guard@2.3.2",
+      "ref": "pkg:cargo/schema_guard@2.3.3",
       "dependsOn": [
         "pkg:cargo/base64@0.23.1",
         "pkg:cargo/chrono@0.4.45",
@@ -14774,7 +14775,7 @@
         "pkg:cargo/linked-hash-map@0.5.6",
         "pkg:cargo/md-5@0.11.0",
         "pkg:cargo/rust-i18n@4.2.4",
-        "pkg:cargo/schema_guard_tokio@2.3.0",
+        "pkg:cargo/schema_guard_tokio@2.4.2",
         "pkg:cargo/semver@1.0.28",
         "pkg:cargo/serde-saphyr@2.0.0",
         "pkg:cargo/serde@1.0.229",
@@ -14796,7 +14797,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/schema_guard_tokio@2.3.0",
+      "ref": "pkg:cargo/schema_guard_tokio@2.4.2",
       "dependsOn": [
         "pkg:cargo/lazy_static@1.5.1",
         "pkg:cargo/regex@1.13.1",
@@ -15546,10 +15547,10 @@
       "ref": "pkg:cargo/tempfile@3.27.0",
       "dependsOn": [
         "pkg:cargo/fastrand@2.5.0",
-        "pkg:cargo/getrandom@0.4.3",
+        "pkg:cargo/getrandom@0.3.4",
         "pkg:cargo/once_cell@1.21.4",
         "pkg:cargo/rustix@1.1.5",
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.52.0"
       ]
     },
     {
@@ -16330,7 +16331,7 @@
     {
       "ref": "pkg:cargo/winapi-util@0.1.11",
       "dependsOn": [
-        "pkg:cargo/windows-sys@0.61.2"
+        "pkg:cargo/windows-sys@0.52.0"
       ]
     },
     {
@@ -16546,11 +16547,20 @@
       ]
     },
     {
-      "ref": "pkg:cargo/ytcc@0.5.6",
-      "dependsOn": []
+      "ref": "pkg:cargo/yt-core-proto@1.21.0",
+      "dependsOn": [
+        "pkg:cargo/diff_doc@1.1.0",
+        "pkg:cargo/prost@0.14.4",
+        "pkg:cargo/rust-i18n@4.2.4",
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/tonic-prost-build@0.14.6",
+        "pkg:cargo/tonic-prost@0.14.6",
+        "pkg:cargo/tonic@0.14.6",
+        "pkg:cargo/uuid@1.28.0"
+      ]
     },
     {
-      "ref": "pkg:cargo/ytct@0.2.2",
+      "ref": "pkg:cargo/ytct@1.21.0",
       "dependsOn": [
         "pkg:cargo/base64@0.23.1",
         "pkg:cargo/prost@0.14.4",
@@ -16566,11 +16576,11 @@
         "pkg:cargo/tonic@0.14.6",
         "pkg:cargo/tower@0.5.3",
         "pkg:cargo/uuid@1.28.0",
-        "pkg:cargo/ytcc@0.5.6"
+        "pkg:cargo/yt-core-proto@1.21.0"
       ]
     },
     {
-      "ref": "pkg:cargo/ytctl@1.20.18",
+      "ref": "pkg:cargo/ytctl@1.21.3",
       "dependsOn": [
         "pkg:cargo/aes@0.9.3",
         "pkg:cargo/bb8-postgres@0.9.0",
@@ -16582,7 +16592,7 @@
         "pkg:cargo/hyper-util@0.1.21",
         "pkg:cargo/libc@0.2.191",
         "pkg:cargo/local-ip-address@0.6.13",
-        "pkg:cargo/marg@0.4.5",
+        "pkg:cargo/marg@0.4.7",
         "pkg:cargo/pem@4.0.0",
         "pkg:cargo/ratatui@0.30.2",
         "pkg:cargo/russh@0.65.0",
@@ -16600,12 +16610,11 @@
         "pkg:cargo/tui-textarea-2@0.13.2",
         "pkg:cargo/uuid@1.28.0",
         "pkg:cargo/whoami@2.1.3",
-        "pkg:cargo/ytcc@0.5.6",
-        "pkg:cargo/ytct@0.2.2"
+        "pkg:cargo/ytct@1.21.0"
       ]
     },
     {
-      "ref": "pkg:cargo/ytserv@1.20.18",
+      "ref": "pkg:cargo/ytserv@1.21.3",
       "dependsOn": [
         "pkg:cargo/async-trait@0.1.92",
         "pkg:cargo/base64@0.23.1",
@@ -16614,7 +16623,7 @@
         "pkg:cargo/chrono@0.4.45",
         "pkg:cargo/crc32fast@1.5.2",
         "pkg:cargo/diff_data@0.4.1",
-        "pkg:cargo/diff_doc@1.0.1",
+        "pkg:cargo/diff_doc@1.1.0",
         "pkg:cargo/dns-lookup@4.0.2",
         "pkg:cargo/etcds@0.24.0",
         "pkg:cargo/futures-util@0.3.34",
@@ -16627,7 +16636,7 @@
         "pkg:cargo/lazy_static@1.5.1",
         "pkg:cargo/libc@0.2.191",
         "pkg:cargo/local-ip-address@0.6.13",
-        "pkg:cargo/marg@0.4.5",
+        "pkg:cargo/marg@0.4.7",
         "pkg:cargo/md-5@0.11.0",
         "pkg:cargo/openssl@0.10.81",
         "pkg:cargo/opentelemetry-otlp@0.33.1",
@@ -16644,8 +16653,8 @@
         "pkg:cargo/rppd@0.2.20",
         "pkg:cargo/rust-i18n@4.2.4",
         "pkg:cargo/rustix@1.1.5",
-        "pkg:cargo/schema_guard@2.3.2",
-        "pkg:cargo/schema_guard_tokio@2.3.0",
+        "pkg:cargo/schema_guard@2.3.3",
+        "pkg:cargo/schema_guard_tokio@2.4.2",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.154",
         "pkg:cargo/shims@0.1.0",
@@ -16663,8 +16672,8 @@
         "pkg:cargo/tokio@1.54.1",
         "pkg:cargo/tracing-subscriber@0.3.23",
         "pkg:cargo/uuid@1.28.0",
-        "pkg:cargo/ytcc@0.5.6",
-        "pkg:cargo/ytct@0.2.2",
+        "pkg:cargo/yt-core-proto@1.21.0",
+        "pkg:cargo/ytct@1.21.0",
         "pkg:cargo/zeroize@1.9.1",
         "pkg:cargo/zip@9.1.0"
       ]

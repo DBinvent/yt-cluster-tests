@@ -5,28 +5,27 @@
 # than a whole run, or is outdated (new code passed since, and the newest run was all ok).
 # Only a green run counts. Rename or delete it and such a night measures again
 # (nightly/nightly.sh --coverage: now). ytserv's percent is the badge's.
-run: "20261106-120116"
-measured: "2026-11-06T15:47:37Z"
-version: {deb: "1.20.12", ytserv: "1.20.12"}
-source: "40acf8d+dirty"
+run: "20261120-043256"
+measured: "2026-11-20T09:30:36Z"
+version: {deb: "1.21.3", ytserv: "1.21.3"}
+source: "09e37df+dirty"
 result: pass
-suites: ["unit", "topology", "topology-py", "hier", "lxc", "migrate", "llm", "topo", "topo-faults", "topo-membership", "rmc", "jepsen"]
-lines: {total: 73766, covered: 57578, percent: 78.1}
+suites: ["unit", "topology", "topology-py", "hier", "lxc", "migrate", "llm", "topo", "topo-faults", "topo-membership", "rmc", "jepsen", "pgbench-m2m"]
+lines: {total: 99047, covered: 88824, percent: 89.7}
 # percent of those lines each part ran: the unit tests, the suites together, each suite
 by:
-  "unit": 51.3
-  "e2e": 48.7
-  "hier": 24.6
-  "llm": 12.0
-  "lxc": 12.5
-  "rmc": 25.2
-  "topo-faults": 29.2
-  "topo-membership": 25.8
-  "topo": 29.5
-  "topology-py": 21.8
-  "topology": 34.7
+  "unit": 80.4
+  "e2e": 35.6
+  "hier": 17.6
+  "llm": 8.6
+  "lxc": 9.2
+  "rmc": 19.5
+  "topo-faults": 20.7
+  "topo-membership": 18.5
+  "topo": 21.1
+  "topology-py": 15.5
+  "topology": 25.4
 crates:
-  - {name: "ytcluster-common", lines: 167, percent: 86.8, unit: 55.7, e2e: 47.3}
-  - {name: "ytcluster-types", lines: 1362, percent: 76.1, unit: 70.0, e2e: 35.8}
-  - {name: "ytctl", lines: 16067, percent: 42.6, unit: 29.9, e2e: 15.5}
-  - {name: "ytserv", lines: 56170, percent: 88.2, unit: 56.9, e2e: 58.5}
+  - {name: "ytcluster-types", lines: 1122, percent: 94.7, unit: 90.6, e2e: 31.1}
+  - {name: "ytctl", lines: 26938, percent: 78.0, unit: 75.4, e2e: 9.4}
+  - {name: "ytserv", lines: 70987, percent: 94.0, unit: 82.1, e2e: 45.6}

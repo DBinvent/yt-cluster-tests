@@ -125,7 +125,7 @@ else
 	         92_rppd.sh 93_etcd.sh 93b_etcd_upsert.sh 92c_rppd_cadence.sh 92b_rppd_breaker.sh 92d_rppd_shaper.sh 92e_rppd_test.sh 91_otel.sh 94_clickhouse.sh \
 	         97_mpp.sh 98_mpp_df.sh 98_skv_join.sh 29_concurrent.sh 29b_flags_ab.sh 29c_parallel_apply.sh \
 	         29d_shard_lease.sh 29e_unique_boundary.sh 29f_table_collision.sh 29g_composite_unique.sh \
-	         29h_foreign_key_boundary.sh 29i_keyless_rows.sh 29j_bson.sh 29k_composite_pk.sh 99_peer_stream.sh 25_cross_db.sh 26_stage.sh 33_identity.sh 37_delta_retry.sh; do
+	         29h_foreign_key_boundary.sh 29i_keyless_rows.sh 29j_bson.sh 29k_composite_pk.sh 29l_cluster_lock.sh 99_peer_stream.sh 25_cross_db.sh 26_stage.sh 33_identity.sh 37_delta_retry.sh; do
 		in_group "$t" && step "$t"
 	done
 

@@ -1870,3 +1870,326 @@
   published: null
   ab: "base cw 37.0/s ok, cwc 35.0/s ok, one-node 35.0/s ok | peer_stream cw 35.0/s ok, cwc 36.1/s ok | one_pc one-node 35.7/s ok, kill ok (row on every voter)"
   note: "not published: a suite failed"
+- run: "20261114-141604"
+  started: "2026-11-14T14:16:04Z"
+  finished: "2026-11-14T16:42:26Z"
+  minutes: 146
+  trigger: changes
+  changed: ["yt-cluster", "yt-cluster-lite"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "sge": "272bd66+dirty", "yt-cluster": "7ef1bc0+dirty", "yt-cluster-lite": "531c319+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "f11efd4+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.0", ytserv: "1.21.0", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 14}
+    - {name: release, result: pass, minutes: 101}
+    - {name: security-gate, result: pass, minutes: 3}
+    - {name: publish, result: pass, minutes: 4}
+  suites:
+    - {name: "unit", passed: 3023, failed: 0, minutes: 24, result: pass}
+  totals: {passed: 3023, failed: 0}
+  result: pass
+  published: {deb: "1.21", rpm: "1.21.0", tgz: "1.21.0", image: "dbinvent/yt:1.21.0"}
+- run: "20261115-050040"
+  started: "2026-11-15T05:00:40Z"
+  finished: "2026-11-15T09:31:14Z"
+  minutes: 271
+  trigger: changes
+  changed: ["ytcluster_ui"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "sge": "272bd66+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "27bc14a", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "2131131+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.1", ytserv: "1.21.1", bumped: true}
+  steps:
+    - {name: build, result: pass, minutes: 13}
+    - {name: release, result: fail, minutes: 7}
+  suites:
+    - {name: "unit", passed: 3023, failed: 0, minutes: 23, result: pass}
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 40, result: pass}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 2, result: pass}
+    - {name: "migrate", passed: 145, failed: 0, minutes: 31, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 9, result: pass}
+    - {name: "topo", passed: 474, failed: 0, minutes: 35, result: pass}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 16, result: pass}
+    - {name: "topology", passed: 1498, failed: 0, minutes: 147, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "rmc", passed: 1004, failed: 0, minutes: 36, result: pass}
+    - {name: "jepsen", passed: 4, failed: 0, minutes: 18, result: pass}
+    - {name: "pgbench-m2m", passed: 0, failed: 0, minutes: 45, result: pass}
+  totals: {passed: 7135, failed: 0}
+  result: fail
+  published: null
+  ab: "base cw 35.4/s ok, cwc 35.5/s ok, one-node 34.6/s ok | peer_stream cw 33.7/s ok, cwc 35.1/s ok | one_pc one-node 34.4/s ok, kill ok (row on every voter)"
+  note: "tested green, but the release build or the publish failed"
+- run: "20261116-050037"
+  started: "2026-11-16T05:00:37Z"
+  finished: "2026-11-16T10:57:44Z"
+  minutes: 357
+  trigger: changes
+  changed: ["ytcluster_ui"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "82bbf56+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "2131131+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.1", ytserv: "1.21.1", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 12}
+    - {name: release, result: pass, minutes: 86}
+    - {name: security-gate, result: pass, minutes: 2}
+    - {name: publish, result: pass, minutes: 4}
+  suites:
+    - {name: "unit", passed: 3023, failed: 0, minutes: 23, result: pass}
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 42, result: pass}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 2, result: pass}
+    - {name: "migrate", passed: 145, failed: 0, minutes: 31, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 9, result: pass}
+    - {name: "topo", passed: 474, failed: 0, minutes: 35, result: pass}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 16, result: pass}
+    - {name: "topology", passed: 1498, failed: 0, minutes: 147, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "rmc", passed: 1006, failed: 0, minutes: 36, result: pass}
+    - {name: "jepsen", passed: 4, failed: 0, minutes: 18, result: pass}
+    - {name: "pgbench-m2m", passed: 0, failed: 0, minutes: 45, result: pass}
+  totals: {passed: 7137, failed: 0}
+  result: pass
+  published: {deb: "1.21", rpm: "1.21.1", tgz: "1.21.1", image: "dbinvent/yt:1.21.1"}
+  ab: "base cw 35.0/s ok, cwc 35.2/s ok, one-node 34.0/s ok | peer_stream cw 34.8/s ok, cwc 34.5/s ok | one_pc one-node 31.8/s ok, kill ok (row on every voter)"
+- run: "20261117-050044"
+  started: "2026-11-17T05:00:44Z"
+  finished: "2026-11-17T10:56:28Z"
+  minutes: 356
+  trigger: changes
+  changed: ["yt-cluster"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "82bbf56+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.2", ytserv: "1.21.2", bumped: true}
+  steps:
+    - {name: build, result: pass, minutes: 10}
+    - {name: release, result: pass, minutes: 89}
+    - {name: security-gate, result: pass, minutes: 2}
+    - {name: publish, result: pass, minutes: 4}
+  suites:
+    - {name: "unit", passed: 3033, failed: 0, minutes: 23, result: pass}
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 41, result: pass}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 2, result: pass}
+    - {name: "migrate", passed: 145, failed: 0, minutes: 31, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 9, result: pass}
+    - {name: "topo", passed: 474, failed: 0, minutes: 35, result: pass}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 16, result: pass}
+    - {name: "topology", passed: 1498, failed: 0, minutes: 148, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "rmc", passed: 1006, failed: 0, minutes: 36, result: pass}
+    - {name: "jepsen", passed: 4, failed: 0, minutes: 18, result: pass}
+    - {name: "pgbench-m2m", passed: 0, failed: 0, minutes: 45, result: pass}
+  totals: {passed: 7147, failed: 0}
+  result: pass
+  published: {deb: "1.21", rpm: "1.21.2", tgz: "1.21.2", image: "dbinvent/yt:1.21.2"}
+  ab: "base cw 34.2/s ok, cwc 36.7/s ok, one-node 34.9/s ok | peer_stream cw 34.7/s ok, cwc 34.4/s ok | one_pc one-node 36.6/s ok, kill ok (row on every voter)"
+- run: "20261118-050045"
+  started: "2026-11-18T05:00:45Z"
+  finished: "2026-11-18T08:04:49Z"
+  minutes: 184
+  trigger: coverage
+  changed: []
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "82bbf56+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.2", ytserv: "1.21.2", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 10}
+    - {name: coverage-build, result: pass, minutes: 16}
+  suites:
+    - {name: "unit", passed: 2940, failed: 0, minutes: 25, result: pass}
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 42, result: pass}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 2, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 9, result: pass}
+    - {name: "topo", passed: 474, failed: 0, minutes: 35, result: pass}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 15, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "topology", passed: 1497, failed: 1, minutes: 145, result: fail}
+    - {name: "rmc", passed: 1004, failed: 0, minutes: 36, result: pass}
+  totals: {passed: 6902, failed: 1}
+  result: fail
+  published: null
+  ab: "base cw 34.5/s ok, cwc 35.8/s ok, one-node 35.3/s ok | peer_stream cw 34.2/s ok, cwc 35.7/s ok | one_pc one-node 36.1/s ok, kill ok (row on every voter)"
+  note: "a suite failed while measuring; coverage not counted: a suite failed"
+- run: "20261118-131425"
+  started: "2026-11-18T13:14:25Z"
+  finished: "2026-11-18T16:16:31Z"
+  minutes: 182
+  trigger: coverage
+  changed: []
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "82bbf56+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.2", ytserv: "1.21.2", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 10}
+    - {name: coverage-build, result: pass, minutes: 9}
+    - {name: coverage, result: pass, minutes: 3}
+  suites:
+    - {name: "unit", passed: 2940, failed: 0, minutes: 23, result: pass}
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 42, result: pass}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 3, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 9, result: pass}
+    - {name: "topo", passed: 474, failed: 0, minutes: 36, result: pass}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 16, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "topology", passed: 1498, failed: 0, minutes: 147, result: pass}
+    - {name: "rmc", passed: 1004, failed: 0, minutes: 36, result: pass}
+  totals: {passed: 6903, failed: 0}
+  result: pass
+  coverage: 67.8
+  published: null
+  ab: "base cw 34.6/s ok, cwc 36.8/s ok, one-node 34.6/s ok | peer_stream cw 33.3/s ok, cwc 35.0/s ok | one_pc one-node 36.6/s ok, kill ok (row on every voter)"
+  note: "tested green; a run for coverage alone publishes nothing; coverage 67.8% of yt-cluster's lines, ytserv 70.0% (on the badge) (nightly/coverage.yaml)"
+- run: "20261119-050041"
+  started: "2026-11-19T05:00:41Z"
+  finished: "2026-11-19T09:31:30Z"
+  minutes: 271
+  trigger: changes
+  changed: ["yt-cluster"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "82bbf56+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.3", ytserv: "1.21.3", bumped: true}
+  steps:
+    - {name: build, result: pass, minutes: 11}
+  suites:
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 42, result: pass}
+    - {name: "unit", passed: 4363, failed: 44, minutes: 42, result: fail}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 2, result: pass}
+    - {name: "migrate", passed: 145, failed: 0, minutes: 33, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 22, result: pass}
+    - {name: "topo", passed: 0, failed: 1, minutes: 19, result: fail}
+    - {name: "topology", passed: 1497, failed: 0, minutes: 146, result: pass}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 25, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "rmc", passed: 1006, failed: 0, minutes: 36, result: pass}
+    - {name: "jepsen", passed: 4, failed: 0, minutes: 18, result: pass}
+    - {name: "pgbench-m2m", passed: 0, failed: 0, minutes: 45, result: pass}
+  totals: {passed: 8002, failed: 45}
+  result: fail
+  published: null
+  ab: "base cw 34.3/s ok, cwc 34.7/s ok, one-node 33.5/s ok | peer_stream cw 35.2/s ok, cwc 35.9/s ok | one_pc one-node 32.5/s ok, kill ok (row on every voter)"
+  note: "not published: a suite failed"
+- run: "20261119-123732"
+  started: "2026-11-19T12:37:32Z"
+  finished: "2026-11-19T18:54:57Z"
+  minutes: 377
+  trigger: changes
+  changed: ["yt-cluster"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "82bbf56+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.3", ytserv: "1.21.3", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 2}
+    - {name: release, result: pass, minutes: 105}
+    - {name: security-gate, result: fail, minutes: 3}
+  suites:
+    - {name: "unit", passed: 4387, failed: 0, minutes: 36, result: pass}
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 43, result: pass}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 5, result: pass}
+    - {name: "migrate", passed: 145, failed: 0, minutes: 36, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 10, result: pass}
+    - {name: "topo", passed: 474, failed: 0, minutes: 35, result: pass}
+    - {name: "topology", passed: 1498, failed: 0, minutes: 148, result: pass}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 16, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "rmc", passed: 1006, failed: 0, minutes: 36, result: pass}
+    - {name: "jepsen", passed: 4, failed: 0, minutes: 22, result: pass}
+    - {name: "pgbench-m2m", passed: 0, failed: 0, minutes: 46, result: pass}
+  totals: {passed: 8501, failed: 0}
+  result: fail
+  published: null
+  ab: "base cw 34.2/s ok, cwc 34.5/s ok, one-node 34.9/s ok | peer_stream cw 34.1/s ok, cwc 34.5/s ok | one_pc one-node 37.4/s ok, kill ok (row on every voter)"
+  note: "tested green, but nothing published: the security check before the publish stopped it (security-gate.log) - the next run tries again"
+- run: "20261119-185727"
+  started: "2026-11-19T18:57:27Z"
+  finished: "2026-11-20T00:10:51Z"
+  minutes: 313
+  trigger: changes
+  changed: ["yt-cluster"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "82bbf56+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.3", ytserv: "1.21.3", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 26}
+  suites:
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 41, result: pass}
+    - {name: "unit", passed: 4387, failed: 0, minutes: 41, result: pass}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 2, result: pass}
+    - {name: "migrate", passed: 145, failed: 0, minutes: 31, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 9, result: pass}
+    - {name: "topology", passed: 1496, failed: 2, minutes: 146, result: fail}
+    - {name: "topo", passed: 436, failed: 42, minutes: 68, result: fail}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 16, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "rmc", passed: 1006, failed: 0, minutes: 36, result: pass}
+    - {name: "jepsen", passed: 4, failed: 0, minutes: 19, result: pass}
+    - {name: "pgbench-m2m", passed: 0, failed: 0, minutes: 46, result: pass}
+  totals: {passed: 8461, failed: 44}
+  result: fail
+  published: null
+  ab: "base cw 34.5/s ok, cwc 35.7/s ok, one-node 32.6/s ok | peer_stream cw 33.6/s ok, cwc 35.8/s ok | one_pc one-node 33.6/s ok, kill ok (row on every voter)"
+  note: "not published: a suite failed"
+- run: "20261120-004148"
+  started: "2026-11-20T00:41:48Z"
+  finished: "2026-11-20T04:32:15Z"
+  minutes: 230
+  trigger: changes
+  changed: ["yt-cluster-lite"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "cadd1fc+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.3", ytserv: "1.21.3", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 50}
+    - {name: release, result: pass, minutes: 129}
+    - {name: security-gate, result: fail, minutes: 4}
+  suites:
+    - {name: "unit", passed: 4389, failed: 0, minutes: 48, result: pass}
+  totals: {passed: 4389, failed: 0}
+  result: fail
+  published: null
+  note: "tested green, but nothing published: the security check before the publish stopped it (security-gate.log) - the next run tries again"
+- run: "20261120-043256"
+  started: "2026-11-20T04:32:56Z"
+  finished: "2026-11-20T11:25:34Z"
+  minutes: 413
+  trigger: changes
+  changed: ["security-gate"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "cadd1fc+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.3", ytserv: "1.21.3", bumped: false}
+  steps:
+    - {name: build, result: pass, minutes: 26}
+    - {name: coverage-build, result: pass, minutes: 16}
+    - {name: coverage, result: pass, minutes: 2}
+    - {name: release, result: pass, minutes: 105}
+    - {name: security-gate, result: pass, minutes: 4}
+    - {name: publish, result: pass, minutes: 5}
+  suites:
+    - {name: "topology-py", passed: 347, failed: 0, minutes: 41, result: pass}
+    - {name: "unit", passed: 4294, failed: 0, minutes: 45, result: pass}
+    - {name: "hier", passed: 111, failed: 0, minutes: 9, result: pass}
+    - {name: "lxc", passed: 99, failed: 0, minutes: 2, result: pass}
+    - {name: "migrate", passed: 145, failed: 0, minutes: 31, result: pass}
+    - {name: "llm", passed: 101, failed: 0, minutes: 9, result: pass}
+    - {name: "topo", passed: 474, failed: 0, minutes: 36, result: pass}
+    - {name: "topo-faults", passed: 200, failed: 0, minutes: 16, result: pass}
+    - {name: "topology", passed: 1498, failed: 0, minutes: 147, result: pass}
+    - {name: "topo-membership", passed: 129, failed: 0, minutes: 9, result: pass}
+    - {name: "rmc", passed: 1006, failed: 0, minutes: 36, result: pass}
+    - {name: "jepsen", passed: 4, failed: 0, minutes: 20, result: pass}
+    - {name: "pgbench-m2m", passed: 0, failed: 0, minutes: 47, result: pass}
+  totals: {passed: 8408, failed: 0}
+  result: pass
+  coverage: 89.7
+  published: {deb: "1.21", rpm: "1.21.3", tgz: "1.21.3", image: "dbinvent/yt:1.21.3"}
+  ab: "base cw 35.8/s ok, cwc 35.6/s ok, one-node 35.2/s ok | peer_stream cw 34.0/s ok, cwc 36.4/s ok | one_pc one-node 33.7/s ok, kill ok (row on every voter)"
+  note: "coverage 89.7% of yt-cluster's lines, ytserv 94.0% (on the badge) (nightly/coverage.yaml)"
+- run: "20261122-040050"
+  started: "2026-11-22T04:00:50Z"
+  finished: "2026-11-22T04:20:45Z"
+  minutes: 20
+  trigger: changes
+  changed: ["etcd", "yt-cluster", "ytproxy"]
+  sources: {"etcd": "ef49b90+dirty", "infra_apt": "3f9faf6", "rppd": "ce0f282+dirty", "yt-cluster": "09e37df+dirty", "yt-cluster-lite": "cadd1fc+dirty", "ytcluster_dist": "46f2282+dirty", "ytcluster_ui": "d8f22c2+dirty", "ytproxy": "e898ea8+dirty"}
+  version: {deb: "1.21.4", ytserv: "1.21.4", bumped: true}
+  steps:
+    - {name: build, result: fail, minutes: 20}
+  suites: []
+  totals: {passed: 0, failed: 0}
+  result: fail
+  published: null
+  note: "the build failed - no suite ran"

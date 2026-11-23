@@ -1,0 +1,28 @@
+[package]
+name = "labac-host"
+version = "0.1.0"
+edition = "2021"
+description = "The host program of the labac login environment (yt-cluster-tests/labac): signon's labac behind an OIDC sign-in"
+license = "MIT"
+publish = false
+
+# a project of its own: nothing above it is a workspace
+[workspace]
+
+[dependencies]
+# the accounts, the mapping rules, the ACL and the token; `oauth` for the id_token check (a JWKS);
+# `service-accounts` for its table alone: ytproxy reads the service accounts with the ACL, and
+# without the table reads neither
+signon = { version = "1.1", default-features = false, features = ["labac", "service-accounts", "oauth", "jwt-rust-crypto"] }
+# the test schema's deploy with its `security` declarations, and the loader the schema map is made with
+schema_guard_tokio = "2.5"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+tokio-postgres = "0.7"
+axum = "0.8"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+uuid = { version = "1", features = ["v4"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

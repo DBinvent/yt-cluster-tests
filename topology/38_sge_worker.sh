@@ -84,6 +84,17 @@ psql -X -tAq -v ON_ERROR_STOP=1 -d $YX_DB 2>&1" 2>&1 || true
 # docker's too: a statement sent to a node that is down or paused is no acknowledged write
 err_of() { printf '%s\n' "$1" | { grep -m1 -E 'ERROR:|FATAL:|PANIC:|psql: error|server closed the connection|Error response from daemon|is not running|is paused' || true; }; }
 cw() { err_of "$(qx "$1" "begin; $2; select yt_complete(true); commit;")"; }
+# [W10] a write of the nemesis writer: "ok" when psql said no error AND ended with 0, "unknown"
+# when it said none but did not end with 0 - a docker exec killed with its container ends 137
+# with nothing said, and was counted acknowledged, though no client was told it committed
+# (nightly 2026-11-18, W10d's one lost write); else the error
+cw_ack() {
+	local out rc
+	out="$(printf '%s\n' "begin; $2; select yt_complete(true); commit;" | rh "docker exec -i -u postgres \
+-e PGOPTIONS='-c lock_timeout=30s -c statement_timeout=60s' $1 psql -X -tAq -v ON_ERROR_STOP=1 -d $YX_DB 2>&1" 2>&1)"; rc=$?
+	out="$(err_of "$out")"
+	if [ -n "$out" ]; then printf '%s' "$out"; elif [ "$rc" = 0 ]; then printf 'ok'; else printf 'unknown rc=%s' "$rc"; fi
+}
 cfg_put() { # cfg_put <name> <value>: through the sync path -> "" or the error
 	cw "$L" "delete from $YX_CFG where module='C' and name='$1'; insert into $YX_CFG (name,module,value) values ('$1','C','$2')"
 }
@@ -360,7 +371,11 @@ O="${FOLLOWERS[0]}"; F="${FOLLOWERS[1]}"; G="${FOLLOWERS[2]}"; H="${FOLLOWERS[3]
 	while [ ! -e "$TMP/stop" ]; do
 		id=$((id + 1))
 		n="${VOTERS[$((id % ${#VOTERS[@]}))]}"
-		if [ -z "$(cw "$n" "insert into $LOAD (id, v) values ($id, 'w$id')")" ]; then echo "$id" >> "$TMP/acked"; fi
+		r="$(cw_ack "$n" "insert into $LOAD (id, v) values ($id, 'w$id')")"
+		case "$r" in
+			ok) echo "$id $n $(date +%T)" >> "$TMP/acked" ;;
+			unknown*) echo "$id $n $(date +%T) $r" >> "$TMP/unknown" ;;
+		esac
 		sleep 0.3
 	done
 ) &
@@ -397,7 +412,11 @@ d="x"
 for ((i = 0; i < 240; i += 5)); do d="$(differing "$digest")"; [ -z "$d" ] && break; sleep 5; done
 [ -z "$d" ] && ok "W10c every node holds the same rows" || bad "W10c the rows differ:$d"
 have="$(q "$L" "select id from $LOAD")"
-lost="$(sort -n "$TMP/acked" 2>/dev/null | while read -r a; do printf '%s\n' "$have" | grep -qx "$a" || echo "$a"; done | wc -l)"
+lost_ids="$(sort -n "$TMP/acked" 2>/dev/null | while read -r a rest; do printf '%s\n' "$have" | grep -qx "$a" || echo "$a $rest"; done)"
+lost="$(printf '%s' "$lost_ids" | grep -c . || true)"
+# [W10] which write, sent to which node, when - and the writes no client was told about
+[ -z "$lost_ids" ] || echo "  lost (id node time): $(printf '%s\n' "$lost_ids" | paste -sd';' -)"
+[ ! -s "$TMP/unknown" ] || echo "  outcome unknown, not counted: $(wc -l < "$TMP/unknown") - $(cut -d' ' -f1-3 "$TMP/unknown" | paste -sd',' -)"
 check "W10d no acknowledged write lost" "0" "$lost"
 
 # the helpers for sources the nodes do not share

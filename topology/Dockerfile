@@ -26,14 +26,20 @@ ENV DEBIAN_FRONTEND=noninteractive
 #   to git, so without them a git-sourced function or migration fails with
 #   "is git installed and on PATH?" - and neither had ever been exercised here.
 # iproute2: the split-brain and partition tests cut a node off at the network.
-RUN apt-get update -q && apt-get install -qy --no-install-recommends \
+# [apt-retry] the archive drops connections and answers 522 now and then (nightly 2026-11-19,
+# three runs): each download retried, and apt-get-update tries the index again - from the
+# third failure on a mirror
+RUN printf 'Acquire::Retries "8";\nAcquire::http::Timeout "60";\n' > /etc/apt/apt.conf.d/80-retries \
+    && printf '%s\n' '#!/bin/sh' 'for i in 1 2 3 4 5 6; do' 'apt-get update "$@" && exit 0' '[ $i -lt 3 ] || sed -i -e "s#http://[a-z.]*archive.ubuntu.com#http://mirrors.kernel.org#g" /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null' 'sleep 20' 'done' 'exit 1' > /usr/local/bin/apt-get-update \
+    && chmod 755 /usr/local/bin/apt-get-update
+RUN apt-get-update -q && apt-get install -qy --no-install-recommends \
         ca-certificates curl gnupg git openssh-client iproute2 \
     && install -d /usr/share/postgresql-common/pgdg \
     && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
         https://www.postgresql.org/media/keys/ACCC4CF8.asc \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
 https://apt.postgresql.org/pub/repos/apt noble-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
-    && apt-get update -q \
+    && apt-get-update -q \
     && apt-get install -qy --no-install-recommends postgresql-18 postgresql-client-18 \
         libpython3.12-stdlib python3-psycopg2 python3-etcd3 python3-pip
 # The python the server functions run in is ytserv's embedded 3.12, and it reads
@@ -65,7 +71,7 @@ COPY yt-cluster.deb /tmp/yt-cluster.deb
 # version and the fetch 404s - measured: `libcurl4t64_8.18.0-1ubuntu2.5 404 Not
 # Found`, on an image that had built fine for weeks. The layer that installs must
 # refresh the index it installs against, or the build has a silent expiry date.
-RUN apt-get update -q \
+RUN apt-get-update -q \
     && apt-get install -qy /tmp/yt-cluster.deb libexpat1 \
     && rm -f /tmp/yt-cluster.deb && rm -rf /var/lib/apt/lists/*
 # The python stdlib the deb now REQUIRES has to actually be there, or server
